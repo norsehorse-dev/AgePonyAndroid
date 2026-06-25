@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    PrivacyInfo.xcprivacy
+    AgePony
+    Created by NorseHorse
+
+    Privacy Manifest required by Apple for App Store submissions since
+    mid-2024. Declares:
+      • NSPrivacyTracking = false — AgePony does not track users.
+      • NSPrivacyTrackingDomains = [] — no domains are used for tracking.
+      • NSPrivacyCollectedDataTypes = [] — AgePony collects no user data.
+      • NSPrivacyAccessedAPITypes — required-reason API usage with codes
+        from Apple's published list.
+
+    Required-reason API codes (per Apple's documentation):
+      • C617.1 — File timestamp APIs used to implement app functionality.
+      • CA92.1 — User defaults to read/write app's own state.
+      • E174.1 — Disk space APIs used to check before writing a file.
+      • 35F9.1 — System boot time used to measure elapsed time in-app.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>E174.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>35F9.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
