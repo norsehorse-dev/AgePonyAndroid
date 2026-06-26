@@ -603,3 +603,87 @@ and touch-only), then confirm each appears in the list with the right type label
 ### Next
 - P7b: SignScreen and VerifyScreen (driving FileSigner / FileVerifier), surfaced from the
   Files tab, with the trusted / valid-unknown / invalid result states.
+
+## Phase P7b — Sign / Verify screens (app)
+
+Adds the Sign and Verify flows to the Files tab, driving the P6 services. This completes the
+2.0 signing feature set in the UI. Version stays 1.0 / 3.
+
+### What this phase does
+- Sign: pick a file, choose a signing-capable identity (SSH Ed25519, hardware key, or
+  security key), and sign through `FileSigner`. Security keys prompt for a PIN via the mounted
+  `SecurityKeyPinPrompt`; auth-required hardware keys prompt biometrics. The armored detached
+  signature is saved as `<name>.sig`.
+- Verify: pick the original file and its `.sig`, run `FileVerifier` against the vault's
+  identities, and show one of three states: Trusted (names the signer), Valid / unknown signer,
+  or Invalid (with the reason).
+- The Files home gains Sign and Verify buttons alongside Encrypt and Decrypt.
+
+### Files added
+- `app/src/main/java/com/agepony/app/ui/files/SignFlow.kt` (new)
+- `app/src/main/java/com/agepony/app/ui/files/VerifyFlow.kt` (new)
+
+### Files edited
+- `app/src/main/java/com/agepony/app/ui/files/FilesScreen.kt` — SIGN / VERIFY modes and buttons.
+- `app/src/main/java/com/agepony/app/ui/files/EncryptFlow.kt` — `ErrorText` and `queryNameSize`
+  promoted from private to internal so the new flows reuse them.
+
+### Validation
+UI only; the compile is the check. The underlying sign/verify logic is already covered by
+`FileVerifierTest` (P6) and the SSHSIG envelope tests (P1). Device checkpoint: sign a file with
+each identity type and verify it in-app, confirming the trusted vs valid-unknown vs invalid
+states and that `ssh-keygen -Y verify -n agepony` agrees.
+
+### Next
+- P7 is complete (identity generation in P7a, Sign / Verify here). Next is P8: open-sourcing
+  prep and the security sweep.
+
+## Phase P8 — Open-sourcing prep + security sweep (Section 7)
+
+Prepares the repo for a public release. Version stays 1.0 / 3.
+
+### Security sweep (clean)
+- No hardcoded keys, tokens, passwords, or certificates in app or core; the only
+  "BEGIN ... PRIVATE KEY" hits are PEM format markers in the SSH parser, not secrets.
+  Tests use public vectors only.
+- No logging in non-test main code (no `Log.` / `println`).
+- No dev-only email in source (public contact is NorseHorse@norsehor.se).
+- No google-services.json / Firebase / GMS, and no proprietary Play dependency in the app
+  build (the in-app review library is gone).
+- The two secret files at the repo root (`agepony-upload.jks`, `keystore.properties`) are now
+  covered by `.gitignore`.
+
+### Files added
+- `LICENSE` (Apache-2.0)
+- `NOTICE`
+
+### Files edited / replaced
+- `.gitignore` — now ignores `*.jks`, `*.keystore`, `*.p12`, `keystore.properties`, `*.env`,
+  `.idea/`, `.kotlin/`, `build/`, `.gradle/`, `local.properties`, `captures/`, `*.iml`.
+- `README.md` — replaced the old phase-deploy note with a real project README describing the
+  app and the `agepony-core` module, build and interop instructions, and the license.
+- `app/src/main/java/com/agepony/app/ui/settings/SettingsScreen.kt` — adds a Source code link
+  to the GitHub repo and a PGPony link in the About section.
+
+### Important before publishing
+`agepony-upload.jks` and `keystore.properties` must not be committed. They are now in
+`.gitignore`, but if they were ever added to git history, untrack them with
+`git rm --cached agepony-upload.jks keystore.properties` before pushing, since `.gitignore`
+does not remove already-tracked files.
+
+### Note for the RelayPony F-Droid submission
+Pushing this AgePony update does not affect the in-flight RelayPony submission: RelayPony pins
+AgePony as a git submodule at a fixed commit, so F-Droid builds it against that pinned commit,
+not AgePony's new HEAD. Only add commits (no history rewrite that orphans the pinned commit),
+and don't bump RelayPony's submodule until its MR is settled. The signing work adds no
+F-Droid-banned dependencies (biometric, NFC, Bouncy Castle are all FOSS).
+
+### Next
+- P9: F-Droid submission for AgePony (Section 8).
+
+## Version bump — 2.0.0 / versionCode 4
+
+With the signing track complete (P1 through P8), bumped `versionName` from 1.0 to 2.0.0 and
+`versionCode` from 3 to 4 in `app/build.gradle.kts`. This is the first 2.0 release: age
+encryption plus SSHSIG signing with software, hardware, and FIDO security keys, and multi-file
+tar bundling. Release AAB is signed with the existing upload keystore.
