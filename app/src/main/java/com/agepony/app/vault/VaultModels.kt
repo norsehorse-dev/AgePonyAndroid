@@ -21,8 +21,27 @@ import kotlinx.serialization.Serializable
 enum class StoredIdentityType {
     @SerialName("x25519") X25519,
     @SerialName("sshEd25519") SSH_ED25519,
-    @SerialName("sshRSA") SSH_RSA
+    @SerialName("sshRSA") SSH_RSA,
+    @SerialName("hardwareKey") HARDWARE_KEY,
+    @SerialName("skEd25519") SK_ED25519,
+    @SerialName("skEcdsaP256") SK_ECDSA_P256
 }
+
+/**
+ * Signing-only identity types cannot decrypt or be used as encryption recipients. A
+ * hardware key holds a non-exportable EC P-256 signing key in the Keystore; it has no
+ * decryption capability. Kept as an extension so every recipient/decrypt path can filter
+ * on it, and so new signing-only types (the sk-* security keys in P3) join here.
+ */
+val StoredIdentityType.isSigningOnly: Boolean
+    get() = when (this) {
+        StoredIdentityType.X25519 -> false
+        StoredIdentityType.SSH_ED25519 -> false
+        StoredIdentityType.SSH_RSA -> false
+        StoredIdentityType.HARDWARE_KEY -> true
+        StoredIdentityType.SK_ED25519 -> true
+        StoredIdentityType.SK_ECDSA_P256 -> true
+    }
 
 @Serializable
 enum class StoredRecipientType {
@@ -57,6 +76,11 @@ data class StoredIdentity(
     val publicKeyB64: String,
     val privateKeyB64: String,
     val sshComment: String? = null,
+    /**
+     * For HARDWARE_KEY identities: the AndroidKeyStore alias holding the non-exportable
+     * private key. Null for software identities whose private material is in privateKeyB64.
+     */
+    val keystoreAlias: String? = null,
     val createdAt: Long
 )
 

@@ -6,6 +6,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.security.Signature
 import java.util.concurrent.Executor
 import javax.crypto.Cipher
 import kotlin.coroutines.resume
@@ -82,6 +83,51 @@ object BiometricGate {
         if (subtitle != null) infoBuilder.setSubtitle(subtitle)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             // A negative button is required when DEVICE_CREDENTIAL is not allowed.
+            infoBuilder.setNegativeButtonText("Cancel")
+        }
+
+        prompt.authenticate(infoBuilder.build(), cryptoObject)
+    }
+
+    /**
+     * Signature variant of [authenticate]. Shows the system biometric prompt and suspends
+     * until it resolves, returning the authenticated [Signature] (the one inside
+     * [cryptoObject]) so the caller can `update`/`sign`. Used by hardware-backed SSHSIG
+     * signing keys. Throws [BiometricGateException] on error or cancellation.
+     */
+    suspend fun authenticateSignature(
+        activity: FragmentActivity,
+        title: String,
+        subtitle: String?,
+        cryptoObject: BiometricPrompt.CryptoObject
+    ): Signature = suspendCancellableCoroutine { cont ->
+        val executor: Executor = ContextCompat.getMainExecutor(activity)
+        val callback = object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                val signature = result.cryptoObject?.signature
+                if (!cont.isActive) return
+                if (signature != null) {
+                    cont.resume(signature)
+                } else {
+                    cont.resumeWithException(
+                        BiometricGateException(-1, "Authentication returned no signature")
+                    )
+                }
+            }
+
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                if (cont.isActive) {
+                    cont.resumeWithException(BiometricGateException(errorCode, errString.toString()))
+                }
+            }
+        }
+
+        val prompt = BiometricPrompt(activity, executor, callback)
+        val infoBuilder = BiometricPrompt.PromptInfo.Builder()
+            .setTitle(title)
+            .setAllowedAuthenticators(allowedAuthenticators())
+        if (subtitle != null) infoBuilder.setSubtitle(subtitle)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             infoBuilder.setNegativeButtonText("Cancel")
         }
 

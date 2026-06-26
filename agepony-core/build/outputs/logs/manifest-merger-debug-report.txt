@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest6821624462108129481.xml:2:13-83
+INJECTED from /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest6821624462108129481.xml:2:13-83
+	package
+		INJECTED from /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest6821624462108129481.xml
+	xmlns:android
+		ADDED from /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest6821624462108129481.xml:2:23-81
+uses-sdk
+INJECTED from /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest6821624462108129481.xml reason: use-sdk injection requested
+INJECTED from /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest6821624462108129481.xml
+INJECTED from /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest6821624462108129481.xml
+	android:targetSdkVersion
+		INJECTED from /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest6821624462108129481.xml
+	android:minSdkVersion
+		INJECTED from /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest6821624462108129481.xml

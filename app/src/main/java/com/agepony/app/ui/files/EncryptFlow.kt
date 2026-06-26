@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.Vault
+import com.agepony.core.archive.TarArchive
 import com.agepony.core.recipients.AgeRecipient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -55,6 +56,7 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
     var sourceBytes by remember { mutableStateOf<ByteArray?>(null) }
     var sourceName by remember { mutableStateOf("file") }
     var sourceSize by remember { mutableStateOf(0L) }
+    var bundleCount by remember { mutableStateOf(0) }
     var recipients by remember { mutableStateOf<List<AgeRecipient>>(emptyList()) }
     var passphrase by remember { mutableStateOf<String?>(null) }
     var armor by remember { mutableStateOf(true) }
@@ -63,23 +65,42 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
     var savedName by remember { mutableStateOf<String?>(null) }
 
     val openInput = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
         error = null
         scope.launch {
             try {
-                val (name, size) = withContext(Dispatchers.IO) { queryNameSize(context, uri) }
-                val bytes = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                        ?: throw IllegalStateException("Couldn't open the file.")
+                if (uris.size == 1) {
+                    val uri = uris.first()
+                    val (name, size) = withContext(Dispatchers.IO) { queryNameSize(context, uri) }
+                    val bytes = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            ?: throw IllegalStateException("Couldn't open the file.")
+                    }
+                    sourceName = name
+                    sourceSize = if (size > 0) size else bytes.size.toLong()
+                    sourceBytes = bytes
+                    bundleCount = 1
+                } else {
+                    val tar = withContext(Dispatchers.IO) {
+                        val used = HashSet<String>()
+                        val entries = uris.map { uri ->
+                            val name = queryNameSize(context, uri).first
+                            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                                ?: throw IllegalStateException("Couldn't open one of the files.")
+                            TarArchive.Entry(uniqueName(name, used), bytes)
+                        }
+                        TarArchive.create(entries)
+                    }
+                    sourceName = "bundle.tar"
+                    sourceSize = tar.size.toLong()
+                    sourceBytes = tar
+                    bundleCount = uris.size
                 }
-                sourceName = name
-                sourceSize = if (size > 0) size else bytes.size.toLong()
-                sourceBytes = bytes
                 stage = EncryptStage.CONFIGURE
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't read the file."
+                error = e.message ?: "Couldn't read the files."
             }
         }
     }
@@ -108,7 +129,7 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
     }
 
     fun reset() {
-        sourceBytes = null; sourceName = "file"; sourceSize = 0L
+        sourceBytes = null; sourceName = "file"; sourceSize = 0L; bundleCount = 0
         recipients = emptyList(); passphrase = null; armor = true
         outputBytes = null; savedName = null; error = null
         stage = EncryptStage.PICK
@@ -122,13 +143,14 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
             ) {
                 Text("Encrypt a file", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                 Text(
-                    "Pick any file. The encrypted result gets a .age extension and can be shared anywhere.",
+                    "Pick one or more files. Several files are bundled into a single .tar before " +
+                        "encryption; the result gets a .age extension and can be shared anywhere.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (error != null) ErrorText(error!!)
                 Button(onClick = { vault.autoLockSuppressed = true; openInput.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Pick a file…")
+                    Text("Pick files…")
                 }
                 TextButton(onClick = onClose) { Text("Cancel") }
             }
@@ -140,9 +162,12 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 Text("Encrypt a file", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
 
                 Text("Source", style = MaterialTheme.typography.titleSmall)
-                Text(sourceName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (bundleCount > 1) "$bundleCount files → bundle.tar" else sourceName,
+                    style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
                 Text(humanSize(sourceSize), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = { vault.autoLockSuppressed = true; openInput.launch(arrayOf("*/*")) }) { Text("Change file") }
+                TextButton(onClick = { vault.autoLockSuppressed = true; openInput.launch(arrayOf("*/*")) }) { Text("Change files") }
 
                 HorizontalDivider()
 
@@ -265,6 +290,20 @@ private fun queryNameSize(context: Context, uri: Uri): Pair<String, Long> {
         }
     }
     return name to size
+}
+
+private fun uniqueName(name: String, used: MutableSet<String>): String {
+    val safe = name.ifBlank { "file" }
+    if (used.add(safe)) return safe
+    val dot = safe.lastIndexOf('.')
+    val base = if (dot > 0) safe.substring(0, dot) else safe
+    val ext = if (dot > 0) safe.substring(dot) else ""
+    var i = 1
+    while (true) {
+        val candidate = "$base-$i$ext"
+        if (used.add(candidate)) return candidate
+        i++
+    }
 }
 
 private fun humanSize(bytes: Long): String {

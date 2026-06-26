@@ -1,53 +1,48 @@
-# AgePony
+# AgePonyAndroid — Phase 2f: Rate AgePony + in-app feedback + UI/UX polish
 
-AgePony is an iOS app for file encryption and signing, built on
-[age](https://age-encryption.org) and SSH. Everything happens on device — no
-accounts, no servers, no tracking.
+Second of two updates implementing the Testers Community feedback. Covers the
+**Rate Your App** item (in-app prompt, nudge, feedback), the **User Feedback Mechanism**
+recommendation, and the **UI/UX Improvements** item (contrast, consistent design language).
 
-- **Encrypt / decrypt** files and text to age recipients (X25519, ssh-ed25519,
-  ssh-rsa) or with a passphrase (scrypt). Output is standard age, readable by the
-  `age` CLI on macOS and Linux.
-- **Detached signing** via SSHSIG (`ssh-keygen -Y sign/verify` compatible),
-  namespace `agepony`. Sign with an in-app SSH key, a Secure Enclave key, or an
-  external **FIDO security key** over NFC — including PIN-protected keys
-  (`sk-ssh-ed25519` and `sk-ecdsa-sha2-nistp256`).
-- **Multi-file bundles**: pick several files and AgePony tars them into one
-  `bundle.tar.age`.
-- On-device vault with biometric lock; no telemetry (see `PrivacyInfo.xcprivacy`).
+**Requires Phase 2e deployed first** — this bundle ships the cumulative `AgePonyApp.kt` and
+`SettingsScreen.kt` but not 2e-only files like `OnboardingScreen.kt`.
 
-## AgePonyCore
+## What's in this update
 
-The cryptography lives in `Sources/AgePonyCore`, a dependency-free Swift package
-(CryptoKit + Security + CommonCrypto). It implements age, SSH key parsing,
-SSHSIG, the FIDO/CTAP2 + PIN-protocol stack, and a USTAR archiver, each pinned to
-reference vectors in `Tests/AgePonyCoreTests`. It has no UIKit/app dependencies
-and can be reused on its own.
+- **Rate AgePony** in Settings then Help & feedback — opens the Play Store listing.
+- **Send feedback** in Settings then Help & feedback — opens an email to NorseHorse pre-filled
+  with app version and device details.
+- **In-app review nudge** — after a few fresh launches, AgePony asks Google to show the native
+  review card, at most once, never on a brand-new user.
+- **UI/UX polish** — explicit secondary-surface, outline, and container color roles in both
+  light and dark for intentional, accessible contrast.
 
-## Build
+## What changed
 
-Open `AgePony.xcodeproj` in Xcode and build the `AgePony` scheme (iOS 16+). Set
-your own signing team under Signing & Capabilities — the committed project has an
-empty `DEVELOPMENT_TEAM` so you can drop in yours. The NFC security-key feature
-needs the Near Field Communication Tag Reading capability and a device (NFC isn't
-available in the simulator).
+- `app/src/main/java/com/agepony/app/review/ReviewPrompt.kt` — new Play In-App Review wrapper.
+- `app/src/main/java/com/agepony/app/vault/Vault.kt` — launchCount and reviewPromptShown prefs.
+- `app/src/main/java/com/agepony/app/MainActivity.kt` — bumps the launch counter on fresh start.
+- `app/src/main/java/com/agepony/app/ui/AgePonyApp.kt` — fires the nudge past onboarding.
+- `app/src/main/java/com/agepony/app/ui/settings/SettingsScreen.kt` — Rate and Send feedback rows.
+- `app/src/main/java/com/agepony/app/ui/theme/Color.kt`, `Theme.kt` — explicit color roles.
+- `gradle/libs.versions.toml`, `app/build.gradle.kts` — `com.google.android.play:review` 2.0.2;
+  versionCode 2 then 3.
+- `NorseHorse_Android_Update_Log.md` — Phase 2f section appended.
 
-Run the crypto tests:
+All edits to existing files are additive apart from the section rename and the versionCode bump.
+No crypto or build-toolchain changes.
 
-    swift test
+## Deploy
 
-## Sibling project
+```
+cd ~/Downloads && unzip -oq AgePonyAndroid_Phase2f.zip && cp -R ~/Downloads/AgePonyAndroid_Phase2f/. ~/Apps/AgePonyAndroid/ && cd ~/Apps/AgePonyAndroid && ./gradlew bundleRelease
+```
 
-AgePony's PGP-focused sibling is **PGPony**, which shares the same design and
-backend conventions:
+## Verify after install
 
-- App Store: https://apps.apple.com/us/app/pgpony/id6759994432
-- Open-source core: https://github.com/norsehorse-dev/PGPonyCore
-
-## License
-
-Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
-
-## Links
-
-- Website: https://agepony.com
-- Contact: NorseHorse@norsehor.se
+1. Settings then Help & feedback shows Replay the intro, Rate AgePony, and Send feedback.
+2. Rate AgePony opens the Play Store listing for com.agepony.app.
+3. Send feedback opens an email to NorseHorse with version and device details pre-filled.
+4. Cold-launch the app three times; on the third the system review card may appear once.
+   It is best-effort, so Play may legitimately show nothing on a debug or sideloaded build.
+5. Subtitle text and dividers in Settings read with clean contrast in both light and dark.

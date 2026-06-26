@@ -240,4 +240,7 @@ private fun typeLabel(t: StoredIdentityType): String = when (t) {
     StoredIdentityType.X25519 -> "age X25519"
     StoredIdentityType.SSH_ED25519 -> "SSH Ed25519"
     StoredIdentityType.SSH_RSA -> "SSH RSA"
+    StoredIdentityType.HARDWARE_KEY -> "Hardware Key (P-256)"
+    StoredIdentityType.SK_ED25519 -> "Security Key (Ed25519)"
+    StoredIdentityType.SK_ECDSA_P256 -> "Security Key (P-256)"
 }

@@ -86,4 +86,19 @@ if [ ! -f ssh_rsa_encrypted_identity ] || [ ! -f ssh_rsa_encrypted_hello.age ]; 
     echo
 fi
 
+# 6. SSHSIG detached signatures (namespace 'agepony') for ed25519 and rsa identities
+if [ ! -f sshsig_message.txt ] || [ ! -f sshsig_ed25519_hello.sig ] || [ ! -f sshsig_rsa_hello.sig ]; then
+    echo "Generating SSHSIG detached-signature fixtures (namespace 'agepony')..."
+    printf '%s' "$PLAINTEXT" > sshsig_message.txt
+    chmod 600 ssh_ed25519_identity ssh_rsa_identity
+    rm -f sshsig_ed25519_hello.sig sshsig_rsa_hello.sig
+    ssh-keygen -Y sign -n agepony -f ssh_ed25519_identity sshsig_message.txt > /dev/null
+    mv sshsig_message.txt.sig sshsig_ed25519_hello.sig
+    ssh-keygen -Y sign -n agepony -f ssh_rsa_identity sshsig_message.txt > /dev/null
+    mv sshsig_message.txt.sig sshsig_rsa_hello.sig
+    echo "  message: sshsig_message.txt"
+    echo "  signatures: sshsig_ed25519_hello.sig, sshsig_rsa_hello.sig"
+    echo
+fi
+
 echo "All fixtures present. Run: ./gradlew test"

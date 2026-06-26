@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.agepony.app.vault.StoredIdentityType
 import com.agepony.app.vault.StoredRecipientType
 import com.agepony.app.vault.Vault
+import com.agepony.app.vault.isSigningOnly
 import com.agepony.app.vault.toAgeRecipient
 import com.agepony.core.recipients.AgeRecipient
 import com.agepony.core.recipients.SSHEd25519Recipient
@@ -127,14 +128,15 @@ fun RecipientPicker(
         } else {
             // Encrypt to self
             SectionHeader("Encrypt to self")
-            if (vault.identities.isEmpty()) {
+            val encryptableIdentities = vault.identities.filter { !it.type.isSigningOnly }
+            if (encryptableIdentities.isEmpty()) {
                 Text(
                     "You have no identities in this vault.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                vault.identities.forEach { identity ->
+                encryptableIdentities.forEach { identity ->
                     CheckRow(
                         checked = selectedIdentityIds.contains(identity.id),
                         title = identity.name,
@@ -294,6 +296,9 @@ private fun identityTypeLabel(t: StoredIdentityType): String = when (t) {
     StoredIdentityType.X25519 -> "age X25519"
     StoredIdentityType.SSH_ED25519 -> "SSH Ed25519"
     StoredIdentityType.SSH_RSA -> "SSH RSA"
+    StoredIdentityType.HARDWARE_KEY -> "Hardware Key (P-256)"
+    StoredIdentityType.SK_ED25519 -> "Security Key (Ed25519)"
+    StoredIdentityType.SK_ECDSA_P256 -> "Security Key (P-256)"
 }
 
 private fun recipientTypeLabel(t: StoredRecipientType): String = when (t) {

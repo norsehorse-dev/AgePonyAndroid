@@ -1,0 +1,9 @@
+com.agepony.core.agepony-core-pngs-0 /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/generated/res/pngs/debug
+com.agepony.core.agepony-core-updated_navigation_xml-1 /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/generated/updated_navigation_xml/debug
+com.agepony.core.agepony-core-mergeDebugResources-2 /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/incremental/debug/mergeDebugResources/merged.dir
+com.agepony.core.agepony-core-mergeDebugResources-3 /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+com.agepony.core.agepony-core-debug-4 /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/merged_res/debug/mergeDebugResources
+com.agepony.core.agepony-core-debug-5 /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/build/intermediates/packaged_res/debug/packageDebugResources
+com.agepony.core.agepony-core-debug-6 /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/src/debug/res
+com.agepony.core.agepony-core-main-7 /Users/kevinstewart/Documents/GitHub/AgePonyAndroid/agepony-core/src/main/res
+gradleHome-0 /Users/kevinstewart/.gradle
