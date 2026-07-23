@@ -26,8 +26,8 @@ android {
         applicationId = "com.agepony.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "3.0.1"
+        versionCode = 7
+        versionName = "3.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -46,6 +46,11 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
+            // Do not embed git VCS metadata in the APK. F-Droid's clean-room build has no
+            // git context, so an embedded revision breaks reproducible-build verification.
+            vcsInfo {
+                include = false
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
