@@ -7,9 +7,9 @@ import kotlinx.serialization.Serializable
 // Persisted records held by the Vault. These are the Android counterparts of
 // iOS's VaultModels.swift Codable structs. They are pure data: the raw key
 // material is stored as Base64 strings, and the concrete crypto-layer types
-// (X25519Identity, SSHEd25519Identity, SSHRSAIdentity, and their recipients)
-// are re-instantiated on demand by hydration helpers added in Phase 2c — this
-// keeps the vault/model layer entirely above the crypto layer.
+// (X25519Identity, SSHEd25519Identity, SSHRSAIdentity, HybridIdentity, and their
+// recipients) are re-instantiated on demand by hydration helpers — this keeps
+// the vault/model layer entirely above the crypto layer.
 //
 // Serialization: kotlinx.serialization (compiler-plugin codegen, no reflection).
 // On the AGP 9 built-in-Kotlin toolchain, KSP — and therefore Moshi codegen —
@@ -20,6 +20,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class StoredIdentityType {
     @SerialName("x25519") X25519,
+    @SerialName("mlkem768x25519") MLKEM768X25519,
     @SerialName("sshEd25519") SSH_ED25519,
     @SerialName("sshRSA") SSH_RSA,
     @SerialName("hardwareKey") HARDWARE_KEY,
@@ -36,6 +37,7 @@ enum class StoredIdentityType {
 val StoredIdentityType.isSigningOnly: Boolean
     get() = when (this) {
         StoredIdentityType.X25519 -> false
+        StoredIdentityType.MLKEM768X25519 -> false
         StoredIdentityType.SSH_ED25519 -> false
         StoredIdentityType.SSH_RSA -> false
         StoredIdentityType.HARDWARE_KEY -> true
@@ -43,12 +45,21 @@ val StoredIdentityType.isSigningOnly: Boolean
         StoredIdentityType.SK_ECDSA_P256 -> true
     }
 
+/** True for post-quantum (MLKEM768-X25519 hybrid) identity types. */
+val StoredIdentityType.isPostQuantum: Boolean
+    get() = this == StoredIdentityType.MLKEM768X25519
+
 @Serializable
 enum class StoredRecipientType {
     @SerialName("x25519") X25519,
+    @SerialName("mlkem768x25519") MLKEM768X25519,
     @SerialName("sshEd25519") SSH_ED25519,
     @SerialName("sshRSA") SSH_RSA
 }
+
+/** True for post-quantum (MLKEM768-X25519 hybrid) recipient types. */
+val StoredRecipientType.isPostQuantum: Boolean
+    get() = this == StoredRecipientType.MLKEM768X25519
 
 @Serializable
 enum class StoredRecipientSource {
@@ -62,11 +73,12 @@ enum class StoredRecipientSource {
 /**
  * A stored identity (private key). Public/private material is Base64; the
  * type-appropriate raw forms mirror iOS:
- *   x25519:     pub = 32-byte raw X25519 public key; priv = 32-byte scalar
- *   sshEd25519: pub = SSH wire blob; priv = 32-byte ed25519 seed
- *               (Android's SSHEd25519Identity derives the public half from the
- *                seed, so unlike iOS we store the 32-byte seed alone, not 64)
- *   sshRSA:     pub = `ssh-rsa ...` line bytes; priv = OpenSSH PEM bytes
+ *   x25519:          pub = 32-byte raw X25519 public key; priv = 32-byte scalar
+ *   mlkem768x25519:  pub = 1216-byte hybrid public key;   priv = 32-byte seed
+ *   sshEd25519:      pub = SSH wire blob; priv = 32-byte ed25519 seed
+ *                    (Android's SSHEd25519Identity derives the public half from the
+ *                     seed, so unlike iOS we store the 32-byte seed alone, not 64)
+ *   sshRSA:          pub = `ssh-rsa ...` line bytes; priv = OpenSSH PEM bytes
  */
 @Serializable
 data class StoredIdentity(

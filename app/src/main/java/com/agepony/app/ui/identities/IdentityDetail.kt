@@ -29,8 +29,10 @@ import androidx.fragment.app.FragmentActivity
 import com.agepony.app.security.BiometricGate
 import com.agepony.app.security.BiometricGateException
 import com.agepony.app.ui.components.KeyBlock
+import com.agepony.app.ui.components.PostQuantumBadge
 import com.agepony.app.vault.StoredIdentityType
 import com.agepony.app.vault.Vault
+import com.agepony.app.vault.isPostQuantum
 import com.agepony.app.vault.privateDisplayString
 import com.agepony.app.vault.publicDisplayString
 import kotlinx.coroutines.launch
@@ -98,13 +100,19 @@ fun IdentityDetail(
                 }) { Text("Rename") }
             }
 
-            Text(
-                text = "${typeLabel(identity.type)}  •  created ${
-                    DateFormat.getDateInstance().format(Date(identity.createdAt))
-                }",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "${typeLabel(identity.type)}  •  created ${
+                        DateFormat.getDateInstance().format(Date(identity.createdAt))
+                    }",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (identity.type.isPostQuantum) {
+                    PostQuantumBadge(modifier = Modifier.padding(start = 8.dp))
+                }
+            }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -238,6 +246,7 @@ fun IdentityDetail(
 
 private fun typeLabel(t: StoredIdentityType): String = when (t) {
     StoredIdentityType.X25519 -> "age X25519"
+    StoredIdentityType.MLKEM768X25519 -> "Quantum-safe (ML-KEM-768 + X25519)"
     StoredIdentityType.SSH_ED25519 -> "SSH Ed25519"
     StoredIdentityType.SSH_RSA -> "SSH RSA"
     StoredIdentityType.HARDWARE_KEY -> "Hardware Key (P-256)"

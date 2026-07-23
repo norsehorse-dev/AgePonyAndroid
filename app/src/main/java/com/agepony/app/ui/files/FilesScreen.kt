@@ -22,10 +22,11 @@ import androidx.compose.ui.unit.dp
 import com.agepony.app.vault.Vault
 
 //
-// Files tab landing (Phase 2c-3a). Encrypt is wired; Decrypt lands in 2c-3b.
+// Files tab landing (Phase 2c-3a). Encrypt / decrypt, plus "upgrade to quantum-safe"
+// (batch re-encrypt existing files to a post-quantum identity).
 //
 
-private enum class FilesMode { HOME, ENCRYPT, DECRYPT }
+private enum class FilesMode { HOME, ENCRYPT, DECRYPT, MIGRATE }
 
 @Composable
 fun FilesScreen(vault: Vault, modifier: Modifier = Modifier) {
@@ -54,10 +55,16 @@ fun FilesScreen(vault: Vault, modifier: Modifier = Modifier) {
                 onClick = { mode = FilesMode.DECRYPT },
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
             ) { Text("Decrypt a file") }
+            TextButton(
+                onClick = { mode = FilesMode.MIGRATE },
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            ) { Text("Upgrade files to quantum-safe") }
         }
 
         FilesMode.ENCRYPT -> EncryptFlow(vault = vault, modifier = modifier, onClose = { mode = FilesMode.HOME })
 
         FilesMode.DECRYPT -> DecryptFlow(vault = vault, modifier = modifier, onClose = { mode = FilesMode.HOME })
+
+        FilesMode.MIGRATE -> MigrateFlow(vault = vault, modifier = modifier, onClose = { mode = FilesMode.HOME })
     }
 }

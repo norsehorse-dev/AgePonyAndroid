@@ -1,5 +1,6 @@
 package com.agepony.app.vault
 
+import com.agepony.core.recipients.HybridRecipient
 import com.agepony.core.recipients.X25519Recipient
 import com.agepony.core.ssh.OpenSSHPublicKey
 import kotlinx.coroutines.Dispatchers
@@ -8,10 +9,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 //
-// Android counterpart of iOS's RecipientImportService. Two import paths funnel
-// into a single RecipientCandidate: paste (age1… / ssh-* line) and GitHub
-// (.keys fetch). QR is deferred (needs camera). Each candidate carries the
-// publicKeyB64 already in the storage shape the hydration layer expects.
+// Android counterpart of iOS's RecipientImportService. Import paths funnel into
+// a single RecipientCandidate: paste (age1… / age1pq… / ssh-* line) and GitHub
+// (.keys fetch). Each candidate carries the publicKeyB64 already in the storage
+// shape the hydration layer expects.
 //
 
 class RecipientImportException(message: String) : Exception(message)
@@ -27,10 +28,28 @@ data class RecipientCandidate(
 
 object RecipientImport {
 
-    /** Parse a single pasted blob (age1… recipient or one-line OpenSSH public key). */
+    /** Parse a single pasted blob (age1pq… / age1… recipient or one-line OpenSSH public key). */
     fun parsePastedText(raw: String): RecipientCandidate {
         val t = raw.trim()
         if (t.isEmpty()) throw RecipientImportException("Nothing to parse.")
+
+        // Post-quantum recipients must be checked before "age1" — their HRP is "age1pq",
+        // so they also start with "age1" and would otherwise route to the X25519 parser.
+        if (t.startsWith("age1pq")) {
+            val recipient = try {
+                HybridRecipient(t)
+            } catch (e: Exception) {
+                throw RecipientImportException("Not a valid quantum-safe age recipient (${e.message}).")
+            }
+            return RecipientCandidate(
+                type = StoredRecipientType.MLKEM768X25519,
+                publicKeyB64 = b64e(recipient.publicKey),
+                sshComment = null,
+                defaultName = shortAgeName(t),
+                source = StoredRecipientSource.PASTE_AGE,
+                sourceMetadata = null,
+            )
+        }
 
         if (t.startsWith("age1")) {
             val recipient = try {
@@ -53,7 +72,7 @@ object RecipientImport {
         }
 
         throw RecipientImportException(
-            "Expected an age1… recipient or an ssh-ed25519 / ssh-rsa line."
+            "Expected an age1… / age1pq… recipient or an ssh-ed25519 / ssh-rsa line."
         )
     }
 

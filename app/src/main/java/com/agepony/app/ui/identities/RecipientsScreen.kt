@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.ui.components.KeyBlock
+import com.agepony.app.ui.components.PostQuantumBadge
 import com.agepony.app.ui.scan.QrScanner
 import com.agepony.app.vault.RecipientCandidate
 import com.agepony.app.vault.RecipientImport
@@ -47,6 +48,7 @@ import com.agepony.app.vault.StoredRecipient
 import com.agepony.app.vault.StoredRecipientSource
 import com.agepony.app.vault.StoredRecipientType
 import com.agepony.app.vault.Vault
+import com.agepony.app.vault.isPostQuantum
 import com.agepony.app.vault.publicDisplayString
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -102,6 +104,9 @@ private fun RecipientRow(recipient: StoredRecipient, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(recipient.name, style = MaterialTheme.typography.bodyLarge)
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (recipient.type.isPostQuantum) {
+                    PostQuantumBadge(modifier = Modifier.padding(end = 6.dp))
+                }
                 Surface(
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                     shape = RoundedCornerShape(8.dp),
@@ -161,12 +166,18 @@ internal fun RecipientDetail(
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Text(
-                "${typeLabel(recipient.type)}  •  ${sourceLabel(recipient.source)}" +
-                    (recipient.sourceMetadata?.let { "  •  $it" } ?: ""),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${typeLabel(recipient.type)}  •  ${sourceLabel(recipient.source)}" +
+                        (recipient.sourceMetadata?.let { "  •  $it" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (recipient.type.isPostQuantum) {
+                    PostQuantumBadge(modifier = Modifier.padding(start = 8.dp))
+                }
+            }
             if (!recipient.sshComment.isNullOrBlank()) {
                 Text(
                     recipient.sshComment!!,
@@ -267,7 +278,7 @@ internal fun AddRecipientFlow(
                 OutlinedTextField(
                     value = pasteText,
                     onValueChange = { pasteText = it; inputError = null },
-                    label = { Text("age1… or ssh-ed25519 / ssh-rsa AAAA…") },
+                    label = { Text("age1… / age1pq… or ssh-ed25519 / ssh-rsa AAAA…") },
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -323,7 +334,7 @@ internal fun AddRecipientFlow(
 
             AddRecipientSource.SCAN -> {
                 Text(
-                    "Scan a QR code that encodes an age recipient (age1…) or an OpenSSH public key.",
+                    "Scan a QR code that encodes an age recipient (age1… / age1pq…) or an OpenSSH public key.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -418,6 +429,7 @@ private fun CandidateRow(ec: EditableCandidate, onDiscard: () -> Unit) {
 
 private fun typeLabel(t: StoredRecipientType): String = when (t) {
     StoredRecipientType.X25519 -> "age X25519"
+    StoredRecipientType.MLKEM768X25519 -> "Quantum-safe (ML-KEM-768 + X25519)"
     StoredRecipientType.SSH_ED25519 -> "SSH Ed25519"
     StoredRecipientType.SSH_RSA -> "SSH RSA"
 }

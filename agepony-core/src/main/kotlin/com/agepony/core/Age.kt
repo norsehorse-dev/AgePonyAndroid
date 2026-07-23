@@ -2,6 +2,7 @@ package com.agepony.core
 
 import com.agepony.core.recipients.AgeIdentity
 import com.agepony.core.recipients.AgeRecipient
+import com.agepony.core.recipients.LabeledAgeRecipient
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
@@ -35,6 +36,7 @@ object Age {
      */
     fun encrypt(plaintext: ByteArray, to: List<AgeRecipient>): ByteArray {
         require(to.isNotEmpty()) { "must have at least one recipient" }
+        enforceRecipientLabels(to)
         val fileKey = ByteArray(FILE_KEY_SIZE).also { SecureRandom().nextBytes(it) }
         val stanzas = to.map { it.wrap(fileKey) }
 
@@ -79,6 +81,7 @@ object Age {
      */
     fun encryptStream(plaintext: InputStream, to: List<AgeRecipient>, out: OutputStream) {
         require(to.isNotEmpty()) { "must have at least one recipient" }
+        enforceRecipientLabels(to)
         val fileKey = ByteArray(FILE_KEY_SIZE).also { SecureRandom().nextBytes(it) }
         val stanzas = to.map { it.wrap(fileKey) }
 
@@ -121,6 +124,27 @@ object Age {
     }
 
     // --- Internals ---
+
+    /**
+     * Enforce age's recipient-labels rule: every recipient must agree on the exact same set
+     * of labels. Recipients that don't implement [LabeledAgeRecipient] have an empty label set.
+     * This blocks mixing a post-quantum recipient (label "postquantum") with a classical one
+     * that would defeat its quantum resistance.
+     */
+    private fun enforceRecipientLabels(to: List<AgeRecipient>) {
+        val first = labelsOf(to.first())
+        for (r in to) {
+            if (labelsOf(r) != first) {
+                throw IllegalArgumentException(
+                    "recipients disagree on labels: all recipients must share the same labels " +
+                        "(e.g. a post-quantum recipient cannot be combined with a non-post-quantum one)"
+                )
+            }
+        }
+    }
+
+    private fun labelsOf(r: AgeRecipient): Set<String> =
+        (r as? LabeledAgeRecipient)?.labels() ?: emptySet()
 
     /**
      * Read exactly the header bytes from `input`: everything up to and including the newline that

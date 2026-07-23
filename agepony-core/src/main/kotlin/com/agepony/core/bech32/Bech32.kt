@@ -4,12 +4,19 @@ package com.agepony.core.bech32
  * Bech32 (BIP-0173) encoding used by age for human-readable key strings:
  *   - `age1...`              for X25519 public keys (HRP = "age")
  *   - `AGE-SECRET-KEY-1...`  for X25519 secret keys (HRP = "AGE-SECRET-KEY")
+ *   - `age1pq1...`           for MLKEM768-X25519 public keys (HRP = "age1pq")
+ *   - `AGE-SECRET-KEY-PQ-1...` for MLKEM768-X25519 secret keys (HRP = "AGE-SECRET-KEY-PQ-")
  *
  * This is the original Bech32 (polymod constant = 1), NOT Bech32m (constant = 0x2bc830a3).
  * age uses the original variant.
+ *
+ * Note: BIP-0173 caps strings at 90 characters, but age applies no such limit —
+ * post-quantum `age1pq1...` recipients encode ~1216 bytes (~1960 characters). We
+ * keep a generous sanity cap only to bound pathological input.
  */
 object Bech32 {
     private const val CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    private const val MAX_LENGTH = 8192   // generous cap; age1pq recipients are ~1960 chars
     private val GENERATOR = intArrayOf(
         0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3
     )
@@ -38,7 +45,7 @@ object Bech32 {
      */
     fun decode(input: String): Pair<String, ByteArray> {
         if (input.length < 8) throw Bech32Exception("too short")
-        if (input.length > 1023) throw Bech32Exception("too long")  // sanity cap
+        if (input.length > MAX_LENGTH) throw Bech32Exception("too long")  // sanity cap
 
         // Case enforcement
         val hasUpper = input.any { it in 'A'..'Z' }

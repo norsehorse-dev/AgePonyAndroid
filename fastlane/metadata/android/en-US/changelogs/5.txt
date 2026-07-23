@@ -1,0 +1,8 @@
+AgePony 3.0.0 brings post-quantum encryption.
+
+- Quantum-safe hybrid keys (ML-KEM-768 + X25519) that resist future quantum computers, interoperable with the age CLI.
+- Encrypt and sign a file in one step, with signatures verified on decrypt.
+- New migration tool: batch upgrade your existing files to quantum-safe encryption, originals kept until the new copy is verified.
+- Clear quantum-safe badges so you always know your protection.
+
+Everything still runs on your device. No tracking, no ads.

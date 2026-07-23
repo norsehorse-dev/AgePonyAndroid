@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.agepony.app.review.ReviewPrompt
 import com.agepony.app.vault.VaultViewModel
 
 //
@@ -61,21 +62,6 @@ fun SettingsScreen(
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
         }.getOrNull() ?: "1.0"
-    }
-
-    // Explicit "Rate" action: open the Play Store listing directly (Google's
-    // guidance is to reserve the in-app review API for programmatic nudges, not
-    // buttons). Try the Play app first, fall back to the web listing.
-    fun openPlayStore() {
-        val id = context.packageName
-        val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$id"))
-        if (runCatching { context.startActivity(market) }.isFailure) {
-            runCatching {
-                context.startActivity(
-                    Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$id"))
-                )
-            }
-        }
     }
 
     // In-app feedback: a mailto to the public address, prefilled with version and
@@ -219,9 +205,9 @@ fun SettingsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        ActionRow(label = "Rate AgePony", trailing = "Open ↗", onClick = { openPlayStore() })
+        ActionRow(label = "Rate AgePony", trailing = "Open ↗", onClick = { ReviewPrompt.openRating(context) })
         Text(
-            "If AgePony has been useful, a rating on the Play Store helps other people find it.",
+            "If AgePony has been useful, a rating helps other people find it.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

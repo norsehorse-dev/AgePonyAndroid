@@ -29,11 +29,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.agepony.app.signing.FileVerifier
 import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.NoMatchingVaultIdentityException
+import com.agepony.app.vault.StoredIdentity
 import com.agepony.app.vault.Vault
 import com.agepony.app.vault.WrongPassphraseException
 import com.agepony.app.vault.toAgeIdentity
+import com.agepony.core.archive.SignedBundle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,6 +47,10 @@ import kotlinx.coroutines.withContext
 //   ask for a passphrase (scrypt) -> save plaintext (SAF).
 // Armor is auto-detected via the BEGIN marker; the header is never parsed
 // directly (we just try identities, then passphrase).
+//
+// After decryption, the plaintext is probed for an AgePony signed bundle
+// (encrypt-and-sign). If present, the embedded SSHSIG is verified against the vault's
+// identities and a trust verdict is shown; the payload is what gets saved.
 //
 
 private enum class DecryptStage { PICK, WORKING, NEED_PASSPHRASE, DONE }
@@ -61,6 +68,7 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
     var error by remember { mutableStateOf<String?>(null) }
     var outputBytes by remember { mutableStateOf<ByteArray?>(null) }
     var savedName by remember { mutableStateOf<String?>(null) }
+    var verdict by remember { mutableStateOf<String?>(null) }
 
     val createOutput = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -95,6 +103,7 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         error = null
         passphrase = ""
         triedIdentities = false
+        verdict = null
         stage = DecryptStage.WORKING
         scope.launch {
             try {
@@ -118,9 +127,12 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                     val plain = withContext(Dispatchers.Default) {
                         FileEncryptor.decryptWithIdentities(bin, ids)
                     }
-                    outputBytes = plain
+                    val knownIds = vault.identities.toList()
+                    val res = withContext(Dispatchers.Default) { unbundleAndVerify(plain, name, knownIds) }
+                    outputBytes = res.bytes
+                    verdict = res.verdict
                     vault.autoLockSuppressed = true
-                    createOutput.launch(FileEncryptor.decryptedName(name))
+                    createOutput.launch(res.name)
                 } catch (e: NoMatchingVaultIdentityException) {
                     stage = DecryptStage.NEED_PASSPHRASE
                 } catch (e: OutOfMemoryError) {
@@ -139,7 +151,7 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
 
     fun reset() {
         sourceName = "file.age"; binary = null; triedIdentities = false
-        passphrase = ""; error = null; outputBytes = null; savedName = null
+        passphrase = ""; error = null; outputBytes = null; savedName = null; verdict = null
         stage = DecryptStage.PICK
     }
 
@@ -210,9 +222,12 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                                 val plain = withContext(Dispatchers.Default) {
                                     FileEncryptor.decryptWithPassphrase(bin, passphrase)
                                 }
-                                outputBytes = plain
+                                val knownIds = vault.identities.toList()
+                                val res = withContext(Dispatchers.Default) { unbundleAndVerify(plain, sourceName, knownIds) }
+                                outputBytes = res.bytes
+                                verdict = res.verdict
                                 vault.autoLockSuppressed = true
-                                createOutput.launch(FileEncryptor.decryptedName(sourceName))
+                                createOutput.launch(res.name)
                             } catch (e: WrongPassphraseException) {
                                 error = e.message
                                 stage = DecryptStage.NEED_PASSPHRASE
@@ -242,10 +257,19 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
+                    modifier = Modifier.padding(top = 8.dp, bottom = if (verdict != null) 8.dp else 24.dp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (verdict != null) {
+                    Text(
+                        verdict!!,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (verdict!!.startsWith("⚠")) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 24.dp),
+                    )
+                }
                 Button(onClick = { reset() }, modifier = Modifier.fillMaxWidth()) { Text("Decrypt another") }
                 OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Done") }
             }
@@ -256,6 +280,33 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
 @Composable
 private fun ErrorLine(message: String) {
     Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+}
+
+private class DecryptResult(val bytes: ByteArray, val name: String, val verdict: String?)
+
+/**
+ * If [plain] is an AgePony signed bundle, verify its embedded signature against [identities]
+ * and return the payload plus a human-readable verdict. Otherwise return [plain] unchanged
+ * with a stripped output name and no verdict.
+ */
+private fun unbundleAndVerify(
+    plain: ByteArray,
+    sourceName: String,
+    identities: List<StoredIdentity>,
+): DecryptResult {
+    val bundle = SignedBundle.parse(plain)
+        ?: return DecryptResult(plain, FileEncryptor.decryptedName(sourceName), null)
+    val result = FileVerifier().verify(
+        bundle.signatureArmored.toByteArray(Charsets.UTF_8),
+        bundle.payload,
+        identities,
+    )
+    val verdict = when (result.trust) {
+        FileVerifier.Trust.TRUSTED -> "Signed by ${result.signerName ?: "a known key"} ✓"
+        FileVerifier.Trust.VALID_UNKNOWN -> "Valid signature — signer not in your vault"
+        FileVerifier.Trust.INVALID -> "⚠ Signature invalid: ${result.reason ?: "verification failed"}"
+    }
+    return DecryptResult(bundle.payload, bundle.name, verdict)
 }
 
 private fun documentName(context: Context, uri: Uri): String {

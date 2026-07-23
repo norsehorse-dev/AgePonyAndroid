@@ -13,3 +13,15 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Signing keys and secrets — never commit these
+*.jks
+*.keystore
+keystore.properties
+*.p12
+
+# Gradle/module build outputs (never commit)
+build/
+*/build/
+.gradle/
+.kotlin/

@@ -36,7 +36,11 @@ kotlin {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
-    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+    // bcprov 1.79 is the first release with the finalized FIPS 203 ML-KEM
+    // (org.bouncycastle.pqc.crypto.mlkem). 1.78.1 predates it, so the PQC core
+    // requires >= 1.79. Classic APIs (SHA-256, HKDF, ChaCha20Poly1305, X25519)
+    // are unchanged from 1.78.1.
+    implementation("org.bouncycastle:bcprov-jdk18on:1.79")
 
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")

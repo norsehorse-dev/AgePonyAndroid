@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,17 +34,26 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.vault.FileEncryptor
+import com.agepony.app.vault.StoredIdentityType
 import com.agepony.app.vault.Vault
+import com.agepony.app.vault.b64d
+import com.agepony.core.archive.SignedBundle
 import com.agepony.core.archive.TarArchive
 import com.agepony.core.recipients.AgeRecipient
+import com.agepony.core.signing.SSHSig
+import com.agepony.core.signing.SSHSigner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 //
 // Encrypt flow (Phase 2c-3a). Android counterpart of iOS's EncryptFlow:
-//   pick input (SAF) -> configure (recipients + armor) -> encrypt -> save (SAF).
+//   pick input (SAF) -> configure (recipients + optional sign + armor) -> encrypt -> save (SAF).
 // The whole input is read into memory; suitable for typical files.
+//
+// Encrypt-and-sign: when a signing identity is chosen, the plaintext is signed with SSHSIG,
+// bundled with its signature (SignedBundle, sign-then-encrypt), and the bundle is encrypted —
+// so the signer's identity stays hidden inside the ciphertext and the output is one file.
 //
 
 private enum class EncryptStage { PICK, CONFIGURE, PICKING, WORKING, DONE }
@@ -59,6 +70,7 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
     var bundleCount by remember { mutableStateOf(0) }
     var recipients by remember { mutableStateOf<List<AgeRecipient>>(emptyList()) }
     var passphrase by remember { mutableStateOf<String?>(null) }
+    var signerId by remember { mutableStateOf<String?>(null) }
     var armor by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var outputBytes by remember { mutableStateOf<ByteArray?>(null) }
@@ -130,7 +142,7 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
 
     fun reset() {
         sourceBytes = null; sourceName = "file"; sourceSize = 0L; bundleCount = 0
-        recipients = emptyList(); passphrase = null; armor = true
+        recipients = emptyList(); passphrase = null; signerId = null; armor = true
         outputBytes = null; savedName = null; error = null
         stage = EncryptStage.PICK
     }
@@ -180,6 +192,23 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
 
                 HorizontalDivider()
 
+                // Optional signing — SSH Ed25519 identities sign in-process.
+                val signingIdentities = vault.identities.filter { it.type == StoredIdentityType.SSH_ED25519 }
+                if (signingIdentities.isNotEmpty()) {
+                    Text("Sign (optional)", style = MaterialTheme.typography.titleSmall)
+                    SignerRow(selected = signerId == null, label = "Don't sign", onClick = { signerId = null })
+                    signingIdentities.forEach { id ->
+                        SignerRow(selected = signerId == id.id, label = id.name, onClick = { signerId = id.id })
+                    }
+                    Text(
+                        "Signs the file with your SSH Ed25519 key, then encrypts. The recipient can verify " +
+                            "it came from you; the signer stays hidden inside the ciphertext.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    HorizontalDivider()
+                }
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = armor, onCheckedChange = { armor = it })
                     Text("Armor as text", modifier = Modifier.padding(start = 12.dp))
@@ -203,7 +232,19 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                         scope.launch {
                             try {
                                 val out = withContext(Dispatchers.Default) {
-                                    FileEncryptor.encrypt(bytes, recipients, passphrase, armor)
+                                    val signer = signerId?.let { sid -> vault.identities.firstOrNull { it.id == sid } }
+                                    val payload = if (signer != null) {
+                                        val sigArmored = SSHSigner.signEd25519(
+                                            b64d(signer.privateKeyB64),
+                                            b64d(signer.publicKeyB64),
+                                            bytes,
+                                            SSHSig.NAMESPACE_AGEPONY,
+                                        )
+                                        SignedBundle.build(sourceName, bytes, sigArmored)
+                                    } else {
+                                        bytes
+                                    }
+                                    FileEncryptor.encrypt(payload, recipients, passphrase, armor)
                                 }
                                 outputBytes = out
                                 vault.autoLockSuppressed = true
@@ -221,7 +262,7 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                     },
                     enabled = canEncrypt,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Encrypt") }
+                ) { Text(if (signerId != null) "Sign & encrypt" else "Encrypt") }
                 TextButton(onClick = onClose) { Text("Cancel") }
             }
 
@@ -241,7 +282,10 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 verticalArrangement = Arrangement.Center,
             ) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                Text("Encrypting…", modifier = Modifier.padding(top = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (signerId != null) "Signing & encrypting…" else "Encrypting…",
+                    modifier = Modifier.padding(top = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             EncryptStage.DONE -> Column(
@@ -263,6 +307,17 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Done") }
             }
         }
+    }
+}
+
+@Composable
+private fun SignerRow(selected: Boolean, label: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Text(label, modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.bodyMedium)
     }
 }
 

@@ -26,8 +26,8 @@ android {
         applicationId = "com.agepony.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "2.0.0"
+        versionCode = 5
+        versionName = "3.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -54,10 +54,32 @@ android {
         }
     }
 
+    // Product flavors keep the proprietary Google Play In-App Review library out of the
+    // F-Droid build. The `play` flavor (Google Play) includes it; the `foss` flavor
+    // (F-Droid) has no Google dependencies. Flavor source sets under src/play and src/foss
+    // each provide the matching com.agepony.app.review.ReviewPrompt implementation.
+    flavorDimensions += "store"
+    productFlavors {
+        create("play") {
+            dimension = "store"
+            isDefault = true
+        }
+        create("foss") {
+            dimension = "store"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
         isCoreLibraryDesugaringEnabled = true
+    }
+
+    // Strip the Google dependency-metadata blob from the APK. It is a known
+    // F-Droid reproducibility culprit and embeds a proprietary metadata section.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
     buildFeatures {
@@ -92,7 +114,9 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.zxing.core)
-    implementation(libs.play.review)
+    // Google Play In-App Review — proprietary, so it's scoped to the `play` flavor only
+    // and never enters the `foss` (F-Droid) build.
+    "playImplementation"(libs.play.review)
     testImplementation(libs.junit)
     testImplementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     androidTestImplementation(platform(libs.androidx.compose.bom))

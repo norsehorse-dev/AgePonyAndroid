@@ -53,5 +53,7 @@ class FileVerifier {
         StoredIdentityType.SK_ECDSA_P256 -> b64d(identity.publicKeyB64)
         StoredIdentityType.SSH_RSA -> null
         StoredIdentityType.X25519 -> null
+        // Encryption-only; never a signer.
+        StoredIdentityType.MLKEM768X25519 -> null
     }
 }

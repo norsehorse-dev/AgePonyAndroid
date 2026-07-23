@@ -1,0 +1,29 @@
+AgePony is a fast, private encryption app for your phone, built on the modern age encryption format. Lock your files and messages so only the right person can open them, sign them so recipients know the file really came from you, and keep everything on your device. No accounts, no servers, no tracking.
+
+NEW IN 3.0.0: POST-QUANTUM ENCRYPTION
+Protect your data against "harvest now, decrypt later" attacks. AgePony now generates quantum-safe hybrid keys (ML-KEM-768 combined with X25519) that stay secure even against a future quantum computer, while staying fully interoperable with the age command-line tool. Anything encrypted to a quantum-safe recipient is clearly badged, so you always know the protection you are using.
+
+Also new in 3.0.0:
+- Encrypt and sign in a single step, so recipients can both open your file and confirm it is really from you.
+- A built-in migration tool to upgrade older files to quantum-safe encryption. Batch re-encrypt your existing files to a new quantum-safe key, with your originals kept until the new copy is verified.
+
+WHY AGEPONY
+- Standard age encryption. AgePony reads and writes the same format as the age CLI, so your files work with other age tools on desktop and server.
+- Public key or passphrase. Encrypt to someone's public key, or lock a file with a passphrase you share separately.
+- SSH keys work too. Encrypt to an existing SSH public key, and sign with your SSH key using the SSHSIG standard.
+- Everything on device. Encryption, decryption, signing, and key generation all happen locally on your phone. Your private keys never leave your device.
+- No tracking, no ads, no account required. AgePony does not collect analytics or personal data.
+- Open source. The full source is available for review.
+
+FEATURES
+- Generate and store age key pairs in an app vault, unlocked with your device biometrics.
+- Quantum-safe hybrid keys (ML-KEM-768 + X25519) alongside classic X25519 keys.
+- Encrypt and decrypt files and text messages.
+- Passphrase encryption for quick, key-free sharing.
+- Sign and verify with SSH Ed25519 keys (SSHSIG).
+- Scan and share recipient keys with your camera by QR code.
+- Batch migrate existing files to quantum-safe encryption.
+
+Whether you are a journalist, an activist, a developer, or simply someone who wants real control over their private files, AgePony gives you strong, standard encryption without the complexity.
+
+AgePony is an independent app built on the open age encryption format and is not affiliated with the age project.

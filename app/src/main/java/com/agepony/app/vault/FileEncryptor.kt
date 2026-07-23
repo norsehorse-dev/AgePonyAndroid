@@ -113,11 +113,17 @@ object FileEncryptor {
         }
     }
 
-    /** Suggested output name for a decrypt: strip a trailing `.age`, else append `.decrypted`. */
-    fun decryptedName(inputName: String): String =
-        if (inputName.length > 4 && inputName.lowercase().endsWith(".age")) {
-            inputName.dropLast(4)
-        } else {
-            "$inputName.decrypted"
+    /**
+     * Suggested output name for a decrypt: strip every trailing `.age` (case-insensitive),
+     * so `notes.txt.age` — or a doubled `notes.txt.age.age` — becomes `notes.txt`. A decrypted
+     * file should never keep a `.age` suffix. If the input had no `.age` at all, append
+     * `.decrypted` so we still propose a distinct name.
+     */
+    fun decryptedName(inputName: String): String {
+        var name = inputName
+        while (name.length > 4 && name.lowercase().endsWith(".age")) {
+            name = name.dropLast(4)
         }
+        return if (name == inputName) "$inputName.decrypted" else name
+    }
 }

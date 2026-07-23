@@ -2,6 +2,8 @@ package com.agepony.app.vault
 
 import com.agepony.core.recipients.AgeIdentity
 import com.agepony.core.recipients.AgeRecipient
+import com.agepony.core.recipients.HybridIdentity
+import com.agepony.core.recipients.HybridRecipient
 import com.agepony.core.recipients.SSHEd25519Identity
 import com.agepony.core.recipients.SSHEd25519Recipient
 import com.agepony.core.recipients.SSHRSARecipient
@@ -17,11 +19,13 @@ import java.io.ByteArrayOutputStream
 //
 // Android storage shapes (differ from iOS, chosen to match the Android core
 // constructors directly):
-//   x25519        identity: priv = 32-byte scalar;  pub = 32-byte X25519 pub
-//   ssh-ed25519   identity: priv = 32-byte seed;    pub = 32-byte ed25519 pub
-//   ssh-ed25519   recipient:                         pub = 32-byte ed25519 pub
-//   ssh-rsa       recipient:                         pub = UTF-8 bytes of the
-//                                                     `ssh-rsa BASE64 [comment]` line
+//   x25519          identity: priv = 32-byte scalar;  pub = 32-byte X25519 pub
+//   mlkem768x25519  identity: priv = 32-byte seed;    pub = 1216-byte hybrid pub
+//   mlkem768x25519  recipient:                         pub = 1216-byte hybrid pub
+//   ssh-ed25519     identity: priv = 32-byte seed;    pub = 32-byte ed25519 pub
+//   ssh-ed25519     recipient:                         pub = 32-byte ed25519 pub
+//   ssh-rsa         recipient:                         pub = UTF-8 bytes of the
+//                                                       `ssh-rsa BASE64 [comment]` line
 // ssh-rsa *identity* import is deferred (the core exposes RSA params but no
 // PEM re-serializer; needs a param blob — landing in a later sub-phase).
 //
@@ -60,6 +64,7 @@ internal fun sshEd25519Line(edPublicKey: ByteArray, comment: String?): String {
 
 fun StoredIdentity.toAgeIdentity(): AgeIdentity = when (type) {
     StoredIdentityType.X25519 -> X25519Identity(b64d(privateKeyB64))
+    StoredIdentityType.MLKEM768X25519 -> HybridIdentity(b64d(privateKeyB64))
     StoredIdentityType.SSH_ED25519 -> SSHEd25519Identity(b64d(privateKeyB64))
     StoredIdentityType.SSH_RSA -> throw NotImplementedError(RSA_IDENTITY_PENDING)
     StoredIdentityType.HARDWARE_KEY -> throw IllegalStateException(HARDWARE_SIGNING_ONLY)
@@ -69,6 +74,7 @@ fun StoredIdentity.toAgeIdentity(): AgeIdentity = when (type) {
 
 fun StoredIdentity.toAgeRecipient(): AgeRecipient = when (type) {
     StoredIdentityType.X25519 -> X25519Recipient(b64d(publicKeyB64))
+    StoredIdentityType.MLKEM768X25519 -> HybridRecipient(b64d(publicKeyB64))
     StoredIdentityType.SSH_ED25519 -> SSHEd25519Recipient(b64d(publicKeyB64))
     StoredIdentityType.SSH_RSA -> throw NotImplementedError(RSA_IDENTITY_PENDING)
     StoredIdentityType.HARDWARE_KEY -> throw IllegalStateException(HARDWARE_SIGNING_ONLY)
@@ -78,6 +84,7 @@ fun StoredIdentity.toAgeRecipient(): AgeRecipient = when (type) {
 
 fun StoredIdentity.publicDisplayString(): String = when (type) {
     StoredIdentityType.X25519 -> X25519Recipient(b64d(publicKeyB64)).toBech32()
+    StoredIdentityType.MLKEM768X25519 -> HybridRecipient(b64d(publicKeyB64)).toBech32()
     StoredIdentityType.SSH_ED25519 -> sshEd25519Line(b64d(publicKeyB64), sshComment)
     StoredIdentityType.SSH_RSA -> "(SSH RSA)"
     StoredIdentityType.HARDWARE_KEY -> {
@@ -91,6 +98,7 @@ fun StoredIdentity.publicDisplayString(): String = when (type) {
 
 fun StoredIdentity.privateDisplayString(): String = when (type) {
     StoredIdentityType.X25519 -> X25519Identity(b64d(privateKeyB64)).toBech32()
+    StoredIdentityType.MLKEM768X25519 -> HybridIdentity(b64d(privateKeyB64)).toBech32()
     StoredIdentityType.SSH_ED25519 ->
         "(SSH Ed25519 — private key stored in the vault; not exportable as text)"
     StoredIdentityType.SSH_RSA -> "(SSH RSA)"
@@ -107,6 +115,7 @@ private fun StoredIdentity.skLine(keyType: String): String = "$keyType $publicKe
 
 fun StoredRecipient.toAgeRecipient(): AgeRecipient = when (type) {
     StoredRecipientType.X25519 -> X25519Recipient(b64d(publicKeyB64))
+    StoredRecipientType.MLKEM768X25519 -> HybridRecipient(b64d(publicKeyB64))
     StoredRecipientType.SSH_ED25519 -> SSHEd25519Recipient(b64d(publicKeyB64))
     StoredRecipientType.SSH_RSA -> {
         val line = String(b64d(publicKeyB64), Charsets.UTF_8)
@@ -119,6 +128,7 @@ fun StoredRecipient.toAgeRecipient(): AgeRecipient = when (type) {
 
 fun StoredRecipient.publicDisplayString(): String = when (type) {
     StoredRecipientType.X25519 -> X25519Recipient(b64d(publicKeyB64)).toBech32()
+    StoredRecipientType.MLKEM768X25519 -> HybridRecipient(b64d(publicKeyB64)).toBech32()
     StoredRecipientType.SSH_ED25519 -> sshEd25519Line(b64d(publicKeyB64), sshComment)
     StoredRecipientType.SSH_RSA -> String(b64d(publicKeyB64), Charsets.UTF_8)
 }

@@ -34,6 +34,7 @@ import com.agepony.app.vault.Vault
 import com.agepony.app.vault.isSigningOnly
 import com.agepony.app.vault.toAgeRecipient
 import com.agepony.core.recipients.AgeRecipient
+import com.agepony.core.recipients.HybridRecipient
 import com.agepony.core.recipients.SSHEd25519Recipient
 import com.agepony.core.recipients.SSHRSARecipient
 import com.agepony.core.recipients.X25519Recipient
@@ -45,6 +46,10 @@ import com.agepony.core.ssh.OpenSSHPublicKey
 // ad-hoc pasted recipients, plus a scrypt "passphrase only" mode that replaces
 // recipient selection. Returns hydrated AgeRecipients (and an optional
 // passphrase) to the caller.
+//
+// Note: post-quantum recipients cannot be combined with classical ones (age's
+// labels rule, enforced in Age.encrypt). Mixing them here surfaces as an encrypt
+// error; disabling the mismatched rows in-picker is a queued UX refinement.
 //
 
 private class AdHocRecipient(val label: String, val recipient: AgeRecipient) {
@@ -180,7 +185,7 @@ fun RecipientPicker(
             OutlinedTextField(
                 value = pasteText,
                 onValueChange = { pasteText = it; pasteError = null },
-                label = { Text("Paste age1… or ssh-* AAAA… (one-time)") },
+                label = { Text("Paste age1… / age1pq… or ssh-* AAAA… (one-time)") },
                 minLines = 2,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -273,6 +278,11 @@ private fun toggle(set: MutableList<String>, id: String) {
 private fun parseAdHoc(raw: String): AdHocRecipient {
     val t = raw.trim()
     if (t.isEmpty()) throw IllegalArgumentException("Nothing to add.")
+    // "age1pq" before "age1": post-quantum recipients share the "age1" prefix.
+    if (t.startsWith("age1pq")) {
+        val r = HybridRecipient(t)
+        return AdHocRecipient(shorten(t), r)
+    }
     if (t.startsWith("age1")) {
         val r = X25519Recipient(t)
         return AdHocRecipient(shorten(t), r)
@@ -286,7 +296,7 @@ private fun parseAdHoc(raw: String): AdHocRecipient {
                 AdHocRecipient("SSH RSA (one-time)", SSHRSARecipient(parsed))
         }
     }
-    throw IllegalArgumentException("Expected an age1… recipient or an ssh-ed25519 / ssh-rsa line.")
+    throw IllegalArgumentException("Expected an age1… / age1pq… recipient or an ssh-ed25519 / ssh-rsa line.")
 }
 
 private fun shorten(s: String): String =
@@ -294,6 +304,7 @@ private fun shorten(s: String): String =
 
 private fun identityTypeLabel(t: StoredIdentityType): String = when (t) {
     StoredIdentityType.X25519 -> "age X25519"
+    StoredIdentityType.MLKEM768X25519 -> "Quantum-safe (ML-KEM-768 + X25519)"
     StoredIdentityType.SSH_ED25519 -> "SSH Ed25519"
     StoredIdentityType.SSH_RSA -> "SSH RSA"
     StoredIdentityType.HARDWARE_KEY -> "Hardware Key (P-256)"
@@ -303,6 +314,7 @@ private fun identityTypeLabel(t: StoredIdentityType): String = when (t) {
 
 private fun recipientTypeLabel(t: StoredRecipientType): String = when (t) {
     StoredRecipientType.X25519 -> "age X25519"
+    StoredRecipientType.MLKEM768X25519 -> "Quantum-safe (ML-KEM-768 + X25519)"
     StoredRecipientType.SSH_ED25519 -> "SSH Ed25519"
     StoredRecipientType.SSH_RSA -> "SSH RSA"
 }

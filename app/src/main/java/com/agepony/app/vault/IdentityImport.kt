@@ -1,5 +1,6 @@
 package com.agepony.app.vault
 
+import com.agepony.core.recipients.HybridIdentity
 import com.agepony.core.recipients.SSHEd25519Identity
 import com.agepony.core.recipients.X25519Identity
 import com.agepony.core.ssh.OpenSSHPrivateKey
@@ -7,8 +8,9 @@ import java.util.UUID
 
 //
 // Android counterpart of iOS's SSHIdentityImporter, plus the age-secret-key
-// path. Produces a StoredIdentity ready for the vault. ssh-ed25519 and age
-// X25519 are supported now; ssh-rsa private keys are deferred.
+// path. Produces a StoredIdentity ready for the vault. age X25519, age
+// post-quantum (AGE-SECRET-KEY-PQ-), and ssh-ed25519 are supported now;
+// ssh-rsa private keys are deferred.
 //
 
 class IdentityImportException(val kind: Kind, message: String) : Exception(message) {
@@ -17,9 +19,20 @@ class IdentityImportException(val kind: Kind, message: String) : Exception(messa
 
 object IdentityImport {
 
-    /** Import an `AGE-SECRET-KEY-1…` private key string. */
+    /**
+     * Import an age secret key string. Handles both the classical `AGE-SECRET-KEY-1…`
+     * and the post-quantum `AGE-SECRET-KEY-PQ-1…` forms, routing on the prefix.
+     */
     fun fromAgeSecretKey(secret: String, name: String): StoredIdentity {
         val t = secret.trim()
+        return if (t.uppercase().startsWith("AGE-SECRET-KEY-PQ-")) {
+            fromAgePqSecretKey(t, name)
+        } else {
+            fromAgeClassicSecretKey(t, name)
+        }
+    }
+
+    private fun fromAgeClassicSecretKey(t: String, name: String): StoredIdentity {
         val identity = try {
             X25519Identity(t)
         } catch (e: Exception) {
@@ -34,6 +47,26 @@ object IdentityImport {
             type = StoredIdentityType.X25519,
             publicKeyB64 = b64e(identity.publicKey),
             privateKeyB64 = b64e(identity.privateKey),
+            createdAt = System.currentTimeMillis(),
+        )
+    }
+
+    /** Import a post-quantum `AGE-SECRET-KEY-PQ-1…` private key string. */
+    private fun fromAgePqSecretKey(t: String, name: String): StoredIdentity {
+        val identity = try {
+            HybridIdentity(t)
+        } catch (e: Exception) {
+            throw IdentityImportException(
+                IdentityImportException.Kind.MALFORMED,
+                "Not a valid AGE-SECRET-KEY-PQ-1… string."
+            )
+        }
+        return StoredIdentity(
+            id = UUID.randomUUID().toString(),
+            name = name.trim().ifBlank { "quantum-safe identity" },
+            type = StoredIdentityType.MLKEM768X25519,
+            publicKeyB64 = b64e(identity.publicKey),
+            privateKeyB64 = b64e(identity.seed),
             createdAt = System.currentTimeMillis(),
         )
     }

@@ -35,6 +35,9 @@ class FileSigner(
         StoredIdentityType.X25519 ->
             throw FileSignerException("age X25519 identities can't sign; choose an SSH key, hardware key, or security key")
 
+        StoredIdentityType.MLKEM768X25519 ->
+            throw FileSignerException("quantum-safe identities are for encryption, not signing; choose an SSH key, hardware key, or security key")
+
         StoredIdentityType.SSH_RSA ->
             throw FileSignerException("RSA signing isn't supported yet")
 

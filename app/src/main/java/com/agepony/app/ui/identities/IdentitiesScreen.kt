@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.security.SecurityKeyService
 import com.agepony.app.security.keystore.HardwareKeyService
+import com.agepony.app.ui.components.PostQuantumBadge
 import com.agepony.app.ui.security.PinPromptController
 import com.agepony.app.ui.security.SecurityKeyPinPrompt
 import com.agepony.app.vault.IdentityImport
@@ -50,7 +51,10 @@ import com.agepony.app.vault.StoredIdentity
 import com.agepony.app.vault.StoredIdentityType
 import com.agepony.app.vault.Vault
 import com.agepony.app.vault.b64e
+import com.agepony.app.vault.isPostQuantum
 import com.agepony.app.vault.publicDisplayString
+import com.agepony.core.recipients.HybridIdentity
+import com.agepony.core.recipients.SSHEd25519Identity
 import com.agepony.core.recipients.X25519Identity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -190,6 +194,9 @@ private fun IdentityRow(identity: StoredIdentity, isActive: Boolean, onClick: ()
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(identity.name, style = MaterialTheme.typography.bodyLarge)
+                if (identity.type.isPostQuantum) {
+                    PostQuantumBadge(modifier = Modifier.padding(start = 8.dp))
+                }
                 if (isActive) {
                     Surface(
                         color = MaterialTheme.colorScheme.primary,
@@ -262,7 +269,7 @@ private fun AddIdentityFlow(
     }
 }
 
-private enum class GenKeyType { X25519, HARDWARE, SECURITY }
+private enum class GenKeyType { X25519, QUANTUM_SAFE, SSH_ED25519, HARDWARE, SECURITY }
 
 @Composable
 private fun GenerateIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
@@ -270,6 +277,8 @@ private fun GenerateIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> U
     when (keyType) {
         null -> GenerateTypeChooser(onPick = { keyType = it }, onCancel = onCancel)
         GenKeyType.X25519 -> GenerateX25519(vault, onDone) { keyType = null }
+        GenKeyType.QUANTUM_SAFE -> GenerateHybrid(vault, onDone) { keyType = null }
+        GenKeyType.SSH_ED25519 -> GenerateEd25519(vault, onDone) { keyType = null }
         GenKeyType.HARDWARE -> GenerateHardwareKey(vault, onDone) { keyType = null }
         GenKeyType.SECURITY -> GenerateSecurityKey(vault, onDone) { keyType = null }
     }
@@ -283,12 +292,19 @@ private fun GenerateTypeChooser(onPick: (GenKeyType) -> Unit, onCancel: () -> Un
     ) {
         Text("Generate identity", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Text(
-            "Pick the kind of key to create. Hardware and security keys sign only; they can't decrypt.",
+            "Pick the kind of key to create. age and quantum-safe keys encrypt/decrypt; the SSH key " +
+                "signs (and can also receive files). Hardware and security keys sign only; they can't decrypt.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Button(onClick = { onPick(GenKeyType.X25519) }, modifier = Modifier.fillMaxWidth()) {
             Text("age X25519 (software)")
+        }
+        OutlinedButton(onClick = { onPick(GenKeyType.QUANTUM_SAFE) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Quantum-safe (ML-KEM-768)")
+        }
+        OutlinedButton(onClick = { onPick(GenKeyType.SSH_ED25519) }, modifier = Modifier.fillMaxWidth()) {
+            Text("SSH signing key (Ed25519)")
         }
         OutlinedButton(onClick = { onPick(GenKeyType.HARDWARE) }, modifier = Modifier.fillMaxWidth()) {
             Text("Hardware key (this device)")
@@ -337,6 +353,113 @@ private fun GenerateX25519(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
                                 type = StoredIdentityType.X25519,
                                 publicKeyB64 = b64e(identity.publicKey),
                                 privateKeyB64 = b64e(identity.privateKey),
+                                createdAt = System.currentTimeMillis(),
+                            )
+                        }
+                        vault.addIdentity(stored)
+                        busy = false
+                        onDone()
+                    }
+                },
+                modifier = Modifier.weight(1f),
+            ) { Text(if (busy) "Generating…" else "Generate") }
+            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Back") }
+        }
+    }
+}
+
+@Composable
+private fun GenerateHybrid(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    Column(
+        Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Quantum-safe identity", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+        Text(
+            "Creates a fresh MLKEM768-X25519 hybrid keypair — safe against future quantum computers " +
+                "and interoperable with age v1.3.0+. Files encrypted to it must use only quantum-safe " +
+                "recipients (it can't be mixed with a classical key).",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = {
+                    if (busy) return@Button
+                    busy = true
+                    scope.launch {
+                        val stored = withContext(Dispatchers.Default) {
+                            val identity = HybridIdentity.generate()
+                            StoredIdentity(
+                                id = UUID.randomUUID().toString(),
+                                name = name.trim().ifBlank { "quantum-safe identity" },
+                                type = StoredIdentityType.MLKEM768X25519,
+                                publicKeyB64 = b64e(identity.publicKey),
+                                privateKeyB64 = b64e(identity.seed),
+                                createdAt = System.currentTimeMillis(),
+                            )
+                        }
+                        vault.addIdentity(stored)
+                        busy = false
+                        onDone()
+                    }
+                },
+                modifier = Modifier.weight(1f),
+            ) { Text(if (busy) "Generating…" else "Generate") }
+            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Back") }
+        }
+    }
+}
+
+@Composable
+private fun GenerateEd25519(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    Column(
+        Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("SSH signing key", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+        Text(
+            "Creates a fresh SSH Ed25519 keypair, stored in your vault. Use it to sign files " +
+                "(including encrypt-and-sign); it can also receive files as an ssh-ed25519 recipient.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = {
+                    if (busy) return@Button
+                    busy = true
+                    scope.launch {
+                        val stored = withContext(Dispatchers.Default) {
+                            val identity = SSHEd25519Identity.generate()
+                            StoredIdentity(
+                                id = UUID.randomUUID().toString(),
+                                name = name.trim().ifBlank { "SSH Ed25519" },
+                                type = StoredIdentityType.SSH_ED25519,
+                                publicKeyB64 = b64e(identity.edPublicKey),
+                                privateKeyB64 = b64e(identity.edSeed),
                                 createdAt = System.currentTimeMillis(),
                             )
                         }
@@ -509,8 +632,8 @@ private fun ImportIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
-            "Paste an AGE-SECRET-KEY-1… string, or a full OpenSSH private key " +
-                "(-----BEGIN OPENSSH PRIVATE KEY-----). Ed25519 and age keys are supported.",
+            "Paste an AGE-SECRET-KEY-1… string, a quantum-safe AGE-SECRET-KEY-PQ-1… string, or a full " +
+                "OpenSSH private key (-----BEGIN OPENSSH PRIVATE KEY-----). Ed25519 and age keys are supported.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -549,7 +672,9 @@ private fun ImportIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
                     scope.launch {
                         try {
                             val stored = withContext(Dispatchers.Default) {
-                                if (txt.startsWith("AGE-SECRET-KEY-1", ignoreCase = true)) {
+                                // Covers both AGE-SECRET-KEY-1… and AGE-SECRET-KEY-PQ-1…;
+                                // fromAgeSecretKey routes on the -PQ- marker.
+                                if (txt.startsWith("AGE-SECRET-KEY-", ignoreCase = true)) {
                                     IdentityImport.fromAgeSecretKey(txt, name)
                                 } else {
                                     IdentityImport.fromOpenSSHPem(txt, passphrase, name)
