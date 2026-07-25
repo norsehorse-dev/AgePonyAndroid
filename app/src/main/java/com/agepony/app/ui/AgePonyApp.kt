@@ -48,7 +48,17 @@ private const val REVIEW_PROMPT_MIN_LAUNCHES = 3
 @Composable
 fun AgePonyApp(vm: VaultViewModel) {
     val vault: Vault = vm.vault
-    var selectedTab by rememberSaveable { mutableStateOf(AgeTab.FILES) }
+    // Seed from the persisted tab so returning from background (which re-locks
+    // the vault and disposes this composable) restores the same tab rather than
+    // resetting to Files. rememberSaveable additionally covers config changes.
+    var selectedTab by rememberSaveable {
+        mutableStateOf(
+            vault.lastTab?.let { name -> AgeTab.entries.firstOrNull { it.name == name } }
+                ?: AgeTab.FILES
+        )
+    }
+    // Persist every change so the choice survives re-lock and process death.
+    LaunchedEffect(selectedTab) { vault.lastTab = selectedTab.name }
 
     // First-run walkthrough (Phase 2e). Shown once after the vault is created,
     // tracked by the previously-unused Vault.hasCompletedOnboarding pref, and

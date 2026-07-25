@@ -56,6 +56,16 @@ class Vault(context: Context) {
         get() = prefs.getBoolean(KEY_ONBOARDED, false)
         set(value) { prefs.edit().putBoolean(KEY_ONBOARDED, value).apply() }
 
+    // Last selected bottom-nav tab. The vault re-locks whenever the app is
+    // backgrounded (see VaultGate), which tears down the app shell, so the tab
+    // is persisted here rather than kept only in composition. Restoring it on
+    // unlock keeps the user on the same tab instead of snapping back to Files,
+    // and because it's on disk it also survives the process death that
+    // aggressive OEM battery managers (e.g. MIUI) inflict on backgrounded apps.
+    var lastTab: String?
+        get() = prefs.getString(KEY_LAST_TAB, null)
+        set(value) { prefs.edit().putString(KEY_LAST_TAB, value).apply() }
+
     // Phase 2f — engagement counters for the in-app review nudge. launchCount is
     // bumped once per fresh process start (see MainActivity); reviewPromptShown
     // latches true the first time the Play in-app review flow is requested so the
@@ -214,6 +224,7 @@ class Vault(context: Context) {
         prefs.edit()
             .remove(KEY_ACTIVE_IDENTITY)
             .remove(KEY_ONBOARDED)
+            .remove(KEY_LAST_TAB)
             .apply()
     }
 
@@ -256,5 +267,6 @@ class Vault(context: Context) {
         const val KEY_ONBOARDED = "hasCompletedOnboarding"
         const val KEY_LAUNCH_COUNT = "launchCount"
         const val KEY_REVIEW_PROMPT_SHOWN = "reviewPromptShown"
+        const val KEY_LAST_TAB = "lastTab"
     }
 }
