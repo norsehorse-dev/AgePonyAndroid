@@ -27,8 +27,11 @@ Backlog items pulled in (rationale: each one touches code we are already opening
 | Recipients / identity file import-export (stretch) | Only if the above land early. Otherwise it moves to 3.2.0. |
 
 Deferred to 3.2.0 (a coherent "trust and exchange" release): recipient address book +
-verification, QR recipient exchange, localization, iOS post-quantum parity,
-within-tab navigation state preservation.
+verification, QR recipient exchange, encrypted identity transfer between devices (see report 4
+below), localization, iOS post-quantum parity, within-tab navigation state preservation.
+
+Note on QR: partly present already. `RecipientsScreen` can scan a recipient QR code today; what is
+missing is showing one.
 
 ## 2. Report 1: out of memory on large files
 
@@ -156,6 +159,64 @@ Note that "one file each" plus streaming is also the memory answer for the batch
 today a multi-file pick materializes every input plus the whole tar in memory at once
 (`EncryptFlow.kt:100` to `:106`).
 
+## 3b. Second round of reports (2026-07-27)
+
+Same tester, two more suggestions plus a question.
+
+### Report 3: name your recipients
+
+**Already shipped, which makes this a discoverability problem rather than a feature gap.**
+`StoredRecipient` has had a `name` since 3.0.0, `RecipientsScreen` shows an editable name field
+before saving (paste, QR scan, or GitHub username import), and named recipients are what the
+encrypt picker lists.
+
+Two real gaps behind the request, both small:
+
+1. **No rename after saving.** `Vault.renameIdentity` exists; there is no `renameRecipient`.
+2. **A key pasted in the encrypt picker is one-shot.** `RecipientPicker.parseAdHoc` builds an
+   `AdHocRecipient` with an auto label (`shorten(...)`) and never offers to save it. That is right
+   for a one-off send, but there should be a "save with a name" affordance next to it.
+
+Proposed for 3.1.0 since both are a few lines: add `Vault.renameRecipient`, a rename row in
+`RecipientsScreen`, and a save-with-name button on ad-hoc entries in `RecipientPicker`.
+
+### Report 4: move identities between devices without an OTP
+
+The tester's scheme: keep a key pair on the laptop, give the phone the public half, have the phone
+encrypt its identities to it, move the file however, decrypt on the laptop.
+
+**This is the right design and it is worth stating why**, since the comparison to OpenKeychain's
+one-time password is not just ergonomics. An OTP protects the transport and does nothing for the
+endpoint, and it necessarily displays a secret, which is precisely what a compromised phone can
+capture. Encrypting to an already-trusted public key displays nothing secret, types nothing, and
+keeps the private half on the laptop. The residual risk is unchanged either way: a compromised
+phone has already lost the identities it holds.
+
+Design (this is the backlog's "recipients / identity import-export", now with a clear shape):
+
+- **Export:** Identities tab, pick which identities, pick a target (saved recipient, or paste or
+  scan a public key), confirm the target's fingerprint, get one `.age` file.
+- **Plaintext format:** a USTAR archive, same machinery as `SignedBundle`, with a manifest entry
+  and one entry per identity in *standard* form (`AGE-SECRET-KEY-...`, OpenSSH PEM). So the
+  receiving end can `age -d` it and get usable key files without AgePony. No proprietary blob, no
+  lock-in.
+- **Optionally signed** via the existing sign-then-encrypt path, so the receiver can tell the
+  bundle came from the sender's key rather than from anyone who knows the target's public key.
+- **Import:** decrypt, detect the manifest, list the identities, let the user choose which to add.
+- **Non-exportable identities** (`HARDWARE_KEY`, `SK_ED25519`, `SK_ECDSA_P256`) are listed and
+  greyed with a reason, never silently dropped. Their private keys cannot leave the device.
+- **Fingerprint confirmation before send.** Encrypting to the wrong public key fails silently and
+  irreversibly, so the target must be confirmed rather than assumed.
+
+Sizing: the crypto is all present, so this is mostly UI plus a bundle format. It pairs naturally
+with the address book and verification work, so the recommendation is to land it as the headline
+of 3.2.0 rather than stretching 3.1.0 further. If 3.1.0 finishes early it can move up.
+
+### The question: is the repo open for issues?
+
+Yes. Issues are enabled on `github.com/norsehorse-dev/AgePonyAndroid` (checked 2026-07-27).
+Worth answering warmly and pointing future requests there, where they are visible and votable.
+
 ## 4. Workstreams
 
 | ID | Work | Files |
@@ -167,7 +228,8 @@ today a multi-file pick materializes every input plus the whole tar in memory at
 | W5 | Multi-file chooser and per-file output to a tree | `ui/files/EncryptFlow.kt`, `ui/files/SafIo.kt` |
 | W6 | Honest OOM diagnosis, scrypt precheck, work-factor setting, diceware generator | `ui/files/EncryptFlow.kt`, `ui/files/DecryptFlow.kt`, `ui/files/RecipientPicker.kt`, `vault/VaultModels.kt`, settings UI |
 | W7 | age header / stanza inspector (read-only view of recipients and stanza types) | new `ui/files/InspectFlow.kt`, reuses `AgeHeader.parse` |
-| W8 | Stretch: recipients / identity import-export | `vault/RecipientImport.kt`, `vault/IdentityImport.kt` |
+| W8 | Rename a saved recipient, and save an ad-hoc pasted key with a name (report 3) | `vault/Vault.kt`, `ui/identities/RecipientsScreen.kt`, `ui/files/RecipientPicker.kt` |
+| W10 | Deferred to 3.2.0: encrypted identity transfer between devices (report 4) | new `vault/IdentityBundle.kt`, `ui/identities/*` |
 | W9 | Version bump, changelog, F-Droid metadata | `app/build.gradle.kts`, `fastlane/metadata/android/en-US/changelogs/` |
 
 Suggested order: W1 and W2 together (core, testable without a device), then W3, then
@@ -248,8 +310,13 @@ running git.
 5. **Decrypt of a multi-file bundle.** With per-file encrypt available, should decrypt
    also learn to extract a `.tar` bundle straight into a chosen folder rather than
    writing `bundle.tar`?
-6. **Work-factor range.** 16 through 20, or cap at 19 so the setting cannot produce a
-   file this app cannot open on a mid-range phone?
+6. **Work-factor range.** Settled at 16 through 20. 2^20 is 1 GiB and will fail on most phones,
+   but it is reachable deliberately rather than by accident, and the precheck explains it.
+7. **Diceware wordlist.** Which list ships, and under what attribution? The EFF long list (7776
+   words, CC BY 3.0 US) is the obvious choice and needs a line in `NOTICE`; a shorter or
+   self-authored list avoids the attribution but weakens the "diceware" claim. Also worth
+   deciding: does the generated passphrase go straight into the field, or is it shown once for the
+   user to write down first?
 
 ## 9. Progress log
 
@@ -283,9 +350,181 @@ To confirm on real Gradle:
 cd ~/Apps/AgePonyAndroid && ./gradlew :agepony-core:test
 ```
 
-Next: W3 (encrypt flow). It needs one more core piece first, streaming SSHSIG hashing
-(`SSHSig.hashStream` plus hashed sign/verify entry points), since sign-and-encrypt currently
-takes the whole plaintext as a `ByteArray`.
+Committed as `07f0185` after `./gradlew :agepony-core:test` passed locally.
+
+**2026-07-27 — W3 part one (everything the encrypt flow needs except the UI).**
+
+- `Armor.kt`: added `EncodingSink` (an `OutputStream` that armors what is written) and
+  `DecodingSource` (an `InputStream` that reads armored text as binary), plus
+  `encodingSink` / `decodingSource`. `encodeStream` / `decodeStream` are now thin wrappers over
+  them, so there is one implementation of each direction. The push/pull shapes are what actually
+  compose with `Age.encryptStream` (which writes to an `OutputStream`) and `Age.decryptStream`
+  (which reads from an `InputStream`). Neither wrapper closes the stream it wraps, so SAF streams
+  stay the caller's to manage.
+- `signing/SSHSig.kt`: added `hashStream`, the bounded-memory twin of `hashMessage`.
+- `signing/SSHSigner.kt`: `signEd25519` now delegates to a new `signEd25519Hashed`, which takes a
+  precomputed message hash. Sign-and-encrypt of a large file becomes two passes over the input
+  (hash, then bundle) instead of one whole-file buffer.
+- `signing/SSHSigVerifier.kt`: `verify` now delegates to a new `verifyHashed(signature,
+  namespace) { alg -> hash }`, so a signed bundle can be verified from the hash
+  `SignedBundle.parseStream` computes while the payload streams past.
+- `app/.../vault/FileEncryptor.kt`: added `encryptStream`, `decryptStreamWithIdentities`,
+  `decryptStreamWithPassphrase`, and `sniffArmored` (peeks the head through a
+  `PushbackInputStream` to decide armor without a second read). Recipient-rule checking moved to
+  a shared private helper, so the buffered and streaming paths cannot drift. `OutOfMemoryError`
+  is deliberately not caught in the streaming path: scrypt's 256 MiB allocation is unrelated to
+  file size, and only the caller can report which one failed (W6).
+- New test: `signing/SSHSigStreamTests.kt`. `ArmorStreamTests.kt` grew sink/source cases,
+  including odd write-size boundaries (1, 7, 47, 48, 49, 64, 1000 bytes per write).
+
+Sandbox verification: 39 tests green across the armor, tar and signed-bundle suites, old and new,
+under a 64 MB heap. The signing tests need Bouncy Castle, which the sandbox cannot fetch, so
+those are verified by the Gradle run.
+
+**2026-07-27 — W3 part two and W5 (the encrypt flow itself).**
+
+Two more core pieces were needed first, both pull-shaped, because `Age.encryptStream` reads its
+plaintext from an `InputStream` while `buildStream` and `writeEntry` are push-shaped:
+
+- `TarArchive.source(entries)` presents a list of `StreamEntry(name, size, open)` as one readable
+  archive. Each entry is opened only when reached, so a fifty-file bundle never has fifty files
+  open. An `ExactSizeInputStream` refuses an entry whose bytes do not match its declared size,
+  because a file that shrank between the size query and the read would otherwise corrupt the tar.
+- `TarArchive.sizeOf(entries)` gives the archive's exact length without building it, which is what
+  lets a multi-file bundle be signed (the signed bundle's header declares the inner tar's size
+  before the inner tar exists).
+- `SignedBundle.bundleSource(...)`, the pull-shaped twin of `buildStream`.
+
+App side:
+
+- New `app/.../ui/files/SafIo.kt`: `SourceRef`, `PreparedSource`, and the SAF helpers
+  (`openInput`, `openOutput`, `createInTree`, `prepare`, `uniqueName`, `humanSize`), plus
+  `CountingInputStream` for progress. Two details worth keeping: `openOutput` asks for mode `wt`
+  first, since a plain `w` leaves the tail of a longer previous file behind on some providers; and
+  `prepare` stages a copy into the app cache only when the provider refuses to report a size and
+  the size is actually needed (tar headers need it, a plain single-file encrypt does not).
+- `EncryptFlow.kt` rewritten. The destination is now chosen before any work starts, which is what
+  streaming requires and is the whole fix for the report. There is no `outputBytes` state any
+  more. Progress is real: a byte counter batched to 512 KiB so a 130 MB file asks for a few
+  hundred recompositions instead of a few thousand.
+- Multi-file chooser: picking 2+ files goes to a MODE step offering "One encrypted archive" or
+  "One encrypted file each". Separate mode asks for a destination folder
+  (`OpenDocumentTree`), writes one `.age` per input, and reports a per-file result list so one
+  failure does not sink the batch.
+- Sign-and-encrypt now reads the input twice (hash, then encrypt) instead of holding it, and the
+  progress bar accounts for both passes.
+- The out-of-memory message finally tells the truth: the passphrase text only appears when a
+  passphrase was actually used, and it says scrypt needs about 256 MB regardless of file size, so
+  a smaller file will not help.
+
+Sandbox verification: 45 core tests green under a 64 MB heap (new: `source` matches `create`,
+lazy opening, shrunk-entry rejection, `sizeOf`, `bundleSource` matches `build`). The app module
+needs the Android SDK, so `EncryptFlow.kt` and `SafIo.kt` are on the local build.
+
+**2026-07-27 — W4 (decrypt flow).**
+
+Decrypt had a problem encrypt did not: whether the plaintext is a signed bundle is only knowable
+once its first block has been decrypted, and `Age.decryptStream` pushes plaintext into an
+`OutputStream`, so there is nothing to probe.
+
+- `SignedBundle.UnwrappingSink(payloadOut)` is the answer: an `OutputStream` that decides
+  mid-stream. If the first 512 bytes are the bundle's marker header it strips the tar wrapper as
+  bytes arrive, routing the payload to `payloadOut` while hashing it; anything else passes
+  through byte for byte and `result()` is null. Handles arbitrary write boundaries, which matters
+  because chunk sizes are not block-aligned.
+- `TarArchive.parseHeaderBlock` was extracted for it, and `forEachEntry` now uses the same
+  function, so there is one header parser rather than two.
+- `Age.canDecryptStream(ciphertext, identities)` reads only the header and reports whether any
+  identity can unwrap it.
+- `FileVerifier.verifyHashed(...)` mirrors the core change, with `verify` delegating to it.
+- `DecryptFlow.kt` rewritten: pick file, probe the header, ask for a passphrase only if needed,
+  pick destination, stream. Because the scrypt stanza lives in the header, a wrong passphrase is
+  now caught in a few hundred bytes of reading, before the user is asked where to save anything.
+
+One honest consequence, called out in the code and in the DONE screen: the signature entry sits
+after the payload in a bundle, so a bad signature is reported once the file is already written.
+The verdict says so plainly rather than implying the file was verified before saving.
+
+Sandbox verification: 49 core tests green under a 64 MB heap. The new ones cover unwrapping at
+write sizes of 1, 3, 511, 512, 513, 4096 and 65536 bytes, pass-through for plain tars and random
+bytes and inputs shorter than one block, truncation reported as damage, and push/pull agreement
+between `UnwrappingSink` and `parseStream`.
+
+**2026-07-27 — W6 part one (scrypt memory: precheck and work-factor control).**
+
+- `crypto/Scrypt.kt`: `memoryBytes(n, r)` = `128 * N * r`, documented next to the KDF it describes,
+  because that number is the whole explanation for the reported failure.
+- `FileEncryptor`: `DEFAULT_SCRYPT_WORK_FACTOR` (18), `MIN` (16), `MAX` (20),
+  `scryptMemoryBytes`, `freeHeapBytes`, `scryptFitsInMemory`, and a new `ScryptMemoryException`.
+  `encrypt` and `encryptStream` take a `workFactor`, and the shared recipient helper refuses to
+  start when scrypt would not fit, with 32 MiB of headroom. The user now gets a sentence with real
+  numbers before any work begins, instead of an `OutOfMemoryError` partway through a file.
+- `Vault.scryptWorkFactor`, persisted in `agepony_vault_settings`, clamped to 16..20.
+- Settings gains a "Passphrase work factor" row showing the live memory cost, whether the value is
+  age's default, and that the factor travels in the file so any age tool can still open it.
+- The recipient picker's hardcoded "Work factor 2^18" line now reads the setting, shows the memory
+  cost, and turns red when the device does not currently have that much free.
+- `EncryptFlow` threads the setting through and reports `ScryptMemoryException` directly.
+
+**2026-07-27 — W6 part two (diceware).**
+
+Decisions taken: EFF long list (7776 words), and the suggestion is shown first and only fills the
+fields when the user accepts it.
+
+- `crypto/Diceware.kt`: `generate`, `entropyBits`, `parseWordlist`, and the EFF list size as a
+  constant. Selection uses `SecureRandom.nextInt(bound)`, which is rejection-sampled and unbiased;
+  the obvious `nextInt() % size` would favour the front of the list and quietly cost entropy.
+  `parseWordlist` rejects a mangled entry rather than skipping it, because silently skipping lines
+  would shrink the keyspace without anyone noticing.
+- `vault/Wordlist.kt` loads the list from `assets`, not `res/raw`, so a missing file is a runtime
+  absence (the generator does not appear) rather than a compile error. It also refuses a list that
+  is not exactly 7776 words, rather than falling back to something weaker.
+- The recipient picker gains "Suggest a passphrase": the phrase is displayed with its word count
+  and entropy, with Shorter / Longer / Again, and only fills both fields on "Use it".
+- `NOTICE` (git repo only, as before) carries the CC BY 3.0 US attribution.
+
+**The wordlist file itself is not in the tree yet.** The sandbox cannot reach eff.org, so it has to
+be fetched locally, which is arguably better provenance anyway:
+
+```
+curl -o ~/Apps/AgePonyAndroid/app/src/main/assets/eff_large_wordlist.txt \
+  https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt
+cp ~/Apps/AgePonyAndroid/app/src/main/assets/eff_large_wordlist.txt \
+   ~/Documents/GitHub/AgePonyAndroid/app/src/main/assets/eff_large_wordlist.txt
+wc -l ~/Apps/AgePonyAndroid/app/src/main/assets/eff_large_wordlist.txt   # expect 7776
+```
+
+The app builds and runs without it; the suggestion button simply does not appear.
+
+Sandbox verification: 57 core tests green, including diceware word counts, clamping, an unbiased
+draw across all four quartiles of the list over 4000 samples, the standard entropy figures
+(6 words from 7776 = 77.5 bits), and parser rejection of mangled lists.
+
+**2026-07-27 — tested on hardware.** Installed as `assembleFossRelease` over the existing 3.0.2
+(same signing key, so the vault survived) and worked through `AgePony_3.1.0_DeviceTests.md` on the
+Pixel 8 / GrapheneOS that filed the original report. Passed. The reported failure is fixed on the
+device that reported it, which is the bar this release was set against.
+
+Diceware section 9 was not exercised: the wordlist asset is still absent, so the generator is
+correctly invisible.
+
+**2026-07-27 — W8 (the recipient-naming gaps from report 3).**
+
+- `Vault.renameRecipient(id, name)`, mirroring `renameIdentity`, but ignoring a blank name rather
+  than accepting one and leaving an unidentifiable row.
+- `RecipientsScreen`'s detail view gains a Rename control: the headline becomes a text field with
+  Save and Cancel.
+- `RecipientPicker` can promote a one-time pasted key into a saved, named recipient. The entry
+  keeps the text that was pasted, so Save re-parses it through `RecipientImport.parsePastedText`
+  and writes exactly the `StoredRecipient` the Recipients tab would have written. On save the
+  one-time copy is dropped and the newly saved recipient is selected in its place, so the encrypt
+  in progress is unaffected.
+
+**Versioning decided: 3.0.3 folds into 3.1.0.** 3.1.0 is `versionCode 8`, changelog `8.txt`, one
+tag, and the nav-restore fix ships as a line in the 3.1.0 notes. One F-Droid recipe update rather
+than two while 3.0.2 is still in review. Section 6's arithmetic follows from that.
+
+Next: W7 (header inspector), then the release mechanics in section 6.
 
 ## 10. Style reminders
 

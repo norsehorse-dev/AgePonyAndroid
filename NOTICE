@@ -6,3 +6,15 @@ you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
+
+---
+
+This product includes the EFF Long Wordlist, bundled as
+app/src/main/assets/eff_large_wordlist.txt and used to generate diceware
+passphrases.
+
+    EFF Long Wordlist
+    Copyright 2016 Electronic Frontier Foundation
+    https://www.eff.org/dice
+    Licensed under Creative Commons Attribution 3.0 United States
+    https://creativecommons.org/licenses/by/3.0/us/
