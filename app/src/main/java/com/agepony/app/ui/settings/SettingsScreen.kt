@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.agepony.app.review.ReviewPrompt
+import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.VaultViewModel
 
 //
@@ -115,6 +116,34 @@ fun SettingsScreen(
             enabled = true,
             onCheckedChange = { encryptToSelf = it; vault.encryptToSelfDefault = it },
         )
+
+        var workFactor by remember { mutableStateOf(vault.scryptWorkFactor) }
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Passphrase work factor", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "2^" + workFactor + " — scrypt holds about " +
+                        (FileEncryptor.scryptMemoryBytes(workFactor) shr 20) +
+                        " MB while it derives the key, whatever the file size. " +
+                        (if (workFactor == FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR) {
+                            "This is age's default."
+                        } else {
+                            "age's default is 2^" + FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR + "."
+                        }) +
+                        " The value is stored in the file, so any age tool can still open it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(
+                onClick = { workFactor -= 1; vault.scryptWorkFactor = workFactor },
+                enabled = workFactor > FileEncryptor.MIN_SCRYPT_WORK_FACTOR,
+            ) { Text("Less") }
+            TextButton(
+                onClick = { workFactor += 1; vault.scryptWorkFactor = workFactor },
+                enabled = workFactor < FileEncryptor.MAX_SCRYPT_WORK_FACTOR,
+            ) { Text("More") }
+        }
 
         HorizontalDivider()
 

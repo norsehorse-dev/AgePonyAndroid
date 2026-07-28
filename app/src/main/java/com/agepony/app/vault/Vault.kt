@@ -74,6 +74,24 @@ class Vault(context: Context) {
         get() = prefs.getInt(KEY_LAUNCH_COUNT, 0)
         set(value) { prefs.edit().putInt(KEY_LAUNCH_COUNT, value).apply() }
 
+    /**
+     * Work factor for passphrase (scrypt) encryption, as the exponent in N = 2^workFactor.
+     *
+     * age's default is 18, which costs 256 MiB of RAM while the key is derived, independent of
+     * file size; a device with less headroom can drop to 16 (64 MiB). The chosen factor is written
+     * into the file's scrypt stanza, so every value stays readable by any age implementation.
+     */
+    var scryptWorkFactor: Int
+        get() = prefs.getInt(KEY_SCRYPT_WORK_FACTOR, FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR)
+            .coerceIn(FileEncryptor.MIN_SCRYPT_WORK_FACTOR, FileEncryptor.MAX_SCRYPT_WORK_FACTOR)
+        set(value) {
+            val clamped = value.coerceIn(
+                FileEncryptor.MIN_SCRYPT_WORK_FACTOR,
+                FileEncryptor.MAX_SCRYPT_WORK_FACTOR,
+            )
+            prefs.edit().putInt(KEY_SCRYPT_WORK_FACTOR, clamped).apply()
+        }
+
     var reviewPromptShown: Boolean
         get() = prefs.getBoolean(KEY_REVIEW_PROMPT_SHOWN, false)
         set(value) { prefs.edit().putBoolean(KEY_REVIEW_PROMPT_SHOWN, value).apply() }
@@ -196,6 +214,20 @@ class Vault(context: Context) {
         persist()
     }
 
+    /**
+     * Rename a saved recipient. Names are the whole point of saving a public key rather than
+     * pasting it each time, and until now one could only be set at the moment of adding.
+     * A blank name is ignored rather than accepted, since it would leave an unidentifiable row.
+     */
+    fun renameRecipient(id: String, newName: String) {
+        val trimmed = newName.trim()
+        if (trimmed.isEmpty()) return
+        val idx = recipients.indexOfFirst { it.id == id }
+        if (idx < 0) return
+        recipients[idx] = recipients[idx].copy(name = trimmed)
+        persist()
+    }
+
     fun deleteRecipient(id: String) {
         recipients.removeAll { it.id == id }
         persist()
@@ -268,5 +300,6 @@ class Vault(context: Context) {
         const val KEY_LAUNCH_COUNT = "launchCount"
         const val KEY_REVIEW_PROMPT_SHOWN = "reviewPromptShown"
         const val KEY_LAST_TAB = "lastTab"
+        const val KEY_SCRYPT_WORK_FACTOR = "scryptWorkFactor"
     }
 }

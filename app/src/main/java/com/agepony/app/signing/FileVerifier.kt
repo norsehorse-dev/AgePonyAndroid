@@ -29,8 +29,22 @@ class FileVerifier {
         message: ByteArray,
         knownIdentities: List<StoredIdentity>,
         namespace: String = SSHSig.NAMESPACE_AGEPONY,
+    ): Result = verifyHashed(signature, knownIdentities, namespace) { alg ->
+        SSHSig.hashMessage(message, alg)
+    }
+
+    /**
+     * The same checks as [verify] for a message too large to hold: [messageHashFor] supplies the
+     * message hash under the envelope's hash algorithm, which a streaming decrypt computes while
+     * the payload goes past on its way to disk.
+     */
+    fun verifyHashed(
+        signature: ByteArray,
+        knownIdentities: List<StoredIdentity>,
+        namespace: String = SSHSig.NAMESPACE_AGEPONY,
+        messageHashFor: (String) -> ByteArray,
     ): Result {
-        val result = SSHSigVerifier.verify(signature, message, namespace)
+        val result = SSHSigVerifier.verifyHashed(signature, namespace, messageHashFor)
         if (!result.valid) {
             return Result(Trust.INVALID, result.keyType, null, result.reason)
         }

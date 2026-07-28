@@ -161,11 +161,40 @@ internal fun RecipientDetail(
             Modifier.padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                recipient.name,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            val renaming = remember(recipientId) { mutableStateOf(false) }
+            val draftName = remember(recipientId) { mutableStateOf(recipient.name) }
+            if (renaming.value) {
+                OutlinedTextField(
+                    value = draftName.value,
+                    onValueChange = { draftName.value = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { renaming.value = false }) { Text("Cancel") }
+                    Button(
+                        onClick = {
+                            vault.renameRecipient(recipientId, draftName.value)
+                            renaming.value = false
+                        },
+                        enabled = draftName.value.isNotBlank(),
+                    ) { Text("Save") }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        recipient.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = {
+                        draftName.value = recipient.name
+                        renaming.value = true
+                    }) { Text("Rename") }
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "${typeLabel(recipient.type)}  •  ${sourceLabel(recipient.source)}" +

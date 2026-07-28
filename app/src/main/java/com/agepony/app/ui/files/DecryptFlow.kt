@@ -1,8 +1,6 @@
 package com.agepony.app.ui.files
 
-import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,29 +30,37 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.signing.FileVerifier
 import com.agepony.app.vault.FileEncryptor
-import com.agepony.app.vault.NoMatchingVaultIdentityException
 import com.agepony.app.vault.StoredIdentity
 import com.agepony.app.vault.Vault
 import com.agepony.app.vault.WrongPassphraseException
 import com.agepony.app.vault.toAgeIdentity
+import com.agepony.core.Age
 import com.agepony.core.archive.SignedBundle
+import com.agepony.core.recipients.AgeIdentity
+import com.agepony.core.recipients.ScryptIdentity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.BufferedOutputStream
+import java.io.InputStream
 
 //
-// Decrypt flow (Phase 2c-3b). Android counterpart of iOS's DecryptFlow:
-//   pick .age (SAF) -> normalize armor -> try vault identities -> if none match,
-//   ask for a passphrase (scrypt) -> save plaintext (SAF).
-// Armor is auto-detected via the BEGIN marker; the header is never parsed
-// directly (we just try identities, then passphrase).
+// Decrypt flow. Android counterpart of iOS's DecryptFlow:
+//   pick .age (SAF) -> work out how it is locked -> pick destination -> stream -> done.
 //
-// After decryption, the plaintext is probed for an AgePony signed bundle
-// (encrypt-and-sign). If present, the embedded SSHSIG is verified against the vault's
-// identities and a trust verdict is shown; the payload is what gets saved.
+// The file is never held in memory. Which key opens it is decided from the header alone, which
+// is small and bounded, so a wrong passphrase costs a few hundred bytes of reading rather than a
+// whole decrypt. Only once a key is known does the flow ask where to save, because streaming
+// needs somewhere to write as it goes.
+//
+// Armor is auto-detected from the first bytes. After decryption the plaintext is probed for an
+// AgePony signed bundle (encrypt-and-sign): the wrapper is stripped as it streams and the
+// embedded SSHSIG is checked against the vault. The signature sits after the payload in the
+// bundle, so a bad signature is reported once the file is already written; the verdict says so
+// plainly rather than pretending the file was verified before saving.
 //
 
-private enum class DecryptStage { PICK, WORKING, NEED_PASSPHRASE, DONE }
+private enum class DecryptStage { PICK, PROBING, NEED_PASSPHRASE, WORKING, DONE }
 
 @Composable
 fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit) {
@@ -61,37 +68,57 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
     val scope = rememberCoroutineScope()
 
     var stage by remember { mutableStateOf(DecryptStage.PICK) }
-    var sourceName by remember { mutableStateOf("file.age") }
-    var binary by remember { mutableStateOf<ByteArray?>(null) }
-    var triedIdentities by remember { mutableStateOf(false) }
+    var source by remember { mutableStateOf<SourceRef?>(null) }
     var passphrase by remember { mutableStateOf("") }
+    var usePassphrase by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var outputBytes by remember { mutableStateOf<ByteArray?>(null) }
     var savedName by remember { mutableStateOf<String?>(null) }
+    var originalName by remember { mutableStateOf<String?>(null) }
     var verdict by remember { mutableStateOf<String?>(null) }
+    var bytesDone by remember { mutableStateOf(0L) }
+
+    val sourceName = source?.name ?: "file.age"
 
     val createOutput = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri: Uri? ->
-        val bytes = outputBytes
-        if (uri == null || bytes == null) {
-            // User cancelled the save; stay where they were.
-            if (stage == DecryptStage.WORKING) {
-                stage = if (triedIdentities) DecryptStage.NEED_PASSPHRASE else DecryptStage.PICK
-            }
+        ActivityResultContracts.CreateDocument(SafIo.MIME_OCTET)
+    ) { dest: Uri? ->
+        val ref = source
+        if (dest == null || ref == null) {
+            stage = if (usePassphrase) DecryptStage.NEED_PASSPHRASE else DecryptStage.PICK
             return@rememberLauncherForActivityResult
         }
+        val pass = if (usePassphrase) passphrase else null
+        val identities = vault.identities.mapNotNull { runCatching { it.toAgeIdentity() }.getOrNull() }
+        val known = vault.identities.toList()
+        error = null
+        bytesDone = 0L
+        stage = DecryptStage.WORKING
         scope.launch {
             try {
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-                        ?: throw IllegalStateException("Couldn't open the destination.")
+                val outcome = withContext(Dispatchers.IO) {
+                    decryptToDocument(
+                        context = context,
+                        source = ref,
+                        dest = dest,
+                        identities = identities,
+                        passphrase = pass,
+                        known = known,
+                        onBytes = { delta -> bytesDone += delta },
+                    )
                 }
-                savedName = documentName(context, uri)
+                originalName = outcome.originalName
+                verdict = outcome.verdict
+                savedName = withContext(Dispatchers.IO) { SafIo.queryNameSize(context, dest).first }
                 stage = DecryptStage.DONE
-            } catch (e: Exception) {
-                error = e.message ?: "Couldn't save the file."
+            } catch (e: WrongPassphraseException) {
+                error = e.message
                 stage = DecryptStage.NEED_PASSPHRASE
+            } catch (e: OutOfMemoryError) {
+                error = decryptOutOfMemoryMessage(pass != null)
+                stage = if (usePassphrase) DecryptStage.NEED_PASSPHRASE else DecryptStage.PICK
+            } catch (e: Exception) {
+                error = e.message ?: "Decrypt failed."
+                stage = if (usePassphrase) DecryptStage.NEED_PASSPHRASE else DecryptStage.PICK
             }
         }
     }
@@ -102,56 +129,37 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         if (uri == null) return@rememberLauncherForActivityResult
         error = null
         passphrase = ""
-        triedIdentities = false
+        usePassphrase = false
         verdict = null
-        stage = DecryptStage.WORKING
+        savedName = null
+        originalName = null
+        stage = DecryptStage.PROBING
         scope.launch {
             try {
-                val name = withContext(Dispatchers.IO) { documentName(context, uri) }
-                val raw = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                        ?: throw IllegalStateException("Couldn't open the file.")
+                val ref = withContext(Dispatchers.IO) { SafIo.sourceRef(context, uri) }
+                source = ref
+                val identities = vault.identities.mapNotNull { runCatching { it.toAgeIdentity() }.getOrNull() }
+                val opens = identities.isNotEmpty() && withContext(Dispatchers.IO) {
+                    headerOpensWith(context, ref, identities)
                 }
-                sourceName = name
-                val bin = withContext(Dispatchers.Default) { FileEncryptor.toBinary(raw) }
-                binary = bin
-
-                val ids = vault.identities.mapNotNull { runCatching { it.toAgeIdentity() }.getOrNull() }
-                if (ids.isEmpty()) {
-                    triedIdentities = true
-                    stage = DecryptStage.NEED_PASSPHRASE
-                    return@launch
-                }
-                triedIdentities = true
-                try {
-                    val plain = withContext(Dispatchers.Default) {
-                        FileEncryptor.decryptWithIdentities(bin, ids)
-                    }
-                    val knownIds = vault.identities.toList()
-                    val res = withContext(Dispatchers.Default) { unbundleAndVerify(plain, name, knownIds) }
-                    outputBytes = res.bytes
-                    verdict = res.verdict
+                if (opens) {
                     vault.autoLockSuppressed = true
-                    createOutput.launch(res.name)
-                } catch (e: NoMatchingVaultIdentityException) {
+                    createOutput.launch(FileEncryptor.decryptedName(ref.name))
+                } else {
+                    usePassphrase = true
                     stage = DecryptStage.NEED_PASSPHRASE
-                } catch (e: OutOfMemoryError) {
-                    error = "Not enough memory to decrypt this file on this device."
-                    stage = DecryptStage.NEED_PASSPHRASE
-                } catch (e: Exception) {
-                    error = e.message ?: "This doesn't look like an age file."
-                    stage = DecryptStage.PICK
                 }
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't read the file."
+                error = e.message ?: "This doesn't look like an age file."
                 stage = DecryptStage.PICK
             }
         }
     }
 
     fun reset() {
-        sourceName = "file.age"; binary = null; triedIdentities = false
-        passphrase = ""; error = null; outputBytes = null; savedName = null; verdict = null
+        source = null; passphrase = ""; usePassphrase = false
+        error = null; savedName = null; originalName = null; verdict = null
+        bytesDone = 0L
         stage = DecryptStage.PICK
     }
 
@@ -164,7 +172,8 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 Text("Decrypt a file", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                 Text(
                     "Pick an age file (.age, binary or armored). AgePony tries your identities first, " +
-                        "then offers a passphrase if the file needs one.",
+                        "then offers a passphrase if the file needs one. Files are streamed, so size " +
+                        "is not a limit.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -176,13 +185,17 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 TextButton(onClick = onClose) { Text("Cancel") }
             }
 
-            DecryptStage.WORKING -> Column(
+            DecryptStage.PROBING -> Column(
                 Modifier.fillMaxSize().padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                Text("Decrypting…", modifier = Modifier.padding(top = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "Reading the header…",
+                    modifier = Modifier.padding(top = 16.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             DecryptStage.NEED_PASSPHRASE -> Column(
@@ -213,26 +226,27 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 if (error != null) ErrorLine(error!!)
                 Button(
                     onClick = {
-                        val bin = binary ?: return@Button
+                        val ref = source ?: return@Button
                         if (passphrase.isEmpty()) { error = "Enter the passphrase."; return@Button }
+                        val entered = passphrase
                         error = null
-                        stage = DecryptStage.WORKING
+                        stage = DecryptStage.PROBING
                         scope.launch {
                             try {
-                                val plain = withContext(Dispatchers.Default) {
-                                    FileEncryptor.decryptWithPassphrase(bin, passphrase)
+                                // The scrypt stanza lives in the header, so a wrong passphrase is
+                                // caught here, before the user is asked where to save anything.
+                                val opens = withContext(Dispatchers.IO) {
+                                    headerOpensWith(context, ref, listOf(ScryptIdentity(entered)))
                                 }
-                                val knownIds = vault.identities.toList()
-                                val res = withContext(Dispatchers.Default) { unbundleAndVerify(plain, sourceName, knownIds) }
-                                outputBytes = res.bytes
-                                verdict = res.verdict
-                                vault.autoLockSuppressed = true
-                                createOutput.launch(res.name)
-                            } catch (e: WrongPassphraseException) {
-                                error = e.message
-                                stage = DecryptStage.NEED_PASSPHRASE
+                                if (!opens) {
+                                    error = "Wrong passphrase, or this file isn't passphrase-encrypted."
+                                    stage = DecryptStage.NEED_PASSPHRASE
+                                } else {
+                                    vault.autoLockSuppressed = true
+                                    createOutput.launch(FileEncryptor.decryptedName(ref.name))
+                                }
                             } catch (e: OutOfMemoryError) {
-                                error = "Not enough memory to derive the key — the file's work factor is very high."
+                                error = decryptOutOfMemoryMessage(true)
                                 stage = DecryptStage.NEED_PASSPHRASE
                             } catch (e: Exception) {
                                 error = e.message ?: "Decrypt failed."
@@ -246,6 +260,35 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 TextButton(onClick = onClose) { Text("Cancel") }
             }
 
+            DecryptStage.WORKING -> Column(
+                Modifier.fillMaxSize().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                val total = source?.size ?: 0L
+                if (total > 0) {
+                    LinearProgressIndicator(
+                        progress = { (bytesDone.toFloat() / total.toFloat()).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+                Text(
+                    "Decrypting…",
+                    modifier = Modifier.padding(top = 16.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (total > 0) {
+                    Text(
+                        "${SafIo.humanSize(bytesDone)} of ${SafIo.humanSize(total)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             DecryptStage.DONE -> Column(
                 Modifier.fillMaxSize().padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -257,17 +300,26 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp, bottom = if (verdict != null) 8.dp else 24.dp),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                val original = originalName
+                if (original != null && original != savedName) {
+                    Text(
+                        "Original name inside the signed file: $original",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
                 if (verdict != null) {
                     Text(
                         verdict!!,
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (verdict!!.startsWith("⚠")) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = 24.dp),
+                        modifier = Modifier.padding(bottom = 16.dp),
                     )
                 }
                 Button(onClick = { reset() }, modifier = Modifier.fillMaxWidth()) { Text("Decrypt another") }
@@ -277,43 +329,84 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
     }
 }
 
-@Composable
-private fun ErrorLine(message: String) {
-    Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-}
+// ---- Work ----
 
-private class DecryptResult(val bytes: ByteArray, val name: String, val verdict: String?)
+private class DecryptOutcome(val originalName: String?, val verdict: String?)
 
 /**
- * If [plain] is an AgePony signed bundle, verify its embedded signature against [identities]
- * and return the payload plus a human-readable verdict. Otherwise return [plain] unchanged
- * with a stripped output name and no verdict.
+ * Can any of [identities] unwrap this file? Reads the age header and stops there, so this costs
+ * a few hundred bytes rather than a decrypt, and it is safe to call before a destination exists.
  */
-private fun unbundleAndVerify(
-    plain: ByteArray,
-    sourceName: String,
-    identities: List<StoredIdentity>,
-): DecryptResult {
-    val bundle = SignedBundle.parse(plain)
-        ?: return DecryptResult(plain, FileEncryptor.decryptedName(sourceName), null)
-    val result = FileVerifier().verify(
+private fun headerOpensWith(
+    context: android.content.Context,
+    source: SourceRef,
+    identities: List<AgeIdentity>,
+): Boolean {
+    val (armored, input) = FileEncryptor.sniffArmored(SafIo.openInput(context, source.uri))
+    return input.use { stream ->
+        val binary: InputStream = if (armored) com.agepony.core.Armor.decodingSource(stream) else stream
+        Age.canDecryptStream(binary, identities)
+    }
+}
+
+/**
+ * Stream the whole file: ciphertext in from the provider, plaintext out to the provider, with a
+ * signed-bundle wrapper stripped on the way past if there is one.
+ */
+private fun decryptToDocument(
+    context: android.content.Context,
+    source: SourceRef,
+    dest: Uri,
+    identities: List<AgeIdentity>,
+    passphrase: String?,
+    known: List<StoredIdentity>,
+    onBytes: (Long) -> Unit,
+): DecryptOutcome {
+    val (armored, rawInput) = FileEncryptor.sniffArmored(SafIo.openInput(context, source.uri))
+    var parsed: SignedBundle.StreamParsed? = null
+
+    CountingInputStream(rawInput, onBytes).use { input ->
+        BufferedOutputStream(SafIo.openOutput(context, dest)).use { fileOut ->
+            val sink = SignedBundle.UnwrappingSink(fileOut)
+            if (passphrase != null) {
+                FileEncryptor.decryptStreamWithPassphrase(input, armored, passphrase, sink)
+            } else {
+                FileEncryptor.decryptStreamWithIdentities(input, armored, identities, sink)
+            }
+            sink.finish()
+            parsed = sink.result()
+            fileOut.flush()
+        }
+    }
+
+    val bundle = parsed ?: return DecryptOutcome(null, null)
+    val result = FileVerifier().verifyHashed(
         bundle.signatureArmored.toByteArray(Charsets.UTF_8),
-        bundle.payload,
-        identities,
-    )
+        known,
+    ) { alg -> bundle.hash(alg) }
     val verdict = when (result.trust) {
         FileVerifier.Trust.TRUSTED -> "Signed by ${result.signerName ?: "a known key"} ✓"
         FileVerifier.Trust.VALID_UNKNOWN -> "Valid signature — signer not in your vault"
         FileVerifier.Trust.INVALID -> "⚠ Signature invalid: ${result.reason ?: "verification failed"}"
     }
-    return DecryptResult(bundle.payload, bundle.name, verdict)
+    return DecryptOutcome(bundle.name, verdict)
 }
 
-private fun documentName(context: Context, uri: Uri): String {
-    var name = "file.age"
-    context.contentResolver.query(uri, null, null, null, null)?.use { c ->
-        val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        if (c.moveToFirst() && idx >= 0) c.getString(idx)?.let { name = it }
+/**
+ * Decrypting streams, so a memory failure here is almost always scrypt: the work factor is
+ * chosen by whoever encrypted the file, and a hostile one can demand gigabytes.
+ */
+private fun decryptOutOfMemoryMessage(usingPassphrase: Boolean): String =
+    if (usingPassphrase) {
+        "Not enough memory to derive the key from this passphrase. The file's scrypt work factor " +
+            "sets how much is needed, whatever the file size, and this one asks for more than " +
+            "this device has."
+    } else {
+        "Not enough memory to finish this decrypt. Files are streamed, so this is unusual — " +
+            "closing other apps and trying again should clear it."
     }
-    return name
+
+@Composable
+private fun ErrorLine(message: String) {
+    Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
 }
