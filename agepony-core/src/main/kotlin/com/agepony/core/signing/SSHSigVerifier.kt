@@ -48,6 +48,17 @@ object SSHSigVerifier {
         signature: ByteArray,
         message: ByteArray,
         expectedNamespace: String? = SSHSig.NAMESPACE_AGEPONY,
+    ): Result = verifyHashed(signature, expectedNamespace) { alg -> SSHSig.hashMessage(message, alg) }
+
+    /**
+     * Verify [signature] when the message is too large to hold in memory: [messageHashFor] is
+     * asked for the message hash under the envelope's hash algorithm, which [SSHSig.hashStream]
+     * can produce by streaming. Same checks and the same [Result] as [verify].
+     */
+    fun verifyHashed(
+        signature: ByteArray,
+        expectedNamespace: String? = SSHSig.NAMESPACE_AGEPONY,
+        messageHashFor: (String) -> ByteArray,
     ): Result {
         val blob = SSHSig.decodeArmoredOrRaw(signature)
         val env = SSHSig.decode(blob)
@@ -66,7 +77,7 @@ object SSHSigVerifier {
         val signedData = SSHSig.signedData(
             env.namespace,
             env.hashAlgorithm,
-            SSHSig.hashMessage(message, env.hashAlgorithm),
+            messageHashFor(env.hashAlgorithm),
         )
 
         val ok = when (keyType) {

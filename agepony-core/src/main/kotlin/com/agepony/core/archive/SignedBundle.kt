@@ -1,5 +1,7 @@
 package com.agepony.core.archive
 
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
@@ -104,6 +106,29 @@ object SignedBundle {
     }
 
     /**
+     * The bundle as something readable, for the encrypt path: `Age.encryptStream` pulls its
+     * plaintext from an `InputStream`, so sign-and-encrypt needs the bundle in pull shape rather
+     * than the push shape [buildStream] offers. [payload] is read once, when it is reached.
+     * Produces exactly the bytes [build] would.
+     */
+    fun bundleSource(
+        originalName: String,
+        payloadSize: Long,
+        payload: InputStream,
+        signatureArmored: String,
+    ): InputStream {
+        val manifest = "$VERSION_LINE\nname=${sanitizeName(originalName)}\n".toByteArray(Charsets.UTF_8)
+        val signature = signatureArmored.toByteArray(Charsets.UTF_8)
+        return TarArchive.source(
+            listOf(
+                TarArchive.StreamEntry(MARKER, manifest.size.toLong()) { ByteArrayInputStream(manifest) },
+                TarArchive.StreamEntry(PAYLOAD, payloadSize) { payload },
+                TarArchive.StreamEntry(SIGNATURE, signature.size.toLong()) { ByteArrayInputStream(signature) },
+            )
+        )
+    }
+
+    /**
      * Streaming counterpart of [parse]: writes the payload to [payloadOut] as it is read and
      * returns the metadata needed to verify it, or null if [input] isn't a signed bundle.
      *
@@ -166,11 +191,200 @@ object SignedBundle {
     }
 
     /**
+     * An [OutputStream] that takes decrypted plaintext and writes the payload to [payloadOut].
+     *
+     * This is the shape the decrypt path needs. `Age.decryptStream` pushes plaintext into an
+     * `OutputStream`, and whether that plaintext is a signed bundle is not known until its first
+     * block has arrived, so the decision has to be made mid-stream: a bundle has its wrapper
+     * stripped as it goes and [result] returns what verification needs, and anything else passes
+     * through byte for byte with a null [result].
+     *
+     * The signature is the last entry, after the payload, so verification can only be reported
+     * once the payload has already been written. The caller must show a failed verdict loudly
+     * rather than assume a saved file is a verified one.
+     *
+     * Call [finish] (or [close], which calls it) before [result].
+     */
+    class UnwrappingSink(private val payloadOut: OutputStream) : OutputStream() {
+
+        private enum class Phase { SNIFF, HEADER, DATA, PAD, TRAILING, PASSTHROUGH }
+        private enum class Target { MANIFEST, PAYLOAD, SIGNATURE, SKIP }
+
+        private var phase = Phase.SNIFF
+        private val block = ByteArray(TarArchive.BLOCK_SIZE)
+        private var blockLen = 0
+
+        private var target = Target.SKIP
+        private var dataLeft = 0L
+        private var padLeft = 0
+        private var payloadSize = -1L
+        private val manifest = ByteArrayOutputStream()
+        private val signature = ByteArrayOutputStream()
+        private val digests = HASH_ALGS.mapValues { (_, jce) -> MessageDigest.getInstance(jce) }
+        private var damage: String? = null
+        private var finished = false
+
+        override fun write(b: Int) {
+            write(byteArrayOf(b.toByte()), 0, 1)
+        }
+
+        override fun write(b: ByteArray, off: Int, len: Int) {
+            check(!finished) { "unwrapping sink is already finished" }
+            var pos = off
+            var left = len
+            while (left > 0) {
+                when (phase) {
+                    Phase.PASSTHROUGH -> {
+                        payloadOut.write(b, pos, left)
+                        return
+                    }
+                    Phase.TRAILING -> return // past end-of-archive: nothing left to route
+                    Phase.SNIFF, Phase.HEADER -> {
+                        val take = minOf(block.size - blockLen, left)
+                        System.arraycopy(b, pos, block, blockLen, take)
+                        blockLen += take
+                        pos += take
+                        left -= take
+                        if (blockLen == block.size) consumeHeaderBlock()
+                    }
+                    Phase.DATA -> {
+                        val take = minOf(left.toLong(), dataLeft).toInt()
+                        route(b, pos, take)
+                        pos += take
+                        left -= take
+                        dataLeft -= take
+                        if (dataLeft == 0L) startPadding()
+                    }
+                    Phase.PAD -> {
+                        val take = minOf(left, padLeft)
+                        pos += take
+                        left -= take
+                        padLeft -= take
+                        if (padLeft == 0) { phase = Phase.HEADER; blockLen = 0 }
+                    }
+                }
+            }
+        }
+
+        override fun flush() = payloadOut.flush()
+
+        /** Settle the final state. Idempotent, and does not close [payloadOut]. */
+        fun finish() {
+            if (finished) return
+            finished = true
+            when (phase) {
+                // Fewer bytes than one header block ever arrived: it was never a tar.
+                Phase.SNIFF -> if (blockLen > 0) {
+                    payloadOut.write(block, 0, blockLen)
+                    blockLen = 0
+                    phase = Phase.PASSTHROUGH
+                }
+                Phase.HEADER -> if (blockLen > 0) damage = damage ?: "truncated header block"
+                Phase.DATA, Phase.PAD -> damage = damage ?: "ended in the middle of an entry"
+                else -> {}
+            }
+        }
+
+        override fun close() = finish()
+
+        /**
+         * What the bundle carried, or null if the plaintext was not a signed bundle (in which
+         * case every byte written reached [payloadOut] unchanged). Throws [BundleException] if it
+         * was a bundle but a damaged one.
+         */
+        fun result(): StreamParsed? {
+            check(finished) { "call finish() before result()" }
+            if (phase == Phase.PASSTHROUGH || phase == Phase.SNIFF) return null
+            damage?.let { throw BundleException("signed bundle is damaged: $it") }
+
+            val manifestText = String(manifest.toByteArray(), Charsets.UTF_8)
+            if (!manifestText.startsWith("agepony-signed/")) {
+                throw BundleException("signed bundle has an unreadable manifest")
+            }
+            if (payloadSize < 0) throw BundleException("signed bundle has no '$PAYLOAD' entry")
+            if (signature.size() == 0) throw BundleException("signed bundle has no '$SIGNATURE' entry")
+
+            val name = manifestText.lineSequence()
+                .firstOrNull { it.startsWith("name=") }
+                ?.removePrefix("name=")
+                ?.ifBlank { "file" }
+                ?: "file"
+            return StreamParsed(
+                name,
+                String(signature.toByteArray(), Charsets.UTF_8),
+                payloadSize,
+                digests.mapValues { (_, d) -> d.digest() },
+            )
+        }
+
+        private fun consumeHeaderBlock() {
+            val first = phase == Phase.SNIFF
+            val info = try {
+                TarArchive.parseHeaderBlock(block)
+            } catch (e: TarArchive.TarException) {
+                if (first) { becomePassthrough(); return }
+                damage = e.message
+                phase = Phase.TRAILING
+                return
+            }
+            if (info == null) { // end-of-archive marker
+                blockLen = 0
+                phase = Phase.TRAILING
+                return
+            }
+            if (first && (info.name != MARKER || info.size > MAX_MANIFEST)) {
+                becomePassthrough()
+                return
+            }
+            blockLen = 0
+            target = when (info.name) {
+                MARKER -> Target.MANIFEST
+                PAYLOAD -> { payloadSize = info.size; Target.PAYLOAD }
+                SIGNATURE -> Target.SIGNATURE
+                else -> Target.SKIP // unknown entries are ignored so the format can grow
+            }
+            dataLeft = info.size
+            padLeft = ((TarArchive.BLOCK_SIZE - info.size % TarArchive.BLOCK_SIZE) % TarArchive.BLOCK_SIZE).toInt()
+            if (dataLeft > 0) phase = Phase.DATA else startPadding()
+        }
+
+        private fun startPadding() {
+            if (padLeft > 0) {
+                phase = Phase.PAD
+            } else {
+                phase = Phase.HEADER
+                blockLen = 0
+            }
+        }
+
+        private fun becomePassthrough() {
+            phase = Phase.PASSTHROUGH
+            if (blockLen > 0) {
+                payloadOut.write(block, 0, blockLen)
+                blockLen = 0
+            }
+        }
+
+        private fun route(b: ByteArray, off: Int, len: Int) {
+            when (target) {
+                Target.PAYLOAD -> {
+                    payloadOut.write(b, off, len)
+                    for (d in digests.values) d.update(b, off, len)
+                }
+                Target.MANIFEST -> if (manifest.size() + len <= MAX_MANIFEST) manifest.write(b, off, len)
+                Target.SIGNATURE -> if (signature.size() + len <= MAX_SIGNATURE) signature.write(b, off, len)
+                Target.SKIP -> {}
+            }
+        }
+    }
+
+    /**
      * Reset budget for [parseStream]: the marker entry is one header block plus one data block,
      * so a rejection is decided well inside this.
      */
     private const val MARK_LIMIT = 4096
     private const val MAX_MANIFEST = 4096L
+    private const val MAX_SIGNATURE = 8192
     private const val COPY_BUFFER = 64 * 1024
 
     /** A bundle that identified itself with the marker entry but is malformed after it. */

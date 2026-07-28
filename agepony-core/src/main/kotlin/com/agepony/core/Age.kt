@@ -123,6 +123,23 @@ object Age {
         AgePayload.decryptStream(fileKey, ciphertext, out)
     }
 
+    /**
+     * True if any of [identities] can unwrap this file's header. Reads the header and stops
+     * there, leaving `ciphertext` positioned at the first payload byte, so a caller can find out
+     * which key a file needs without decrypting it. Throws the usual header exceptions for input
+     * that is not age at all.
+     */
+    fun canDecryptStream(ciphertext: InputStream, identities: List<AgeIdentity>): Boolean {
+        if (identities.isEmpty()) return false
+        val parsed = AgeHeader.parse(readHeaderBytes(ciphertext))
+        for (stanza in parsed.stanzas) {
+            for (id in identities) {
+                if (id.unwrap(stanza) != null) return true
+            }
+        }
+        return false
+    }
+
     // --- Internals ---
 
     /**

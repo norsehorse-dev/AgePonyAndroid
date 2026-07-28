@@ -86,111 +86,224 @@ object Armor {
     }
 
     /**
-     * Streaming encode: read binary from [binary], write armored text to [out] in bounded
-     * memory. Output is byte for byte what [encode] would produce for the same input.
-     * Does not close either stream.
+     * An [OutputStream] that armors whatever is written to it. The BEGIN marker goes out when the
+     * sink is created; [finish] emits the trailing short group and the END marker. Bytes produced
+     * are identical to [encode] for the same input.
+     *
+     * [close] finishes the armor but deliberately leaves the wrapped stream open, so a caller can
+     * keep owning a SAF output stream.
      */
-    fun encodeStream(binary: InputStream, out: OutputStream) {
-        val encoder = Base64.getEncoder()
-        val nl = '\n'.code
-        out.write(BEGIN_MARKER.toByteArray(Charsets.US_ASCII))
-        out.write(nl)
+    class EncodingSink(private val out: OutputStream) : OutputStream() {
+        private val encoder = Base64.getEncoder()
+        private val group = ByteArray(GROUP)
+        private var held = 0
+        private var finished = false
 
-        val buf = ByteArray(READ_CHUNK)
-        while (true) {
-            val n = readFully(binary, buf)
-            if (n == 0) break
-            val aligned = n - (n % GROUP)
+        init {
+            out.write(BEGIN_MARKER.toByteArray(Charsets.US_ASCII))
+            out.write(NEWLINE)
+        }
+
+        override fun write(b: Int) {
+            write(byteArrayOf(b.toByte()), 0, 1)
+        }
+
+        override fun write(b: ByteArray, off: Int, len: Int) {
+            check(!finished) { "armor sink is already finished" }
+            var pos = off
+            var left = len
+
+            if (held > 0) {
+                val take = minOf(GROUP - held, left)
+                System.arraycopy(b, pos, group, held, take)
+                held += take
+                pos += take
+                left -= take
+                if (held == GROUP) {
+                    emitLines(group, 0, GROUP)
+                    held = 0
+                }
+            }
+
+            val aligned = left - (left % GROUP)
             if (aligned > 0) {
-                // A multiple of 48 bytes encodes to a multiple of 64 unpadded base64 chars.
-                val enc = encoder.encode(if (aligned == buf.size) buf else buf.copyOfRange(0, aligned))
+                emitLines(b, pos, aligned)
+                pos += aligned
+                left -= aligned
+            }
+            if (left > 0) {
+                System.arraycopy(b, pos, group, 0, left)
+                held = left
+            }
+        }
+
+        /** Emit the final partial group and the END marker. Idempotent. */
+        fun finish() {
+            if (finished) return
+            finished = true
+            if (held > 0) {
+                // The only short group, and the only place base64 padding can appear.
+                out.write(encoder.encode(group.copyOfRange(0, held)))
+                out.write(NEWLINE)
+                held = 0
+            }
+            out.write(END_MARKER.toByteArray(Charsets.US_ASCII))
+            out.write(NEWLINE)
+        }
+
+        override fun flush() = out.flush()
+
+        override fun close() = finish()
+
+        /** [len] is a multiple of 48, so its base64 is a whole number of unpadded 64-char lines. */
+        private fun emitLines(src: ByteArray, off: Int, len: Int) {
+            var pos = off
+            var left = len
+            while (left > 0) {
+                val take = minOf(left, READ_CHUNK)
+                val enc = encoder.encode(src.copyOfRange(pos, pos + take))
                 var i = 0
                 while (i < enc.size) {
                     out.write(enc, i, LINE_WIDTH)
-                    out.write(nl)
+                    out.write(NEWLINE)
                     i += LINE_WIDTH
                 }
+                pos += take
+                left -= take
             }
-            if (aligned < n) {
-                // Short group: only possible at end of input, and the only place padding appears.
-                out.write(encoder.encode(buf.copyOfRange(aligned, n)))
-                out.write(nl)
-                break
-            }
-            if (n < buf.size) break // clean EOF on a group boundary
         }
-
-        out.write(END_MARKER.toByteArray(Charsets.US_ASCII))
-        out.write(nl)
     }
 
     /**
-     * Streaming decode: read armored text from [armored], write decoded binary to [out] in
-     * bounded memory. Accepts what [decode] accepts, including CRLF line endings, trailing
-     * whitespace and blank lines around the markers. Does not close either stream.
+     * An [InputStream] that reads armored text and yields the decoded binary, so an armored file
+     * can be fed straight to a binary reader without being decoded whole first. Accepts what
+     * [decode] accepts, including CRLF, trailing whitespace and blank lines around the markers.
+     * [close] leaves the wrapped stream open.
      */
-    fun decodeStream(armored: InputStream, out: OutputStream) {
-        val reader = BufferedReader(InputStreamReader(armored, Charsets.US_ASCII))
-        val decoder = Base64.getDecoder()
-        val pending = StringBuilder(FLUSH_AT + LINE_WIDTH)
-        var sawBegin = false
-        var sawEnd = false
-        var sawPadding = false
+    class DecodingSource(input: InputStream) : InputStream() {
+        private val reader = BufferedReader(InputStreamReader(input, Charsets.US_ASCII))
+        private val decoder = Base64.getDecoder()
+        private val pending = StringBuilder(FLUSH_AT + LINE_WIDTH)
+        private var buf = ByteArray(0)
+        private var pos = 0
+        private var sawBegin = false
+        private var sawEnd = false
+        private var sawPadding = false
+        private var done = false
 
-        fun flush(all: Boolean) {
+        override fun read(): Int {
+            if (!fill()) return -1
+            return buf[pos++].toInt() and 0xff
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (len == 0) return 0
+            if (!fill()) return -1
+            val take = minOf(len, buf.size - pos)
+            System.arraycopy(buf, pos, b, off, take)
+            pos += take
+            return take
+        }
+
+        override fun available(): Int = buf.size - pos
+
+        override fun close() { /* the wrapped stream stays the caller's */ }
+
+        /** Refill [buf] when it runs out. False once the armored body is exhausted. */
+        private fun fill(): Boolean {
+            while (pos >= buf.size) {
+                if (done) return false
+                buf = nextChunk()
+                pos = 0
+            }
+            return true
+        }
+
+        private fun nextChunk(): ByteArray {
+            while (true) {
+                val raw = reader.readLine()
+                if (raw == null) {
+                    if (!sawBegin) throw ArmorException("missing BEGIN marker")
+                    if (!sawEnd) throw ArmorException("missing END marker")
+                    done = true
+                    return decodePending(all = true)
+                }
+                val line = raw.trim()
+
+                if (!sawBegin) {
+                    if (line.isEmpty()) continue
+                    if (line != BEGIN_MARKER) throw ArmorException("missing BEGIN marker")
+                    sawBegin = true
+                    continue
+                }
+
+                if (!sawEnd) {
+                    // Reading continues past END so trailing junk is still rejected, the way
+                    // decode() rejects it by requiring END to be the last line.
+                    if (line == END_MARKER) { sawEnd = true; continue }
+                    if (line == BEGIN_MARKER) throw ArmorException("unexpected second BEGIN marker")
+                    if (line.isEmpty()) continue
+                    if (sawPadding) throw ArmorException("base64 padding before the end of the body")
+                    pending.append(line)
+                    if (pending.length >= FLUSH_AT) {
+                        val chunk = decodePending(all = false)
+                        if (chunk.isNotEmpty()) return chunk
+                    }
+                    continue
+                }
+
+                if (line.isNotEmpty()) throw ArmorException("unexpected content after END marker")
+            }
+        }
+
+        private fun decodePending(all: Boolean): ByteArray {
             val take = if (all) pending.length else pending.length - (pending.length % 4)
-            if (take == 0) return
+            if (take == 0) return ByteArray(0)
             val chunk = pending.substring(0, take)
             pending.delete(0, take)
             if (chunk.indexOf('=') >= 0) sawPadding = true
-            val bytes = try {
+            return try {
                 decoder.decode(chunk)
             } catch (e: IllegalArgumentException) {
                 throw ArmorException("invalid base64 in armor body: ${e.message}")
             }
-            out.write(bytes)
         }
+    }
 
-        while (true) {
-            val raw = reader.readLine() ?: break
-            val line = raw.trim()
-            if (!sawBegin) {
-                if (line.isEmpty()) continue
-                if (line != BEGIN_MARKER) throw ArmorException("missing BEGIN marker")
-                sawBegin = true
-                continue
-            }
-            if (!sawEnd) {
-                if (line == END_MARKER) { sawEnd = true; continue }
-                if (line == BEGIN_MARKER) throw ArmorException("unexpected second BEGIN marker")
-                if (line.isEmpty()) continue
-                if (sawPadding) throw ArmorException("base64 padding before the end of the body")
-                pending.append(line)
-                if (pending.length >= FLUSH_AT) flush(all = false)
-                continue
-            }
-            // After END, only blank lines are tolerated (decode() requires END to be the last line).
-            if (line.isNotEmpty()) throw ArmorException("unexpected content after END marker")
-        }
+    /** Wrap [out] so everything written to it comes out armored. Finish with [EncodingSink.finish]. */
+    fun encodingSink(out: OutputStream): EncodingSink = EncodingSink(out)
 
-        if (!sawBegin) throw ArmorException("missing BEGIN marker")
-        if (!sawEnd) throw ArmorException("missing END marker")
-        flush(all = true)
+    /** Wrap armored [armored] so it reads as the decoded binary. */
+    fun decodingSource(armored: InputStream): DecodingSource = DecodingSource(armored)
+
+    /**
+     * Streaming encode: read binary from [binary], write armored text to [out] in bounded memory.
+     * Output is byte for byte what [encode] would produce. Does not close either stream.
+     */
+    fun encodeStream(binary: InputStream, out: OutputStream) {
+        val sink = EncodingSink(out)
+        copy(binary, sink)
+        sink.finish()
+    }
+
+    /**
+     * Streaming decode: read armored text from [armored], write decoded binary to [out] in
+     * bounded memory. Does not close either stream.
+     */
+    fun decodeStream(armored: InputStream, out: OutputStream) {
+        copy(DecodingSource(armored), out)
     }
 
     // --- Internals ---
 
-    /**
-     * Read up to `buf.size` bytes, blocking through short reads until the buffer is full or the
-     * stream ends. Returns the number of bytes read (0 at EOF).
-     */
-    private fun readFully(input: InputStream, buf: ByteArray): Int {
-        var off = 0
-        while (off < buf.size) {
-            val r = input.read(buf, off, buf.size - off)
+    private const val NEWLINE = '\n'.code
+
+    private fun copy(input: InputStream, out: OutputStream) {
+        val buf = ByteArray(READ_CHUNK)
+        while (true) {
+            val r = input.read(buf)
             if (r < 0) break
-            off += r
+            out.write(buf, 0, r)
         }
-        return off
     }
 }

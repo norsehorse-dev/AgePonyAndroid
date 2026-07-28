@@ -3,8 +3,11 @@ package com.agepony.core.signing
 import com.agepony.core.crypto.SHA256
 import com.agepony.core.ssh.SSHMPInt
 import com.agepony.core.ssh.SSHWire
+import org.bouncycastle.crypto.Digest
+import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.digests.SHA512Digest
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.util.Base64
@@ -92,6 +95,30 @@ object SSHSig {
             HASH_SHA256 -> SHA256.digest(message)
             else -> throw SSHSigFormatException("unsupported hash algorithm: '$hashAlg'")
         }
+
+    /**
+     * Hash a message read from [message] in bounded memory, 64 KiB at a time. Same result as
+     * [hashMessage] over the same bytes.
+     *
+     * SSHSIG only ever covers the message hash, so this is what lets a large file be signed or
+     * verified without being held in memory. Does not close the stream.
+     */
+    fun hashStream(message: InputStream, hashAlg: String = HASH_SHA512): ByteArray {
+        val digest: Digest = when (hashAlg) {
+            HASH_SHA512 -> SHA512Digest()
+            HASH_SHA256 -> SHA256Digest()
+            else -> throw SSHSigFormatException("unsupported hash algorithm: '$hashAlg'")
+        }
+        val buf = ByteArray(64 * 1024)
+        while (true) {
+            val r = message.read(buf)
+            if (r < 0) break
+            digest.update(buf, 0, r)
+        }
+        val out = ByteArray(digest.digestSize)
+        digest.doFinal(out, 0)
+        return out
+    }
 
     /**
      * Build the signed-data blob the signature algorithm covers. [messageHash] is the

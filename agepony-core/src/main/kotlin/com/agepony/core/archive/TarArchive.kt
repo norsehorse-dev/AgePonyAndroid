@@ -1,8 +1,11 @@
 package com.agepony.core.archive
 
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.SequenceInputStream
+import java.util.Enumeration
 
 /**
  * Compact USTAR tar, used to bundle multiple files into a single payload before age
@@ -27,6 +30,9 @@ object TarArchive {
     private const val NAME_MAX = 100
     private const val MODE_0644 = 420L // 0o644
     private const val COPY_BUFFER = 64 * 1024
+
+    /** USTAR block size. Public because streaming readers have to buffer exactly one header. */
+    const val BLOCK_SIZE = BLOCK
 
     /** Largest entry a USTAR 12-byte octal size field can express: 8^11 - 1, just under 8 GiB. */
     const val MAX_ENTRY_SIZE = 8589934591L
@@ -90,6 +96,114 @@ object TarArchive {
         out.write(ByteArray(BLOCK * 2))
     }
 
+    // --- Streaming source ---
+
+    /**
+     * One entry of a streamed archive. [open] is called only when the entry is reached, so a
+     * hundred-file archive never has a hundred files open at once, and [size] must be that
+     * entry's exact byte count.
+     */
+    class StreamEntry(val name: String, val size: Long, val open: () -> InputStream)
+
+    /**
+     * Present [entries] as a single readable archive, without building it anywhere. This is the
+     * pull-shaped counterpart of [writeEntry]: `Age.encryptStream` reads its plaintext from an
+     * `InputStream`, so a multi-file encrypt needs the tar to be readable rather than writable.
+     * Produces exactly the bytes [create] would for the same entries.
+     */
+    fun source(entries: List<StreamEntry>, mtime: Long = 0L): InputStream {
+        for (e in entries) {
+            if (e.size < 0) throw TarException("entry '${e.name}' has negative size ${e.size}")
+            if (e.size > MAX_ENTRY_SIZE) throw TarException("entry '${e.name}' is too large for USTAR: ${e.size} bytes")
+        }
+        return SequenceInputStream(TarPartEnumeration(entries, mtime))
+    }
+
+    /**
+     * Exact length of the archive [source] will produce for [entries], without producing it.
+     * Sign-and-encrypt of a multi-file bundle needs this: the signed bundle's tar header has to
+     * declare the inner archive's size before the inner archive exists.
+     */
+    fun sizeOf(entries: List<StreamEntry>): Long {
+        var total = 0L
+        for (e in entries) total += BLOCK + e.size + ((BLOCK - e.size % BLOCK) % BLOCK)
+        return total + BLOCK * 2
+    }
+
+    /** Header, payload, padding for each entry in turn, then the end-of-archive blocks. */
+    private class TarPartEnumeration(
+        private val entries: List<StreamEntry>,
+        private val mtime: Long,
+    ) : Enumeration<InputStream> {
+        private var index = 0
+        private var part = 0 // 0 header, 1 payload, 2 padding
+        private var exhausted = false
+
+        override fun hasMoreElements(): Boolean = !exhausted
+
+        override fun nextElement(): InputStream {
+            if (index >= entries.size) {
+                exhausted = true
+                return ByteArrayInputStream(ByteArray(BLOCK * 2))
+            }
+            val e = entries[index]
+            return when (part) {
+                0 -> {
+                    part = 1
+                    ByteArrayInputStream(TarArchive.header(e.name, e.size, mtime))
+                }
+                1 -> {
+                    part = 2
+                    ExactSizeInputStream(e.open(), e.size, e.name)
+                }
+                else -> {
+                    part = 0
+                    index++
+                    ByteArrayInputStream(ByteArray(((BLOCK - e.size % BLOCK) % BLOCK).toInt()))
+                }
+            }
+        }
+    }
+
+    /**
+     * Reads exactly [size] bytes from [src] and refuses to silently do otherwise: a file that
+     * shrank between the size query and the read would otherwise produce a corrupt archive.
+     */
+    private class ExactSizeInputStream(
+        private val src: InputStream,
+        private val size: Long,
+        private val name: String,
+    ) : InputStream() {
+        private var read = 0L
+
+        override fun read(): Int {
+            if (read >= size) return endOfEntry()
+            val b = src.read()
+            if (b < 0) return endOfEntry()
+            read++
+            return b
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (read >= size) return endOfEntry()
+            val want = minOf(len.toLong(), size - read).toInt()
+            if (want == 0) return 0
+            val r = src.read(b, off, want)
+            if (r < 0) return endOfEntry()
+            read += r
+            return r
+        }
+
+        override fun close() = src.close()
+
+        private fun endOfEntry(): Int {
+            if (read != size) {
+                throw TarException("entry '$name' ended after $read bytes, header declared $size")
+            }
+            return -1
+        }
+    }
+
     fun extract(archive: ByteArray): List<Entry> {
         if (archive.size % BLOCK != 0) throw TarException("tar size is not a multiple of 512")
         val entries = ArrayList<Entry>()
@@ -110,6 +224,24 @@ object TarArchive {
 
     // --- Streaming read ---
 
+    /** What a header block declares. */
+    class HeaderInfo(val name: String, val size: Long)
+
+    /**
+     * Read one 512-byte header block. Returns null for the all-zero end-of-archive marker, and
+     * throws [TarException] for anything that is not a valid USTAR header, which is how a reader
+     * decides that a stream is not a tar at all.
+     */
+    fun parseHeaderBlock(block: ByteArray): HeaderInfo? {
+        if (block.size != BLOCK) throw TarException("header block must be $BLOCK bytes, got ${block.size}")
+        if (block.all { it.toInt() == 0 }) return null
+        verifyChecksum(block)
+        val name = readString(block, 0, NAME_MAX)
+        val size = readOctal(block, 124, 12)
+        if (size < 0) throw TarException("entry '$name' has negative size")
+        return HeaderInfo(name, size)
+    }
+
     /**
      * Walk [input] entry by entry without materializing the archive. [handler] receives each
      * entry's name, size, and a stream bounded to that entry's bytes; whatever the handler
@@ -125,16 +257,12 @@ object TarArchive {
             val got = readFully(input, headerBlock, BLOCK)
             if (got == 0) return                      // clean end of input
             if (got < BLOCK) throw TarException("truncated tar header (got $got of $BLOCK bytes)")
-            if (headerBlock.all { it.toInt() == 0 }) return   // end-of-archive marker
-            verifyChecksum(headerBlock)
-            val name = readString(headerBlock, 0, NAME_MAX)
-            val size = readOctal(headerBlock, 124, 12)
-            if (size < 0) throw TarException("entry '$name' has negative size")
+            val info = parseHeaderBlock(headerBlock) ?: return   // end-of-archive marker
 
-            val bounded = BoundedInputStream(input, size)
-            handler(name, size, bounded)
-            bounded.drain(name)
-            skipFully(input, (BLOCK - size % BLOCK) % BLOCK, name)
+            val bounded = BoundedInputStream(input, info.size)
+            handler(info.name, info.size, bounded)
+            bounded.drain(info.name)
+            skipFully(input, (BLOCK - info.size % BLOCK) % BLOCK, info.name)
         }
     }
 

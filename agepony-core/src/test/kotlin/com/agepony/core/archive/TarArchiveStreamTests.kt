@@ -106,4 +106,46 @@ class TarArchiveStreamTests {
             TarArchive.forEachEntry(ByteArrayInputStream(archive.copyOfRange(0, 300))) { _, _, _ -> }
         }
     }
+
+    @Test
+    fun source_matchesCreate() {
+        val streamEntries = entries.map { e ->
+            TarArchive.StreamEntry(e.name, e.data.size.toLong()) { ByteArrayInputStream(e.data) }
+        }
+        assertArrayEquals(TarArchive.create(entries), TarArchive.source(streamEntries).readBytes())
+    }
+
+    @Test
+    fun source_opensEachEntryOnlyWhenItIsReached() {
+        var opened = 0
+        val streamEntries = entries.map { e ->
+            TarArchive.StreamEntry(e.name, e.data.size.toLong()) {
+                opened++
+                ByteArrayInputStream(e.data)
+            }
+        }
+        val source = TarArchive.source(streamEntries)
+        assertEquals(0, opened, "no entry should be opened before the archive is read")
+        source.read(ByteArray(512)) // first header only
+        assertEquals(0, opened, "the first payload is not needed while its header is being read")
+        source.readBytes()
+        assertEquals(entries.size, opened)
+    }
+
+    @Test
+    fun source_refusesAnEntryThatShrank() {
+        val short = listOf(
+            TarArchive.StreamEntry("shrank.bin", 1000L) { ByteArrayInputStream(data(10, 5)) }
+        )
+        assertThrows(TarArchive.TarException::class.java) { TarArchive.source(short).readBytes() }
+    }
+
+    @Test
+    fun sizeOf_predictsTheArchiveLength() {
+        val streamEntries = entries.map { e ->
+            TarArchive.StreamEntry(e.name, e.data.size.toLong()) { ByteArrayInputStream(e.data) }
+        }
+        assertEquals(TarArchive.create(entries).size.toLong(), TarArchive.sizeOf(streamEntries))
+        assertEquals(1024L, TarArchive.sizeOf(emptyList()))
+    }
 }

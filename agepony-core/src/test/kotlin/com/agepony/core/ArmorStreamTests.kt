@@ -129,4 +129,80 @@ class ArmorStreamTests {
             return take
         }
     }
+
+    @Test
+    fun encodingSink_matchesEncodeAcrossWriteBoundaries() {
+        // Odd write sizes must not disturb the 48-byte grouping.
+        for (chunk in listOf(1, 7, 47, 48, 49, 64, 1000)) {
+            val d = data(5000, chunk.toLong())
+            val out = ByteArrayOutputStream()
+            val sink = Armor.encodingSink(out)
+            var i = 0
+            while (i < d.size) {
+                val take = minOf(chunk, d.size - i)
+                sink.write(d, i, take)
+                i += take
+            }
+            sink.finish()
+            assertArrayEquals(
+                Armor.encode(d).toByteArray(Charsets.US_ASCII),
+                out.toByteArray(),
+                "sink output differs from Armor.encode with $chunk-byte writes",
+            )
+        }
+    }
+
+    @Test
+    fun encodingSink_handlesNoWritesAndSingleBytes() {
+        val empty = ByteArrayOutputStream()
+        Armor.encodingSink(empty).finish()
+        assertArrayEquals(Armor.encode(ByteArray(0)).toByteArray(), empty.toByteArray())
+
+        val d = data(100)
+        val single = ByteArrayOutputStream()
+        val sink = Armor.encodingSink(single)
+        for (b in d) sink.write(b.toInt())
+        sink.finish()
+        assertArrayEquals(Armor.encode(d).toByteArray(), single.toByteArray())
+    }
+
+    @Test
+    fun encodingSink_finishIsIdempotentAndLeavesTheStreamOpen() {
+        val d = data(100)
+        val out = ByteArrayOutputStream()
+        val sink = Armor.encodingSink(out)
+        sink.write(d)
+        sink.close()
+        sink.finish()
+        assertArrayEquals(Armor.encode(d).toByteArray(), out.toByteArray())
+        // The wrapped stream is still usable: close() must not have closed it.
+        out.write('x'.code)
+        assertEquals(Armor.encode(d).length + 1, out.size())
+    }
+
+    @Test
+    fun decodingSource_readsAsBinary() {
+        for (n in sizes) {
+            val d = data(n, n.toLong())
+            val src = Armor.decodingSource(ByteArrayInputStream(Armor.encode(d).toByteArray()))
+            assertArrayEquals(d, src.readBytes(), "decoding source mismatch at n=$n")
+        }
+    }
+
+    @Test
+    fun decodingSource_singleByteReadsAndErrors() {
+        val d = data(200)
+        val src = Armor.decodingSource(ByteArrayInputStream(Armor.encode(d).toByteArray()))
+        val collected = ByteArrayOutputStream()
+        while (true) {
+            val b = src.read()
+            if (b < 0) break
+            collected.write(b)
+        }
+        assertArrayEquals(d, collected.toByteArray())
+
+        assertThrows(Armor.ArmorException::class.java) {
+            Armor.decodingSource(ByteArrayInputStream("not armor at all".toByteArray())).readBytes()
+        }
+    }
 }

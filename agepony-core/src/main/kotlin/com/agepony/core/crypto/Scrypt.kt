@@ -12,6 +12,15 @@ import org.bouncycastle.crypto.generators.SCrypt
  *   - dkLen = 32
  */
 object Scrypt {
+    /**
+     * Bytes scrypt allocates for these parameters, in one block: 128 * N * r.
+     *
+     * At age's default work factor 18 with r=8 that is 256 MiB, whatever the size of the file
+     * being encrypted. This is why a passphrase encrypt can fail on a device where a recipient
+     * encrypt of the very same file succeeds.
+     */
+    fun memoryBytes(n: Int, r: Int): Long = 128L * n * r
+
     fun derive(passphrase: ByteArray, salt: ByteArray, n: Int, r: Int, p: Int, length: Int): ByteArray {
         require(n > 0 && (n and (n - 1)) == 0) { "N must be a positive power of 2" }
         return SCrypt.generate(passphrase, salt, n, r, p, length)

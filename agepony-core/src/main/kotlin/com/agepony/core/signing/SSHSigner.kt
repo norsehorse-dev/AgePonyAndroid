@@ -60,9 +60,28 @@ object SSHSigner {
         message: ByteArray,
         namespace: String = SSHSig.NAMESPACE_AGEPONY,
         hashAlg: String = SSHSig.HASH_SHA512,
+    ): String = signEd25519Hashed(
+        seed32,
+        publicKey32,
+        SSHSig.hashMessage(message, hashAlg),
+        namespace,
+        hashAlg,
+    )
+
+    /**
+     * Sign a message that has already been hashed with [hashAlg], as [SSHSig.hashStream] does for
+     * a large file. Identical output to [signEd25519] for the same message, since SSHSIG signs
+     * only the hash.
+     */
+    fun signEd25519Hashed(
+        seed32: ByteArray,
+        publicKey32: ByteArray,
+        messageHash: ByteArray,
+        namespace: String = SSHSig.NAMESPACE_AGEPONY,
+        hashAlg: String = SSHSig.HASH_SHA512,
     ): String {
         require(seed32.size == 32) { "ed25519 seed must be 32 bytes" }
-        val toSign = SSHSig.signedData(namespace, hashAlg, SSHSig.hashMessage(message, hashAlg))
+        val toSign = SSHSig.signedData(namespace, hashAlg, messageHash)
         val signer = Ed25519Signer()
         signer.init(true, Ed25519PrivateKeyParameters(seed32, 0))
         signer.update(toSign, 0, toSign.size)
