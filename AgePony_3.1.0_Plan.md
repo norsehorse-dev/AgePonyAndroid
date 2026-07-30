@@ -524,7 +524,33 @@ correctly invisible.
 tag, and the nav-restore fix ships as a line in the 3.1.0 notes. One F-Droid recipe update rather
 than two while 3.0.2 is still in review. Section 6's arithmetic follows from that.
 
-Next: W7 (header inspector), then the release mechanics in section 6.
+**2026-07-27 — W7 (header inspector).**
+
+- `Age.parseHeaderStream(input)` returns the parsed header and leaves the stream at the payload.
+- New `ui/files/InspectFlow.kt`, reachable from the Files landing screen. Reads the header and
+  stops, so it is instant on a 1 GB file, and shows: size, armored or binary, header length,
+  whether any vault identity can open it, and each recipient stanza described in words. The scrypt
+  stanza reports the file's own work factor and what it will cost in memory, which is the same
+  number W6 surfaces at encrypt time, now readable from a file someone else made.
+- Deliberately read-only, and it says so on screen: stanzas are public information, and showing
+  them reveals nothing the holder of the file does not already have.
+
+Both W7 and W8 are committed but **not yet built**, since the tested APK predates them.
+
+**2026-07-27 — W9 (release mechanics).**
+
+- `app/build.gradle.kts`: `versionCode 8`, `versionName "3.1.0"`.
+- `fastlane/metadata/android/en-US/changelogs/8.txt`, 498 characters against F-Droid's 500 limit.
+  Written around what a user notices, not what was refactored, and it includes the folded-in
+  3.0.3 tab-restore line.
+- `full_description.txt` leads with 3.1.0 and keeps post-quantum below it, with four new feature
+  bullets.
+
+Reproducibility guards were already in place and are untouched: `dependenciesInfo.includeInApk =
+false`, `vcsInfo { include = false }`, no minification.
+
+Remaining before the tag: build, a short manual pass on the new screens, commit, tag `3.1.0`, push,
+then a new build block in the fdroiddata fork. 3.0.2's existing recipe stays exactly as it is.
 
 ## 10. Style reminders
 

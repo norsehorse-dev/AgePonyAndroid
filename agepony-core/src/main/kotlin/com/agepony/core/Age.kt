@@ -124,6 +124,14 @@ object Age {
     }
 
     /**
+     * Parse just the header of [ciphertext] and hand back its stanzas, leaving the stream
+     * positioned at the first payload byte. Lets a reader show what a file is encrypted to
+     * without decrypting it, and without holding more than the (bounded) header.
+     */
+    fun parseHeaderStream(ciphertext: InputStream): AgeHeader.ParsedHeader =
+        AgeHeader.parse(readHeaderBytes(ciphertext))
+
+    /**
      * True if any of [identities] can unwrap this file's header. Reads the header and stops
      * there, leaving `ciphertext` positioned at the first payload byte, so a caller can find out
      * which key a file needs without decrypting it. Throws the usual header exceptions for input

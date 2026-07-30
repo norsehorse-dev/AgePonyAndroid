@@ -1,0 +1,8 @@
+AgePony 3.1.0 makes file size stop mattering.
+
+- Encrypt and decrypt files of any size. Nothing is held in memory, so a 1 GB file works like a small one.
+- Encrypting several files now asks: one archive, or one encrypted file each.
+- Inspect any age file to see what it is encrypted to, without decrypting it.
+- The scrypt work factor is adjustable now, for devices with less memory to spare.
+- Rename saved recipients, and save a pasted key with a name.
+- Returns to the tab you left on re-lock.

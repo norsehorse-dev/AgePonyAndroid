@@ -26,7 +26,7 @@ import com.agepony.app.vault.Vault
 // (batch re-encrypt existing files to a post-quantum identity).
 //
 
-private enum class FilesMode { HOME, ENCRYPT, DECRYPT, MIGRATE }
+private enum class FilesMode { HOME, ENCRYPT, DECRYPT, INSPECT, MIGRATE }
 
 @Composable
 fun FilesScreen(vault: Vault, modifier: Modifier = Modifier) {
@@ -56,6 +56,10 @@ fun FilesScreen(vault: Vault, modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
             ) { Text("Decrypt a file") }
             TextButton(
+                onClick = { mode = FilesMode.INSPECT },
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            ) { Text("Inspect a file") }
+            TextButton(
                 onClick = { mode = FilesMode.MIGRATE },
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
             ) { Text("Upgrade files to quantum-safe") }
@@ -64,6 +68,8 @@ fun FilesScreen(vault: Vault, modifier: Modifier = Modifier) {
         FilesMode.ENCRYPT -> EncryptFlow(vault = vault, modifier = modifier, onClose = { mode = FilesMode.HOME })
 
         FilesMode.DECRYPT -> DecryptFlow(vault = vault, modifier = modifier, onClose = { mode = FilesMode.HOME })
+
+        FilesMode.INSPECT -> InspectFlow(vault = vault, modifier = modifier, onClose = { mode = FilesMode.HOME })
 
         FilesMode.MIGRATE -> MigrateFlow(vault = vault, modifier = modifier, onClose = { mode = FilesMode.HOME })
     }
