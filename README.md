@@ -1,48 +1,95 @@
-# AgePonyAndroid — Phase 2f: Rate AgePony + in-app feedback + UI/UX polish
+# AgePony for Android
 
-Second of two updates implementing the Testers Community feedback. Covers the
-**Rate Your App** item (in-app prompt, nudge, feedback), the **User Feedback Mechanism**
-recommendation, and the **UI/UX Improvements** item (contrast, consistent design language).
+AgePony is an encryption app for Android built on the [age](https://age-encryption.org/v1) file encryption format. It encrypts and decrypts files and text, signs and verifies them with SSH keys, and generates post-quantum hybrid keys. Everything runs on the device: no accounts, no servers, no analytics.
 
-**Requires Phase 2e deployed first** — this bundle ships the cumulative `AgePonyApp.kt` and
-`SettingsScreen.kt` but not 2e-only files like `OnboardingScreen.kt`.
+Play Store listing: `com.agepony.app`
+Website: https://agepony.com
 
-## What's in this update
+## Features
 
-- **Rate AgePony** in Settings then Help & feedback — opens the Play Store listing.
-- **Send feedback** in Settings then Help & feedback — opens an email to NorseHorse pre-filled
-  with app version and device details.
-- **In-app review nudge** — after a few fresh launches, AgePony asks Google to show the native
-  review card, at most once, never on a brand-new user.
-- **UI/UX polish** — explicit secondary-surface, outline, and container color roles in both
-  light and dark for intentional, accessible contrast.
+- age encryption and decryption for files and text, byte-compatible with the `age` CLI
+- Post-quantum hybrid recipients (ML-KEM-768 + X25519), encoded as `age1pq1...` keys
+- Passphrase encryption using scrypt recipients
+- Encrypt to SSH public keys (`ssh-ed25519`, `ssh-rsa`)
+- Sign and verify with SSHSIG, using software Ed25519 keys, Android Keystore hardware keys, or a FIDO2 security key over NFC
+- Multi-file tar bundling, so a set of files travels as one signed and encrypted archive
+- Migration flow that batch re-encrypts existing files to a quantum-safe key, keeping originals until the new copy verifies
+- Recipient and identity vault, encrypted with a Keystore-backed master key and gated by biometrics
+- QR scanning and display for exchanging recipient keys
+- ASCII armor support
 
-## What changed
-
-- `app/src/main/java/com/agepony/app/review/ReviewPrompt.kt` — new Play In-App Review wrapper.
-- `app/src/main/java/com/agepony/app/vault/Vault.kt` — launchCount and reviewPromptShown prefs.
-- `app/src/main/java/com/agepony/app/MainActivity.kt` — bumps the launch counter on fresh start.
-- `app/src/main/java/com/agepony/app/ui/AgePonyApp.kt` — fires the nudge past onboarding.
-- `app/src/main/java/com/agepony/app/ui/settings/SettingsScreen.kt` — Rate and Send feedback rows.
-- `app/src/main/java/com/agepony/app/ui/theme/Color.kt`, `Theme.kt` — explicit color roles.
-- `gradle/libs.versions.toml`, `app/build.gradle.kts` — `com.google.android.play:review` 2.0.2;
-  versionCode 2 then 3.
-- `NorseHorse_Android_Update_Log.md` — Phase 2f section appended.
-
-All edits to existing files are additive apart from the section rename and the versionCode bump.
-No crypto or build-toolchain changes.
-
-## Deploy
+## Modules
 
 ```
-cd ~/Downloads && unzip -oq AgePonyAndroid_Phase2f.zip && cp -R ~/Downloads/AgePonyAndroid_Phase2f/. ~/Apps/AgePonyAndroid/ && cd ~/Apps/AgePonyAndroid && ./gradlew bundleRelease
+agepony-core/   age implementation, no Android UI dependencies
+app/            Compose UI, vault, Keystore and NFC integration
 ```
 
-## Verify after install
+`agepony-core` holds the format work: header and stanza parsing, the streaming payload cipher, Bech32, armor, recipient types (`X25519`, `Scrypt`, `SSHEd25519`, `SSHRSA`, `Hybrid`), SSH key parsing, SSHSIG, tar bundling, the primitives (ChaCha20-Poly1305, HKDF, scrypt, bcrypt-pbkdf, AES-CTR/CBC, SHA-3, X25519, ML-KEM-768), and a CTAP2/CBOR stack for security keys. It depends on Bouncy Castle 1.79 or later, which is the first release with the finalized FIPS 203 ML-KEM.
 
-1. Settings then Help & feedback shows Replay the intro, Rate AgePony, and Send feedback.
-2. Rate AgePony opens the Play Store listing for com.agepony.app.
-3. Send feedback opens an email to NorseHorse with version and device details pre-filled.
-4. Cold-launch the app three times; on the third the system review card may appear once.
-   It is best-effort, so Play may legitimately show nothing on a debug or sideloaded build.
-5. Subtitle text and dividers in Settings read with clean contrast in both light and dark.
+The public entry point is `Age`:
+
+```kotlin
+val ciphertext = Age.encrypt(plaintext, to = listOf(recipient))
+val plaintext = Age.decrypt(ciphertext, identities = listOf(identity))
+```
+
+`encrypt` and `decrypt` buffer the whole message. `encryptStream` and `decryptStream` are the bounded-memory versions for large files, streaming the payload in 64 KiB chunks with byte-identical output. Output is binary; call `Armor.encode` if you want ASCII armor.
+
+## Build
+
+Requirements: JDK 17, Android SDK 36. The Gradle wrapper is committed, so no separate Gradle install is needed.
+
+```
+./gradlew assemblePlayDebug
+./gradlew test
+```
+
+There are two product flavors on the `store` dimension:
+
+- `play` includes the Google Play In-App Review library and is the Play Store build
+- `foss` has no Google dependencies and is the F-Droid build
+
+Each flavor supplies its own `com.agepony.app.review.ReviewPrompt`. The `foss` version is a no-op.
+
+Release builds read signing config from `keystore.properties` at the repo root, which is gitignored and not published. `assembleRelease` without it produces an unsigned build.
+
+For F-Droid reproducibility the release build disables VCS metadata embedding and strips the Google dependency-metadata blob from the APK and bundle. Leave `vcsInfo.include = false` and `dependenciesInfo` alone unless you know what breaks.
+
+minSdk is 26 for the app and 21 for `agepony-core`.
+
+## Tests
+
+```
+./gradlew :agepony-core:test
+```
+
+Roughly 280 JUnit 5 tests covering the primitives, header and stanza round trips, streaming payloads, SSH key parsing including encrypted private keys, SSHSIG, and every recipient type.
+
+Cross-implementation fixtures live in `agepony-core/src/test/resources/fixtures` and are regenerated by `generate-fixtures.sh` using the reference `age` and `ssh-keygen` tools. `CrossImplFixtureTests` and `CrossImplEncryptedFixtureTests` decrypt them, so a passing suite means files written elsewhere open here and vice versa.
+
+## Interoperability
+
+X25519, scrypt, and SSH recipients follow the age v1 spec and work with the `age` CLI, rage, and AgePony for iOS.
+
+Hybrid post-quantum recipients use an `mlkem768x25519` stanza. That is an AgePony extension. A stock age client will not recognize it, so use X25519 recipients when the other side is running upstream age.
+
+## Not implemented on purpose
+
+There is no share sheet integration. Files move through the system file picker. This matches AgePony for iOS, where share extensions were cut deliberately.
+
+## Contributing
+
+Issues and pull requests are welcome: https://github.com/norsehorse-dev/AgePonyAndroid/issues
+
+For bug reports include the app version, your Android version, and what you were encrypting, decrypting, signing, or verifying. Never paste private keys or real ciphertext into an issue.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+AgePony is an independent app built on the open age format and is not affiliated with the age project.
+
+## Contact
+
+NorseHorse@norsehor.se
