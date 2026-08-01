@@ -117,6 +117,39 @@ fun SettingsScreen(
             onCheckedChange = { encryptToSelf = it; vault.encryptToSelfDefault = it },
         )
 
+        SettingRow(
+            title = "Armor as text by default",
+            subtitle = "Start the encrypt screen with ASCII armor on. Armored output pastes into a " +
+                "message; raw binary is about a third smaller. Changing the switch while encrypting " +
+                "updates this too.",
+            checked = vault.armorDefault,
+            enabled = true,
+            onCheckedChange = { vault.armorDefault = it },
+        )
+
+        SettingRow(
+            title = "Passphrase-only by default",
+            subtitle = "Open the recipient picker in passphrase (scrypt) mode instead of key " +
+                "selection, for when you mostly encrypt with a passphrase.",
+            checked = vault.passphraseModeDefault,
+            enabled = true,
+            onCheckedChange = { vault.passphraseModeDefault = it },
+        )
+
+        if (vault.sessionPassphrase != null) {
+            ActionRow(
+                label = "Forget the remembered passphrase",
+                trailing = "Forget",
+                onClick = { vault.forgetSessionPassphrase() },
+            )
+            Text(
+                "A passphrase is being held in memory so a run of files is only asked for it once. " +
+                    "It is never written to disk and is dropped whenever the vault locks.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         var workFactor by remember { mutableStateOf(vault.scryptWorkFactor) }
         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

@@ -55,12 +55,22 @@ import java.util.UUID
 // recipient selection. Returns hydrated AgeRecipients (and an optional
 // passphrase) to the caller.
 //
+// The picker comes in two shapes. [RecipientPickerContent] draws the rows into
+// whatever column the caller is already scrolling — that is how the encrypt
+// screen shows recipients inline instead of pushing a second full screen
+// (GitHub issue #2: "it is much more convenient to do all this in ONE window").
+// [RecipientPicker] is the standalone, self-scrolling version the Text tab uses.
+//
+// Selection state lives in [RecipientSelection] rather than inside the composable,
+// so a caller can collapse and reopen the picker — or encrypt and come back for
+// the next file — without the choices resetting.
+//
 // Note: post-quantum recipients cannot be combined with classical ones (age's
 // labels rule, enforced in Age.encrypt). Mixing them here surfaces as an encrypt
 // error; disabling the mismatched rows in-picker is a queued UX refinement.
 //
 
-private class AdHocRecipient(
+internal class AdHocRecipient(
     val label: String,
     val recipient: AgeRecipient,
     /** The text the user pasted, kept so the entry can be saved to the vault with a name. */
@@ -69,6 +79,80 @@ private class AdHocRecipient(
     val key: String = label + System.nanoTime()
 }
 
+/**
+ * Everything the picker lets the user choose, hoisted out of the composable so it survives the
+ * picker being collapsed, and so the encrypt flow can carry one selection across several files.
+ */
+internal class RecipientSelection(
+    initialUseScrypt: Boolean,
+    initialPassphrase: String,
+    preselectIdentityId: String?,
+) {
+    val identityIds = mutableStateListOf<String>()
+    val recipientIds = mutableStateListOf<String>()
+    val adHoc = mutableStateListOf<AdHocRecipient>()
+
+    var useScrypt by mutableStateOf(initialUseScrypt)
+    var passphrase by mutableStateOf(initialPassphrase)
+    var passphraseConfirm by mutableStateOf(initialPassphrase)
+
+    init {
+        if (preselectIdentityId != null) identityIds.add(preselectIdentityId)
+    }
+
+    /** Hydrate the chosen identities, saved recipients and one-time keys into age recipients. */
+    fun buildRecipients(vault: Vault): List<AgeRecipient> = buildList {
+        vault.identities.filter { identityIds.contains(it.id) }
+            .forEach { runCatching { add(it.toAgeRecipient()) } }
+        vault.recipients.filter { recipientIds.contains(it.id) }
+            .forEach { runCatching { add(it.toAgeRecipient()) } }
+        adHoc.forEach { add(it.recipient) }
+    }
+
+    val selectedCount: Int get() = identityIds.size + recipientIds.size + adHoc.size
+
+    /** Forget every choice, including the typed passphrase. */
+    fun clear() {
+        identityIds.clear()
+        recipientIds.clear()
+        adHoc.clear()
+        passphrase = ""
+        passphraseConfirm = ""
+    }
+}
+
+/**
+ * A selection seeded from the user's remembered preferences: passphrase mode, plus the active
+ * identity when "encrypt to self" is on.
+ *
+ * [seedSessionPassphrase] is for the file encrypt flow, which is the only caller that should
+ * inherit a passphrase held from earlier in the session; the Text tab starts from empty so a
+ * passphrase typed for a file never turns up prefilled somewhere else.
+ */
+@Composable
+internal fun rememberRecipientSelection(
+    vault: Vault,
+    seedSessionPassphrase: Boolean = false,
+): RecipientSelection = remember {
+    // Only an identity that can actually receive a file is worth preselecting. Signing-only and
+    // hardware identities can be active (Settings lets any of them be), but toAgeRecipient throws
+    // for them, so preselecting one would tick nothing visible and then quietly hydrate to no
+    // recipients at all.
+    val preselect = if (vault.encryptToSelfDefault) {
+        val encryptable = vault.identities.filter { !it.type.isSigningOnly }
+        val active = vault.activeIdentityId
+        encryptable.firstOrNull { it.id == active }?.id ?: encryptable.firstOrNull()?.id
+    } else {
+        null
+    }
+    RecipientSelection(
+        initialUseScrypt = vault.passphraseModeDefault,
+        initialPassphrase = if (seedSessionPassphrase) vault.sessionPassphrase.orEmpty() else "",
+        preselectIdentityId = preselect,
+    )
+}
+
+/** Standalone picker: its own selection, its own scrolling. Used by the Text tab. */
 @Composable
 fun RecipientPicker(
     vault: Vault,
@@ -76,67 +160,90 @@ fun RecipientPicker(
     onCancel: () -> Unit,
     onConfirm: (recipients: List<AgeRecipient>, passphrase: String?) -> Unit,
 ) {
-    val selectedIdentityIds = remember {
-        mutableStateListOf<String>().apply {
-            if (vault.encryptToSelfDefault) {
-                val active = vault.activeIdentityId ?: vault.identities.firstOrNull()?.id
-                if (active != null && vault.identities.any { it.id == active }) add(active)
-            }
-        }
-    }
-    val selectedRecipientIds = remember { mutableStateListOf<String>() }
-    val adHoc = remember { mutableStateListOf<AdHocRecipient>() }
+    val selection = rememberRecipientSelection(vault)
+    RecipientPickerContent(
+        vault = vault,
+        selection = selection,
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        showTitle = true,
+        onCancel = onCancel,
+        onConfirm = onConfirm,
+    )
+}
 
+/**
+ * The picker rows themselves. Adds no scrolling of its own, so it can be dropped into a column the
+ * caller already scrolls; nesting two vertical scrolls would leave the inner one unable to move.
+ */
+@Composable
+internal fun RecipientPickerContent(
+    vault: Vault,
+    selection: RecipientSelection,
+    modifier: Modifier = Modifier,
+    showTitle: Boolean = true,
+    confirmLabelSuffix: String = "",
+    /** Whether confirming a passphrase should hold it for the rest of the session. */
+    rememberPassphrase: Boolean = false,
+    onCancel: () -> Unit,
+    onConfirm: (recipients: List<AgeRecipient>, passphrase: String?) -> Unit,
+) {
     var pasteText by remember { mutableStateOf("") }
     var pasteError by remember { mutableStateOf<String?>(null) }
 
-    var useScrypt by remember { mutableStateOf(false) }
     var savingKey by remember { mutableStateOf<String?>(null) }
     var saveName by remember { mutableStateOf("") }
     var saveError by remember { mutableStateOf<String?>(null) }
-    var passphrase by remember { mutableStateOf("") }
-    var passphraseConfirm by remember { mutableStateOf("") }
     var suggestion by remember { mutableStateOf<String?>(null) }
     var suggestionWords by remember { mutableStateOf(Diceware.DEFAULT_WORD_COUNT) }
     val context = LocalContext.current
 
-    val selectedCount = selectedIdentityIds.size + selectedRecipientIds.size + adHoc.size
-    val scryptValid = passphrase.isNotEmpty() && passphrase == passphraseConfirm
-    val canConfirm = if (useScrypt) scryptValid else selectedCount > 0
+    val selectedCount = selection.selectedCount
+    val scryptValid = selection.passphrase.isNotEmpty() &&
+        selection.passphrase == selection.passphraseConfirm
+    val canConfirm = if (selection.useScrypt) scryptValid else selectedCount > 0
 
     Column(
-        modifier
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+        modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            "Choose recipients",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        if (showTitle) {
+            Text(
+                "Choose recipients",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Switch(checked = useScrypt, onCheckedChange = { useScrypt = it })
+            // Remembered: whoever always encrypts to a passphrase should not re-flip this
+            // on every file (issue #2, item 2).
+            Switch(
+                checked = selection.useScrypt,
+                onCheckedChange = { selection.useScrypt = it; vault.passphraseModeDefault = it },
+            )
             Text("Passphrase only (scrypt)", modifier = Modifier.padding(start = 12.dp))
         }
 
-        if (useScrypt) {
+        if (selection.useScrypt) {
             OutlinedTextField(
-                value = passphrase,
-                onValueChange = { passphrase = it },
+                value = selection.passphrase,
+                onValueChange = { selection.passphrase = it },
                 label = { Text("Passphrase") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
-                value = passphraseConfirm,
-                onValueChange = { passphraseConfirm = it },
+                value = selection.passphraseConfirm,
+                onValueChange = { selection.passphraseConfirm = it },
                 label = { Text("Confirm passphrase") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            if (passphraseConfirm.isNotEmpty() && passphrase != passphraseConfirm) {
+            if (selection.passphraseConfirm.isNotEmpty() &&
+                selection.passphrase != selection.passphraseConfirm
+            ) {
                 Text(
                     "Passphrases don't match.",
                     style = MaterialTheme.typography.bodySmall,
@@ -188,8 +295,8 @@ fun RecipientPicker(
                             onClick = { suggestion = Diceware.generate(wordlist, suggestionWords) }
                         ) { Text("Again") }
                         Button(onClick = {
-                            passphrase = suggestion!!
-                            passphraseConfirm = suggestion!!
+                            selection.passphrase = suggestion!!
+                            selection.passphraseConfirm = suggestion!!
                             suggestion = null
                         }) { Text("Use it") }
                     }
@@ -226,10 +333,10 @@ fun RecipientPicker(
             } else {
                 encryptableIdentities.forEach { identity ->
                     CheckRow(
-                        checked = selectedIdentityIds.contains(identity.id),
+                        checked = selection.identityIds.contains(identity.id),
                         title = identity.name,
                         subtitle = identityTypeLabel(identity.type),
-                        onToggle = { toggle(selectedIdentityIds, identity.id) },
+                        onToggle = { toggle(selection.identityIds, identity.id) },
                     )
                 }
             }
@@ -239,17 +346,17 @@ fun RecipientPicker(
                 SectionHeader("Saved recipients")
                 vault.recipients.forEach { recipient ->
                     CheckRow(
-                        checked = selectedRecipientIds.contains(recipient.id),
+                        checked = selection.recipientIds.contains(recipient.id),
                         title = recipient.name,
                         subtitle = recipientTypeLabel(recipient.type),
-                        onToggle = { toggle(selectedRecipientIds, recipient.id) },
+                        onToggle = { toggle(selection.recipientIds, recipient.id) },
                     )
                 }
             }
 
             // Ad-hoc
             SectionHeader("One-time recipient")
-            adHoc.forEach { ah ->
+            selection.adHoc.forEach { ah ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -267,7 +374,7 @@ fun RecipientPicker(
                             Text("Save")
                         }
                     }
-                    TextButton(onClick = { adHoc.removeAll { it.key == ah.key } }) { Text("Remove") }
+                    TextButton(onClick = { selection.adHoc.removeAll { it.key == ah.key } }) { Text("Remove") }
                 }
 
                 // Promote a one-time key to a named recipient, so the next encrypt shows a person
@@ -307,8 +414,8 @@ fun RecipientPicker(
                                     )
                                     // It is a saved recipient now, so drop the one-time copy and
                                     // select the saved one in its place.
-                                    selectedRecipientIds.add(vault.recipients.last().id)
-                                    adHoc.removeAll { it.key == ah.key }
+                                    selection.recipientIds.add(vault.recipients.last().id)
+                                    selection.adHoc.removeAll { it.key == ah.key }
                                     savingKey = null
                                 } catch (e: Exception) {
                                     saveError = e.message ?: "Couldn't save this recipient."
@@ -332,7 +439,7 @@ fun RecipientPicker(
             TextButton(
                 onClick = {
                     try {
-                        adHoc.add(parseAdHoc(pasteText))
+                        selection.adHoc.add(parseAdHoc(pasteText))
                         pasteText = ""
                         pasteError = null
                     } catch (e: Exception) {
@@ -347,17 +454,16 @@ fun RecipientPicker(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             Button(
                 onClick = {
-                    if (useScrypt) {
-                        onConfirm(emptyList(), passphrase)
+                    if (selection.useScrypt) {
+                        // Held in memory until the vault locks, so the next file in a run is not
+                        // asked for the same passphrase again (issue #2, item 3).
+                        if (rememberPassphrase) vault.rememberSessionPassphrase(selection.passphrase)
+                        onConfirm(emptyList(), selection.passphrase)
                     } else {
-                        val built = buildList {
-                            vault.identities.filter { selectedIdentityIds.contains(it.id) }
-                                .forEach { runCatching { add(it.toAgeRecipient()) } }
-                            vault.recipients.filter { selectedRecipientIds.contains(it.id) }
-                                .forEach { runCatching { add(it.toAgeRecipient()) } }
-                            adHoc.forEach { add(it.recipient) }
-                        }
-                        onConfirm(built, null)
+                        // A recipient choice replaces passphrase mode; don't leave a stale
+                        // passphrase behind for the next file to silently pick up.
+                        if (rememberPassphrase) vault.forgetSessionPassphrase()
+                        onConfirm(selection.buildRecipients(vault), null)
                     }
                 },
                 enabled = canConfirm,
@@ -365,10 +471,10 @@ fun RecipientPicker(
             ) {
                 Text(
                     when {
-                        useScrypt -> "Use passphrase"
+                        selection.useScrypt -> "Use passphrase$confirmLabelSuffix"
                         selectedCount == 0 -> "Pick a recipient"
-                        selectedCount == 1 -> "Use 1 recipient"
-                        else -> "Use $selectedCount recipients"
+                        selectedCount == 1 -> "Use 1 recipient$confirmLabelSuffix"
+                        else -> "Use $selectedCount recipients$confirmLabelSuffix"
                     }
                 )
             }

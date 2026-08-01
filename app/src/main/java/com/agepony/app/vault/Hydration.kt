@@ -132,3 +132,15 @@ fun StoredRecipient.publicDisplayString(): String = when (type) {
     StoredRecipientType.SSH_ED25519 -> sshEd25519Line(b64d(publicKeyB64), sshComment)
     StoredRecipientType.SSH_RSA -> String(b64d(publicKeyB64), Charsets.UTF_8)
 }
+
+/**
+ * Same rendering as [StoredRecipient.publicDisplayString], for a candidate that has been
+ * parsed but not saved yet. Add Recipient shows this so the reviewer can see *which* key
+ * they are naming without having to trust the name field to carry that information.
+ */
+fun RecipientCandidate.publicDisplayString(): String = when (type) {
+    StoredRecipientType.X25519 -> X25519Recipient(b64d(publicKeyB64)).toBech32()
+    StoredRecipientType.MLKEM768X25519 -> HybridRecipient(b64d(publicKeyB64)).toBech32()
+    StoredRecipientType.SSH_ED25519 -> sshEd25519Line(b64d(publicKeyB64), sshComment)
+    StoredRecipientType.SSH_RSA -> String(b64d(publicKeyB64), Charsets.UTF_8)
+}

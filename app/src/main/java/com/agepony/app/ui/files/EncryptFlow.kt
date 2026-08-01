@@ -64,8 +64,16 @@ import java.io.InputStream
 // to encrypt, rather than being held. The signature and payload travel in a SignedBundle
 // (sign-then-encrypt), so the signer stays hidden inside the ciphertext and the output is one file.
 //
+// 3.2.0 (GitHub issue #2) reshaped the setup around encrypting more than one file in a sitting:
+//   - Recipients are chosen inline on the Configure screen instead of on a second full screen,
+//     so the whole setup is one window.
+//   - "Armor as text" and passphrase mode are remembered between files and between launches.
+//   - The passphrase is held until the vault locks, so a run of files asks for it once.
+//   - Finishing an encrypt keeps every one of those choices and goes straight to picking the
+//     next files, rather than resetting to an empty form.
+//
 
-private enum class EncryptStage { PICK, MODE, CONFIGURE, PICKING, WORKING, DONE }
+private enum class EncryptStage { PICK, MODE, CONFIGURE, WORKING, DONE }
 
 /** What a batch of files should turn into. Asked whenever more than one file is picked. */
 private enum class OutputMode { BUNDLE, SEPARATE }
@@ -84,10 +92,17 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
     var stage by remember { mutableStateOf(EncryptStage.PICK) }
     var sources by remember { mutableStateOf<List<SourceRef>>(emptyList()) }
     var mode by remember { mutableStateOf(OutputMode.BUNDLE) }
+
+    // Recipient state is hoisted into a RecipientSelection so collapsing the inline picker — or
+    // finishing a file and coming back for the next — does not wipe the choices.
+    val selection = rememberRecipientSelection(vault, seedSessionPassphrase = true)
+    var pickerOpen by remember { mutableStateOf(false) }
     var recipients by remember { mutableStateOf<List<AgeRecipient>>(emptyList()) }
-    var passphrase by remember { mutableStateOf<String?>(null) }
+    // A passphrase still held from earlier in this unlocked session counts as already chosen.
+    var passphrase by remember { mutableStateOf(vault.sessionPassphrase) }
+
     var signerId by remember { mutableStateOf<String?>(null) }
-    var armor by remember { mutableStateOf(true) }
+    var armor by remember { mutableStateOf(vault.armorDefault) }
     var error by remember { mutableStateOf<String?>(null) }
 
     var phase by remember { mutableStateOf("Encrypting") }
@@ -99,6 +114,7 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
 
     val totalSize = sources.sumOf { it.size }
     val separate = sources.size > 1 && mode == OutputMode.SEPARATE
+    val hasRecipientChoice = recipients.isNotEmpty() || !passphrase.isNullOrEmpty()
 
     fun signerKey(): SignerKey? {
         val id = signerId ?: return null
@@ -232,11 +248,39 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         }
     }
 
-    fun reset() {
-        sources = emptyList(); mode = OutputMode.BUNDLE
-        recipients = emptyList(); passphrase = null; signerId = null; armor = true
-        error = null; results = emptyList(); savedName = null
-        bytesDone = 0L; bytesTotal = 0L; fileIndex = 0
+    /** Clear only what belongs to the files just handled; recipients and settings stay. */
+    fun clearJob() {
+        sources = emptyList()
+        mode = OutputMode.BUNDLE
+        results = emptyList()
+        savedName = null
+        bytesDone = 0L
+        bytesTotal = 0L
+        fileIndex = 0
+        error = null
+    }
+
+    /**
+     * Issue #2, item 5: finishing an encrypt used to drop every choice and put the user back at an
+     * empty form. Now it keeps recipients, passphrase, signer and armor and opens the file picker,
+     * so the next file is one tap away.
+     */
+    fun encryptMore() {
+        clearJob()
+        stage = EncryptStage.PICK
+        vault.autoLockSuppressed = true
+        openInput.launch(arrayOf("*/*"))
+    }
+
+    /** Throw away the whole setup, including recipients and any remembered passphrase. */
+    fun startOver() {
+        clearJob()
+        recipients = emptyList()
+        passphrase = null
+        signerId = null
+        pickerOpen = false
+        selection.clear()
+        vault.forgetSessionPassphrase()
         stage = EncryptStage.PICK
     }
 
@@ -254,11 +298,22 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (hasRecipientChoice) {
+                    Text(
+                        "Still set from last time: " + recipientSummary(recipients.size, passphrase) +
+                            ", " + (if (armor) "armored" else "binary") + ".",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (error != null) ErrorText(error!!)
                 Button(
                     onClick = { vault.autoLockSuppressed = true; openInput.launch(arrayOf("*/*")) },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Pick files…") }
+                if (hasRecipientChoice) {
+                    TextButton(onClick = { startOver() }) { Text("Clear recipients & passphrase") }
+                }
                 TextButton(onClick = onClose) { Text("Cancel") }
             }
 
@@ -325,9 +380,52 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
 
                 HorizontalDivider()
 
+                // Recipients, inline. Opening this used to replace the whole screen and then throw
+                // the user back to the top of the form on the way out (issue #2, item 4).
                 Text("Recipients", style = MaterialTheme.typography.titleSmall)
                 Text(recipientSummary(recipients.size, passphrase), style = MaterialTheme.typography.bodyMedium)
-                TextButton(onClick = { stage = EncryptStage.PICKING }) { Text("Choose recipients") }
+                if (!passphrase.isNullOrEmpty()) {
+                    Text(
+                        "Kept until the vault locks, so the next file won't ask again.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = { pickerOpen = !pickerOpen }) {
+                        Text(
+                            when {
+                                pickerOpen -> "Hide"
+                                hasRecipientChoice -> "Change recipients"
+                                else -> "Choose recipients"
+                            }
+                        )
+                    }
+                    if (!passphrase.isNullOrEmpty()) {
+                        TextButton(onClick = {
+                            passphrase = null
+                            vault.forgetSessionPassphrase()
+                            selection.passphrase = ""
+                            selection.passphraseConfirm = ""
+                        }) { Text("Forget passphrase") }
+                    }
+                }
+
+                if (pickerOpen) {
+                    RecipientPickerContent(
+                        vault = vault,
+                        selection = selection,
+                        modifier = Modifier.fillMaxWidth(),
+                        showTitle = false,
+                        rememberPassphrase = true,
+                        onCancel = { pickerOpen = false },
+                        onConfirm = { r, p ->
+                            recipients = r
+                            passphrase = p
+                            pickerOpen = false
+                        },
+                    )
+                }
 
                 HorizontalDivider()
 
@@ -350,7 +448,9 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = armor, onCheckedChange = { armor = it })
+                    // Remembered across files and launches (issue #2, item 1); the same switch
+                    // lives in Settings under Encryption.
+                    Switch(checked = armor, onCheckedChange = { armor = it; vault.armorDefault = it })
                     Text("Armor as text", modifier = Modifier.padding(start = 12.dp))
                 }
                 Text(
@@ -362,8 +462,18 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
 
                 if (error != null) ErrorText(error!!)
 
-                val canEncrypt = sources.isNotEmpty() &&
-                    (recipients.isNotEmpty() || !passphrase.isNullOrEmpty())
+                // Deliberately dead while the picker is open. Inlining the picker put this button
+                // on the same screen as unconfirmed edits, and encrypting from here would use the
+                // last *confirmed* choice — quietly sending a file to the previous recipient, or
+                // to a passphrase the user was in the middle of replacing with a key.
+                val canEncrypt = sources.isNotEmpty() && hasRecipientChoice && !pickerOpen
+                if (pickerOpen && hasRecipientChoice) {
+                    Text(
+                        "Confirm or cancel the recipient list above to carry on.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Button(
                     onClick = {
                         vault.autoLockSuppressed = true
@@ -388,16 +498,6 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 }
                 TextButton(onClick = onClose) { Text("Cancel") }
             }
-
-            EncryptStage.PICKING -> RecipientPicker(
-                vault = vault,
-                onCancel = { stage = EncryptStage.CONFIGURE },
-                onConfirm = { r, p ->
-                    recipients = r
-                    passphrase = p
-                    stage = EncryptStage.CONFIGURE
-                },
-            )
 
             EncryptStage.WORKING -> Column(
                 Modifier.fillMaxSize().padding(24.dp),
@@ -469,7 +569,15 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                         HorizontalDivider()
                     }
                 }
-                Button(onClick = { reset() }, modifier = Modifier.fillMaxWidth()) { Text("Encrypt more") }
+                Button(onClick = { encryptMore() }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Encrypt more files")
+                }
+                Text(
+                    "Keeps " + recipientSummary(recipients.size, passphrase).lowercase() + " and " +
+                        (if (armor) "armored" else "binary") + " output, and goes straight to picking files.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Done") }
             }
         }

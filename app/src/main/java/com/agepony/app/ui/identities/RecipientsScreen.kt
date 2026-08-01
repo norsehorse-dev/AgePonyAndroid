@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -57,6 +58,11 @@ import java.util.UUID
 // Recipients pane (Phase 2c-2): list / detail / add. Add Recipient supports the
 // paste and GitHub paths (QR deferred). Parsed candidates are reviewed (name +
 // include) before saving, mirroring iOS's AddRecipientView "Found" section.
+//
+// The candidate's name field starts *empty* and the key summary is rendered above it.
+// It used to be pre-filled with the truncated key, which testers read as a read-only
+// display of the parsed key rather than an editable field, so recipients ended up
+// saved under names like "age1pqdu27d…d8swW".
 //
 
 @Composable
@@ -241,7 +247,7 @@ private enum class AddRecipientSource(val label: String) { PASTE("Paste"), GITHU
 
 private class EditableCandidate(val candidate: RecipientCandidate) {
     val key: String = UUID.randomUUID().toString()
-    var name by mutableStateOf(candidate.defaultName)
+    var name by mutableStateOf("")
     var include by mutableStateOf(true)
 }
 
@@ -259,6 +265,10 @@ internal fun AddRecipientFlow(
     val candidates = remember { mutableStateListOf<EditableCandidate>() }
     val scope = rememberCoroutineScope()
     var showScanner by remember { mutableStateOf(false) }
+
+    // A blank name still saves (it falls back to the key summary), but it is nearly always an
+    // oversight rather than a choice, so confirm instead of silently storing a key as a name.
+    var confirmUnnamed by remember { mutableStateOf(false) }
 
     if (showScanner) {
         QrScanner(
@@ -278,6 +288,46 @@ internal fun AddRecipientFlow(
         return
     }
 
+    val commit: () -> Unit = {
+        candidates.filter { it.include }.forEach { ec ->
+            val c = ec.candidate
+            vault.addRecipient(
+                StoredRecipient(
+                    id = UUID.randomUUID().toString(),
+                    name = ec.name.trim().ifBlank { c.defaultName },
+                    type = c.type,
+                    publicKeyB64 = c.publicKeyB64,
+                    sshComment = c.sshComment,
+                    source = c.source,
+                    sourceMetadata = c.sourceMetadata,
+                    createdAt = System.currentTimeMillis(),
+                )
+            )
+        }
+        onDone()
+    }
+
+    if (confirmUnnamed) {
+        AlertDialog(
+            onDismissRequest = { confirmUnnamed = false },
+            title = { Text("Unnamed recipient") },
+            text = {
+                Text(
+                    "You haven't written the name of one or more recipients. " +
+                        "Save changes anyway?"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmUnnamed = false
+                    commit()
+                }) { Text("Save anyway") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmUnnamed = false }) { Text("Go back") }
+            },
+        )
+    }
 
     Column(
         Modifier
@@ -394,22 +444,11 @@ internal fun AddRecipientFlow(
             val savable = candidates.count { it.include }
             Button(
                 onClick = {
-                    candidates.filter { it.include }.forEach { ec ->
-                        val c = ec.candidate
-                        vault.addRecipient(
-                            StoredRecipient(
-                                id = UUID.randomUUID().toString(),
-                                name = ec.name.trim().ifBlank { c.defaultName },
-                                type = c.type,
-                                publicKeyB64 = c.publicKeyB64,
-                                sshComment = c.sshComment,
-                                source = c.source,
-                                sourceMetadata = c.sourceMetadata,
-                                createdAt = System.currentTimeMillis(),
-                            )
-                        )
+                    if (candidates.any { it.include && it.name.isBlank() }) {
+                        confirmUnnamed = true
+                    } else {
+                        commit()
                     }
-                    onDone()
                 },
                 enabled = savable > 0,
                 modifier = Modifier.weight(1f),
@@ -421,36 +460,71 @@ internal fun AddRecipientFlow(
 
 @Composable
 private fun CandidateRow(ec: EditableCandidate, onDiscard: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Switch(checked = ec.include, onCheckedChange = { ec.include = it })
-        Column(Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(
-                typeLabel(ec.candidate.type),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedTextField(
-                value = ec.name,
-                onValueChange = { ec.name = it },
-                label = { Text("Name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (!ec.candidate.sshComment.isNullOrBlank()) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        // Which key this is, first — then an empty field to name it. The order matters:
+        // a name field pre-filled with the key reads as a label, not as an input.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(checked = ec.include, onCheckedChange = { ec.include = it })
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(
-                    ec.candidate.sshComment!!,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
+                    typeLabel(ec.candidate.type),
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    candidateKeySummary(ec.candidate),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (!ec.candidate.sshComment.isNullOrBlank()) {
+                    Text(
+                        ec.candidate.sshComment!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
+            TextButton(onClick = onDiscard) { Text("Discard") }
         }
-        TextButton(onClick = onDiscard) { Text("Discard") }
+        OutlinedTextField(
+            value = ec.name,
+            onValueChange = { ec.name = it },
+            label = { Text("Name") },
+            placeholder = { Text("e.g. Alice") },
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+        )
+    }
+}
+
+/**
+ * One-line, middle-elided rendering of a parsed key: enough to compare against what the
+ * sender published, short enough to sit above the name field. Falls back to the candidate's
+ * default name if the key somehow will not re-render.
+ */
+private fun candidateKeySummary(candidate: RecipientCandidate): String {
+    val full = runCatching { candidate.publicDisplayString() }.getOrNull()
+        ?: return candidate.defaultName
+    return when (candidate.type) {
+        StoredRecipientType.X25519, StoredRecipientType.MLKEM768X25519 ->
+            if (full.length <= 24) full else "${full.take(14)}…${full.takeLast(5)}"
+
+        StoredRecipientType.SSH_ED25519, StoredRecipientType.SSH_RSA -> {
+            // "ssh-ed25519 AAAAC3… comment" — keep the algorithm, elide the blob, drop the comment
+            // (it already has its own line).
+            val parts = full.trim().split(Regex("\\s+"))
+            val algo = parts.firstOrNull().orEmpty()
+            val blob = parts.getOrNull(1).orEmpty()
+            if (blob.length <= 18) "$algo $blob".trim()
+            else "$algo ${blob.take(10)}…${blob.takeLast(6)}"
+        }
     }
 }
 

@@ -96,6 +96,56 @@ class Vault(context: Context) {
         get() = prefs.getBoolean(KEY_REVIEW_PROMPT_SHOWN, false)
         set(value) { prefs.edit().putBoolean(KEY_REVIEW_PROMPT_SHOWN, value).apply() }
 
+    // Phase 3.2 — encrypt-flow stickiness (GitHub issue #2). The encrypt screen used to start
+    // from the same defaults every time, so anyone who always wants binary output, or always
+    // encrypts to a passphrase, re-set the same two switches on every file. These remember the
+    // last choice. Both are mirrored into Compose state as well as prefs, because Settings and
+    // the encrypt screen can each write them and neither should show a stale switch.
+
+    private var armorDefaultState by mutableStateOf(prefs.getBoolean(KEY_ARMOR_DEFAULT, true))
+
+    /** Whether the encrypt screen starts with ASCII armor on. age's own default here is armored. */
+    var armorDefault: Boolean
+        get() = armorDefaultState
+        set(value) {
+            armorDefaultState = value
+            prefs.edit().putBoolean(KEY_ARMOR_DEFAULT, value).apply()
+        }
+
+    private var passphraseModeDefaultState by
+        mutableStateOf(prefs.getBoolean(KEY_PASSPHRASE_MODE_DEFAULT, false))
+
+    /** Whether the recipient picker opens in passphrase (scrypt) mode rather than key selection. */
+    var passphraseModeDefault: Boolean
+        get() = passphraseModeDefaultState
+        set(value) {
+            passphraseModeDefaultState = value
+            prefs.edit().putBoolean(KEY_PASSPHRASE_MODE_DEFAULT, value).apply()
+        }
+
+    /**
+     * The passphrase last confirmed in the encrypt flow, so encrypting a run of files asks for it
+     * once instead of once per file.
+     *
+     * Memory only. It is never written to prefs and never enters the vault snapshot, and [lock]
+     * drops it alongside the vault key — and VaultGate locks the vault whenever the app is
+     * backgrounded, so a remembered passphrase does not outlive a visible session. Choosing
+     * recipients instead of a passphrase clears it, so a non-null value always means the last
+     * choice was passphrase mode.
+     */
+    var sessionPassphrase: String? by mutableStateOf<String?>(null)
+        private set
+
+    /** Hold [value] for the rest of this unlocked session; blank or null forgets instead. */
+    fun rememberSessionPassphrase(value: String?) {
+        sessionPassphrase = value?.takeIf { it.isNotEmpty() }
+    }
+
+    /** Drop the remembered passphrase now, without locking the vault. */
+    fun forgetSessionPassphrase() {
+        sessionPassphrase = null
+    }
+
     /** Bump the fresh-launch counter by one and return the new value. */
     fun incrementLaunchCount(): Int {
         val next = launchCount + 1
@@ -175,6 +225,7 @@ class Vault(context: Context) {
     fun lock() {
         vk?.fill(0)
         vk = null
+        sessionPassphrase = null
         identities.clear()
         recipients.clear()
         notes.clear()
@@ -301,5 +352,7 @@ class Vault(context: Context) {
         const val KEY_REVIEW_PROMPT_SHOWN = "reviewPromptShown"
         const val KEY_LAST_TAB = "lastTab"
         const val KEY_SCRYPT_WORK_FACTOR = "scryptWorkFactor"
+        const val KEY_ARMOR_DEFAULT = "armorDefault"
+        const val KEY_PASSPHRASE_MODE_DEFAULT = "passphraseModeDefault"
     }
 }

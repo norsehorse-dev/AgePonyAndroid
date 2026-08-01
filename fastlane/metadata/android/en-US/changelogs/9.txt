@@ -1,0 +1,9 @@
+AgePony 3.2.0 makes encrypting a run of files quick.
+
+- Recipients are chosen on the encrypt screen itself, not a second page.
+- Armor and passphrase-only are remembered between files and launches.
+- A passphrase is held until the vault locks, so a run asks once.
+- "Encrypt more files" keeps every setting and goes to the picker.
+- Add Recipient no longer pre-fills the name field with the key.
+
+Also carries 3.1.0: files of any size, one archive or one file each, and a file inspector.

@@ -26,8 +26,8 @@ android {
         applicationId = "com.agepony.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "3.1.0"
+        versionCode = 9
+        versionName = "3.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -45,7 +45,14 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Only sign when keystore.properties is actually present. Assigning the config
+            // unconditionally made packageRelease fail with 'SigningConfig "release" is missing
+            // required property "storeFile"' in any tree without the keystore — a clean clone,
+            // a CI checkout, or F-Droid's clean room. Leaving it unset there produces an
+            // unsigned APK, which is what those builds want and what the README already claims.
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             // Do not embed git VCS metadata in the APK. F-Droid's clean-room build has no
             // git context, so an embedded revision breaks reproducible-build verification.
             vcsInfo {
