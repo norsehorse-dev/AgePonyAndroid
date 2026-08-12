@@ -6,6 +6,7 @@ import com.agepony.core.recipients.HybridIdentity
 import com.agepony.core.recipients.HybridRecipient
 import com.agepony.core.recipients.SSHEd25519Identity
 import com.agepony.core.recipients.SSHEd25519Recipient
+import com.agepony.core.recipients.SSHRSAIdentity
 import com.agepony.core.recipients.SSHRSARecipient
 import com.agepony.core.recipients.X25519Identity
 import com.agepony.core.recipients.X25519Recipient
@@ -24,17 +25,16 @@ import java.io.ByteArrayOutputStream
 //   mlkem768x25519  recipient:                         pub = 1216-byte hybrid pub
 //   ssh-ed25519     identity: priv = 32-byte seed;    pub = 32-byte ed25519 pub
 //   ssh-ed25519     recipient:                         pub = 32-byte ed25519 pub
+//   ssh-rsa         identity: priv = UTF-8 bytes of the decrypted OpenSSH PEM
+//                    (normalized to cipher=none by OpenSSHEncryptedKey at import);
+//                                                     pub = UTF-8 bytes of the
+//                                                      `ssh-rsa BASE64 [comment]` line
 //   ssh-rsa         recipient:                         pub = UTF-8 bytes of the
 //                                                       `ssh-rsa BASE64 [comment]` line
-// ssh-rsa *identity* import is deferred (the core exposes RSA params but no
-// PEM re-serializer; needs a param blob — landing in a later sub-phase).
 //
 
 internal fun b64d(s: String): ByteArray = java.util.Base64.getDecoder().decode(s)
 internal fun b64e(b: ByteArray): String = java.util.Base64.getEncoder().encodeToString(b)
-
-private const val RSA_IDENTITY_PENDING =
-    "SSH RSA private-key import lands in a later sub-phase"
 
 private const val HARDWARE_SIGNING_ONLY =
     "hardware key is signing-only; it cannot decrypt or act as an encryption recipient"
@@ -66,7 +66,8 @@ fun StoredIdentity.toAgeIdentity(): AgeIdentity = when (type) {
     StoredIdentityType.X25519 -> X25519Identity(b64d(privateKeyB64))
     StoredIdentityType.MLKEM768X25519 -> HybridIdentity(b64d(privateKeyB64))
     StoredIdentityType.SSH_ED25519 -> SSHEd25519Identity(b64d(privateKeyB64))
-    StoredIdentityType.SSH_RSA -> throw NotImplementedError(RSA_IDENTITY_PENDING)
+    StoredIdentityType.SSH_RSA ->
+        SSHRSAIdentity.fromPEM(String(b64d(privateKeyB64), Charsets.UTF_8))
     StoredIdentityType.HARDWARE_KEY -> throw IllegalStateException(HARDWARE_SIGNING_ONLY)
     StoredIdentityType.SK_ED25519 -> throw IllegalStateException(SK_SIGNING_ONLY)
     StoredIdentityType.SK_ECDSA_P256 -> throw IllegalStateException(SK_SIGNING_ONLY)
@@ -76,7 +77,13 @@ fun StoredIdentity.toAgeRecipient(): AgeRecipient = when (type) {
     StoredIdentityType.X25519 -> X25519Recipient(b64d(publicKeyB64))
     StoredIdentityType.MLKEM768X25519 -> HybridRecipient(b64d(publicKeyB64))
     StoredIdentityType.SSH_ED25519 -> SSHEd25519Recipient(b64d(publicKeyB64))
-    StoredIdentityType.SSH_RSA -> throw NotImplementedError(RSA_IDENTITY_PENDING)
+    StoredIdentityType.SSH_RSA -> {
+        val line = String(b64d(publicKeyB64), Charsets.UTF_8)
+        when (val parsed = OpenSSHPublicKey.parse(line)) {
+            is OpenSSHPublicKey.RSA -> SSHRSARecipient(parsed)
+            else -> throw IllegalStateException("stored ssh-rsa identity did not parse as RSA")
+        }
+    }
     StoredIdentityType.HARDWARE_KEY -> throw IllegalStateException(HARDWARE_SIGNING_ONLY)
     StoredIdentityType.SK_ED25519 -> throw IllegalStateException(SK_SIGNING_ONLY)
     StoredIdentityType.SK_ECDSA_P256 -> throw IllegalStateException(SK_SIGNING_ONLY)
@@ -86,7 +93,7 @@ fun StoredIdentity.publicDisplayString(): String = when (type) {
     StoredIdentityType.X25519 -> X25519Recipient(b64d(publicKeyB64)).toBech32()
     StoredIdentityType.MLKEM768X25519 -> HybridRecipient(b64d(publicKeyB64)).toBech32()
     StoredIdentityType.SSH_ED25519 -> sshEd25519Line(b64d(publicKeyB64), sshComment)
-    StoredIdentityType.SSH_RSA -> "(SSH RSA)"
+    StoredIdentityType.SSH_RSA -> String(b64d(publicKeyB64), Charsets.UTF_8)
     StoredIdentityType.HARDWARE_KEY -> {
         val c = sshComment?.trim().orEmpty()
         if (c.isEmpty()) "ecdsa-sha2-nistp256 $publicKeyB64"
@@ -101,7 +108,8 @@ fun StoredIdentity.privateDisplayString(): String = when (type) {
     StoredIdentityType.MLKEM768X25519 -> HybridIdentity(b64d(privateKeyB64)).toBech32()
     StoredIdentityType.SSH_ED25519 ->
         "(SSH Ed25519 — private key stored in the vault; not exportable as text)"
-    StoredIdentityType.SSH_RSA -> "(SSH RSA)"
+    // The stored decrypted PEM, same as iOS. The vault's encryption is what protects it.
+    StoredIdentityType.SSH_RSA -> String(b64d(privateKeyB64), Charsets.UTF_8)
     StoredIdentityType.HARDWARE_KEY ->
         "(hardware key — private key stays in the device keystore; not exportable)"
     StoredIdentityType.SK_ED25519, StoredIdentityType.SK_ECDSA_P256 ->

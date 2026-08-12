@@ -1,0 +1,7 @@
+AgePony 4.0.0 makes signing fully usable, and adds a duress password.
+
+- Sign and verify files from a new Sign tab, using SSH Ed25519 or RSA keys, a hardware key, or a security key over NFC.
+- Keep a list of trusted signers; import and export OpenSSH allowed_signers.
+- Sign-then-encrypt now works with hardware keys too.
+- Unlock with a password or PIN, with or without biometrics.
+- Optional duress password that silently wipes the vault when entered.

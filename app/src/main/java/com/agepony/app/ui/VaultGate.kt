@@ -2,36 +2,60 @@ package com.agepony.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.agepony.app.security.BiometricGate
 import com.agepony.app.vault.VaultViewModel
 
 //
-// Gates the five-tab app shell behind the vault state, mirroring the iOS launch
-// gate: first run shows "create vault", a provisioned-but-locked vault shows
-// "unlock", and an unlocked vault shows AgePonyApp(). The vault locks again when
-// the app stops (backgrounds) — UNLESS a system picker (SAF) was launched from
-// inside the app, in which case the round trip is exempt so the in-progress
-// flow and its result launcher survive. When biometric is disabled the locked
-// vault unlocks automatically (no prompt).
+// Gates the app shell behind the vault state, mirroring the iOS launch gate:
+// first run shows "create vault", a provisioned-but-locked vault shows "unlock",
+// and an unlocked vault shows AgePonyApp(). The vault locks again when the app
+// stops (backgrounds) — UNLESS a system picker (SAF) was launched from inside
+// the app, in which case the round trip is exempt so the in-progress flow and
+// its result launcher survive.
+//
+// Creation offers two paths: a biometric-sealed vault (when the device has a
+// screen lock or fingerprint), and an app-owned password/PIN vault (always, and
+// the only option on a device with no lock enrolled — this is what makes setup
+// possible without a screen lock, 4.0.0).
+//
+// Unlock paths, in the order the locked screen offers them:
+//   - biometric, when enabled;
+//   - app-owned password / PIN, when enrolled; the same field is where a decoy
+//     password is entered, and the wipe it triggers is invisible here — it just
+//     resolves to an unlocked, empty vault;
+//   - silent (no-lock) auto-unlock, only when biometric is off AND a plain blob
+//     exists — the deliberate "no lock at all" mode.
 //
 @Composable
 fun VaultGate(vm: VaultViewModel) {
@@ -50,93 +74,256 @@ fun VaultGate(vm: VaultViewModel) {
         onDispose { activity.lifecycle.removeObserver(observer) }
     }
 
-    // Biometric off: unlock silently when provisioned but locked.
+    // "No lock" mode only: biometric off and a plain (non-auth) blob present.
+    // Password-enrolled vaults are NOT auto-unlocked — the password is the gate.
     LaunchedEffect(vm.provisioned, vm.vault.isUnlocked, vm.biometricEnabled, vm.isBusy, vm.error) {
         if (vm.provisioned && !vm.vault.isUnlocked && !vm.biometricEnabled &&
-            !vm.isBusy && vm.error == null
+            vm.vault.plainKeyBlobExists() && !vm.isBusy && vm.error == null
         ) {
             vm.unlock(activity)
         }
     }
 
     when {
-        !vm.provisioned -> GateScaffold(
-            heading = "Welcome to AgePony",
-            body = "AgePony stores your keys, recipients, and notes in a vault " +
-                "sealed on this device and unlocked with your biometric. " +
-                "Create your vault to get started.",
-            actionLabel = "Create secure vault",
-            busy = vm.isBusy,
-            error = vm.error,
-            onAction = { vm.bootstrap(activity) }
-        )
-
-        !vm.vault.isUnlocked -> GateScaffold(
-            heading = "AgePony is locked",
-            body = if (vm.biometricEnabled) {
-                "Unlock your vault to access your keys and notes."
-            } else {
-                "Opening your vault…"
-            },
-            actionLabel = "Unlock",
-            busy = vm.isBusy,
-            error = vm.error,
-            onAction = { vm.unlock(activity) }
-        )
-
+        !vm.provisioned -> WelcomeScreen(vm, activity)
+        !vm.vault.isUnlocked -> LockedScreen(vm, activity)
         else -> AgePonyApp(vm)
     }
 }
 
 @Composable
-private fun GateScaffold(
-    heading: String,
-    body: String,
-    actionLabel: String,
-    busy: Boolean,
-    error: String?,
-    onAction: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+private fun WelcomeScreen(vm: VaultViewModel, activity: FragmentActivity) {
+    // Recomputed on each composition; cheap, and it can change if the user leaves to set
+    // up a screen lock and comes back.
+    val biometricAvailable = remember(vm.isBusy) { BiometricGate.canAuthenticate(activity) }
+    var showCreatePassword by remember { mutableStateOf(false) }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = heading,
+                "Welcome to AgePony",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
             Text(
-                text = body,
+                if (biometricAvailable) {
+                    "AgePony stores your keys, recipients, and notes in a vault sealed on " +
+                        "this device. Unlock it with your biometric, a password, or both."
+                } else {
+                    "AgePony stores your keys, recipients, and notes in a vault sealed on " +
+                        "this device. No screen lock is set up, so protect it with a password " +
+                        "or PIN. To unlock with a fingerprint instead, set up a screen lock in " +
+                        "Android settings first, then create the vault."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 16.dp, bottom = 32.dp)
+                modifier = Modifier.padding(top = 16.dp, bottom = 32.dp),
             )
-            if (busy) {
+
+            if (vm.isBusy) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            } else if (biometricAvailable) {
+                Button(onClick = { vm.bootstrap(activity) }, modifier = Modifier.width(260.dp)) {
+                    Text("Create with biometric")
+                }
+                TextButton(
+                    onClick = { showCreatePassword = true },
+                    modifier = Modifier.padding(top = 12.dp),
+                ) { Text("Use a password instead") }
             } else {
-                Button(onClick = onAction, modifier = Modifier.width(240.dp)) {
-                    Text(actionLabel)
+                Button(onClick = { showCreatePassword = true }, modifier = Modifier.width(260.dp)) {
+                    Text("Create with a password")
                 }
             }
-            if (error != null) {
+
+            if (vm.error != null) {
                 Text(
-                    text = error,
+                    vm.error!!,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 24.dp)
+                    modifier = Modifier.padding(top = 24.dp),
                 )
             }
         }
     }
+
+    if (showCreatePassword) {
+        CreateSecretDialog(
+            onConfirm = { secret, kind ->
+                vm.bootstrapWithPassword(secret, kind)
+                showCreatePassword = false
+            },
+            onDismiss = { showCreatePassword = false },
+        )
+    }
+}
+
+@Composable
+private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity) {
+    val isPin = vm.unlockSecretKind == "pin"
+    val secretNoun = if (isPin) "PIN" else "password"
+    // When both are available, biometric leads and the password field is opt-in.
+    var showPasswordField by remember { mutableStateOf(!vm.biometricEnabled) }
+    var secret by remember { mutableStateOf("") }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                "AgePony is locked",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                if (vm.biometricEnabled) "Unlock your vault to access your keys and notes."
+                else "Enter your $secretNoun to unlock.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 16.dp, bottom = 32.dp),
+            )
+
+            if (vm.isBusy) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            } else {
+                if (vm.biometricEnabled) {
+                    Button(onClick = { vm.unlock(activity) }, modifier = Modifier.width(240.dp)) {
+                        Text("Unlock")
+                    }
+                }
+
+                if (vm.passwordEnrolled) {
+                    if (showPasswordField) {
+                        OutlinedTextField(
+                            value = secret,
+                            onValueChange = { secret = it },
+                            singleLine = true,
+                            label = { Text(secretNoun.replaceFirstChar { it.uppercase() }) },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password
+                            ),
+                            modifier = Modifier.fillMaxWidth().padding(top = if (vm.biometricEnabled) 24.dp else 0.dp),
+                        )
+                        Button(
+                            onClick = {
+                                val chars = secret.toCharArray()
+                                secret = ""
+                                vm.unlockWithPassword(chars)
+                            },
+                            enabled = secret.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        ) { Text("Unlock with $secretNoun") }
+                    } else {
+                        TextButton(
+                            onClick = { showPasswordField = true },
+                            modifier = Modifier.padding(top = 16.dp),
+                        ) { Text("Use your $secretNoun instead") }
+                    }
+                }
+            }
+
+            if (vm.error != null) {
+                Text(
+                    vm.error!!,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 24.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Create-time secret entry: password or PIN, with a confirm field so a typo doesn't lock
+ * the user out of a vault they can't recover. Mirrors the Settings SetSecretDialog, kept
+ * separate so the gate doesn't depend on Settings internals.
+ */
+@Composable
+private fun CreateSecretDialog(
+    onConfirm: (CharArray, String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var kind by remember { mutableStateOf("password") }
+    var value by remember { mutableStateOf("") }
+    var again by remember { mutableStateOf("") }
+    val isPin = kind == "pin"
+    val mismatch = again.isNotEmpty() && value != again
+    val valid = value.isNotEmpty() && value == again
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Protect your vault") },
+        text = {
+            Column {
+                Text(
+                    "Choose a password or PIN to unlock AgePony. There is no recovery if you " +
+                        "forget it — the vault is sealed with it.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Row(modifier = Modifier.padding(top = 8.dp)) {
+                    TextButton(onClick = { kind = "password" }) {
+                        Text(
+                            "Password",
+                            color = if (!isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(onClick = { kind = "pin" }) {
+                        Text(
+                            "PIN",
+                            color = if (isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                val kb = KeyboardOptions(
+                    keyboardType = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    singleLine = true,
+                    label = { Text(if (isPin) "PIN" else "Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = kb,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                OutlinedTextField(
+                    value = again,
+                    onValueChange = { again = it },
+                    singleLine = true,
+                    label = { Text("Confirm") },
+                    isError = mismatch,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = kb,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                if (mismatch) {
+                    Text(
+                        "They don't match.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(value.toCharArray(), kind) }, enabled = valid) {
+                Text("Create vault")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

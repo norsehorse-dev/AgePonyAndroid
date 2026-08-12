@@ -99,8 +99,29 @@ object SSHSigner {
         message: ByteArray,
         namespace: String = SSHSig.NAMESPACE_AGEPONY,
         hashAlg: String = SSHSig.HASH_SHA512,
+    ): String = signRsaSha512Hashed(
+        n,
+        e,
+        d,
+        SSHSig.hashMessage(message, hashAlg),
+        namespace,
+        hashAlg,
+    )
+
+    /**
+     * Sign an already-hashed message with RSA, the [signEd25519Hashed] counterpart: identical
+     * output to [signRsaSha512] for the same message, so a large file can be streamed through
+     * [SSHSig.hashStream] instead of held in memory.
+     */
+    fun signRsaSha512Hashed(
+        n: BigInteger,
+        e: BigInteger,
+        d: BigInteger,
+        messageHash: ByteArray,
+        namespace: String = SSHSig.NAMESPACE_AGEPONY,
+        hashAlg: String = SSHSig.HASH_SHA512,
     ): String {
-        val toSign = SSHSig.signedData(namespace, hashAlg, SSHSig.hashMessage(message, hashAlg))
+        val toSign = SSHSig.signedData(namespace, hashAlg, messageHash)
         val signer = RSADigestSigner(org.bouncycastle.crypto.digests.SHA512Digest())
         signer.init(true, RSAKeyParameters(true, n, d))
         signer.update(toSign, 0, toSign.size)
@@ -152,6 +173,26 @@ object SSHSigner {
         val sigWire = SSHSig.ecdsaSigWire(r, s)
         val armored = SSHSig.armor(SSHSig.encode(pub, namespace, hashAlg, sigWire))
         return selfCheck(armored, message, namespace, "ecdsa P-256")
+    }
+
+    /**
+     * [assembleEcdsaP256] for an already-computed message hash, so the hardware signing
+     * path can stream a large payload through [SSHSig.hashStream] instead of holding it.
+     * The DER signature must cover the signed-data built from the same hash; the
+     * self-verification runs against the hash as well.
+     */
+    fun assembleEcdsaP256Hashed(
+        publicQ65: ByteArray,
+        derSignature: ByteArray,
+        messageHash: ByteArray,
+        namespace: String = SSHSig.NAMESPACE_AGEPONY,
+        hashAlg: String = SSHSig.HASH_SHA512,
+    ): String {
+        val (r, s) = derToRS(derSignature)
+        val pub = SSHSig.ecdsaP256PublicWire(publicQ65)
+        val sigWire = SSHSig.ecdsaSigWire(r, s)
+        val armored = SSHSig.armor(SSHSig.encode(pub, namespace, hashAlg, sigWire))
+        return selfCheckHashed(armored, messageHash, namespace, "ecdsa P-256")
     }
 
     /**
@@ -209,6 +250,23 @@ object SSHSigner {
         if (!ok) throw SSHSignerException(
             "$what signature failed self-verification after assembly; " +
             "check the raw signature, flags, counter, and public key material"
+        )
+        return armored
+    }
+
+    /** [selfCheck] against a message hash, for the hashed assembly path. */
+    private fun selfCheckHashed(
+        armored: String,
+        messageHash: ByteArray,
+        namespace: String,
+        what: String,
+    ): String {
+        val result = SSHSigVerifier.verifyHashed(
+            armored.toByteArray(Charsets.US_ASCII), namespace
+        ) { messageHash }
+        if (!result.valid) throw SSHSignerException(
+            "$what signature failed self-verification after assembly; " +
+            "check the raw signature and public key material (${result.reason})"
         )
         return armored
     }

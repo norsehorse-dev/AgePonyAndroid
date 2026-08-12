@@ -10,7 +10,7 @@ Also included:
 WHY AGEPONY
 - Standard age encryption. AgePony reads and writes the same format as the age CLI, so your files work with other age tools on desktop and server.
 - Public key or passphrase. Encrypt to someone's public key, or lock a file with a passphrase you share separately.
-- SSH keys work too. Encrypt to an existing SSH public key, and sign with your SSH key using the SSHSIG standard.
+- SSH signing, done properly. Sign and verify files from a dedicated Sign tab using SSH Ed25519 or RSA keys, a hardware key, or a security key over NFC, and keep a list of trusted signers. Signatures use the SSHSIG standard, so ssh-keygen verifies them.
 - On device by default. Encryption, decryption, signing, and key generation all happen locally on your phone, and your private keys never leave your device.
 - One optional online step. When you import a recipient from GitHub, AgePony fetches that person's public SSH keys from github.com. That is the only network request the app makes, it happens only when you tap Fetch, and nothing about you is sent.
 - No tracking, no ads, no account required. AgePony does not collect analytics or personal data.
@@ -21,7 +21,9 @@ FEATURES
 - Quantum-safe hybrid keys (ML-KEM-768 + X25519) alongside classic X25519 keys.
 - Encrypt and decrypt files and text messages.
 - Passphrase encryption for quick, key-free sharing.
-- Sign and verify with SSH Ed25519 keys (SSHSIG).
+- Sign and verify files (SSHSIG) with SSH Ed25519 or RSA keys, hardware keys, or a security key over NFC, with a trusted-signers list.
+- Unlock with your biometric, a password, or a PIN, so the app works even with no screen lock set up.
+- Optional duress password that wipes the vault when entered.
 - Scan recipient keys with your camera by QR code.
 - Import a recipient from a GitHub username, fetching their public SSH keys from github.com.
 - Batch migrate existing files to quantum-safe encryption.

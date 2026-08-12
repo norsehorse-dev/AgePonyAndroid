@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.agepony.app.signing.FileVerifier
 import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.StoredIdentity
+import com.agepony.app.vault.StoredSigner
 import com.agepony.app.vault.Vault
 import com.agepony.app.vault.WrongPassphraseException
 import com.agepony.app.vault.toAgeIdentity
@@ -90,6 +91,7 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         val pass = if (usePassphrase) passphrase else null
         val identities = vault.identities.mapNotNull { runCatching { it.toAgeIdentity() }.getOrNull() }
         val known = vault.identities.toList()
+        val signers = vault.signers.toList()
         error = null
         bytesDone = 0L
         stage = DecryptStage.WORKING
@@ -103,6 +105,7 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                         identities = identities,
                         passphrase = pass,
                         known = known,
+                        signers = signers,
                         onBytes = { delta -> bytesDone += delta },
                     )
                 }
@@ -360,6 +363,7 @@ private fun decryptToDocument(
     identities: List<AgeIdentity>,
     passphrase: String?,
     known: List<StoredIdentity>,
+    signers: List<StoredSigner>,
     onBytes: (Long) -> Unit,
 ): DecryptOutcome {
     val (armored, rawInput) = FileEncryptor.sniffArmored(SafIo.openInput(context, source.uri))
@@ -383,6 +387,7 @@ private fun decryptToDocument(
     val result = FileVerifier().verifyHashed(
         bundle.signatureArmored.toByteArray(Charsets.UTF_8),
         known,
+        signers,
     ) { alg -> bundle.hash(alg) }
     val verdict = when (result.trust) {
         FileVerifier.Trust.TRUSTED -> "Signed by ${result.signerName ?: "a known key"} ✓"

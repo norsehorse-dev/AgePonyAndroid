@@ -11,6 +11,9 @@ import kotlinx.serialization.Serializable
 // recipients) are re-instantiated on demand by hydration helpers — this keeps
 // the vault/model layer entirely above the crypto layer.
 //
+// StoredSigner (the trusted-signers list) lives in its own file, mirroring
+// iOS's Vault/StoredSigner.swift.
+//
 // Serialization: kotlinx.serialization (compiler-plugin codegen, no reflection).
 // On the AGP 9 built-in-Kotlin toolchain, KSP — and therefore Moshi codegen —
 // is unavailable, so kotlinx.serialization (same plugin mechanism as the
@@ -78,7 +81,7 @@ enum class StoredRecipientSource {
  *   sshEd25519:      pub = SSH wire blob; priv = 32-byte ed25519 seed
  *                    (Android's SSHEd25519Identity derives the public half from the
  *                     seed, so unlike iOS we store the 32-byte seed alone, not 64)
- *   sshRSA:          pub = `ssh-rsa ...` line bytes; priv = OpenSSH PEM bytes
+ *   sshRSA:          pub = `ssh-rsa ...` line bytes; priv = decrypted OpenSSH PEM bytes
  */
 @Serializable
 data class StoredIdentity(
@@ -118,10 +121,17 @@ data class StoredNote(
     val updatedAt: Long
 )
 
-/** Full vault contents — the unit that is serialized and sealed to vault.dat. */
+/**
+ * Full vault contents — the unit that is serialized and sealed to vault.dat.
+ *
+ * `signers` was added in 4.0.0. The default keeps both directions safe: an older
+ * vault.dat decodes with an empty list, and an older app reading a newer vault.dat
+ * drops the unknown field (ignoreUnknownKeys) rather than failing to unlock.
+ */
 @Serializable
 data class VaultSnapshot(
     val identities: List<StoredIdentity> = emptyList(),
     val recipients: List<StoredRecipient> = emptyList(),
-    val notes: List<StoredNote> = emptyList()
+    val notes: List<StoredNote> = emptyList(),
+    val signers: List<StoredSigner> = emptyList()
 )

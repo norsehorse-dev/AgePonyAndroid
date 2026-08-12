@@ -1,13 +1,8 @@
 package com.agepony.app.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -18,17 +13,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.review.ReviewPrompt
 import com.agepony.app.ui.files.FilesScreen
 import com.agepony.app.ui.identities.IdentitiesScreen
 import com.agepony.app.ui.notes.NotesScreen
 import com.agepony.app.ui.onboarding.OnboardingScreen
+import com.agepony.app.ui.sign.SignScreen
 import com.agepony.app.ui.text.TextScreen
 import com.agepony.app.ui.settings.SettingsScreen
 import com.agepony.app.vault.Vault
@@ -38,12 +31,9 @@ import com.agepony.app.vault.VaultViewModel
 private const val REVIEW_PROMPT_MIN_LAUNCHES = 3
 
 /**
- * Root composable: a Scaffold with a bottom NavigationBar over the five tabs.
+ * Root composable: a Scaffold with a bottom NavigationBar over the six tabs.
  * Selected tab survives configuration changes via rememberSaveable (AgeTab is
  * an enum, so the default Bundle-backed saver handles it).
- *
- * Phase 2c wires the Identities and Files tabs to their real screens; the other
- * tabs remain placeholders until their phases land.
  */
 @Composable
 fun AgePonyApp(vm: VaultViewModel) {
@@ -117,6 +107,13 @@ fun AgePonyApp(vm: VaultViewModel) {
                     .padding(innerPadding),
             )
 
+            AgeTab.SIGN -> SignScreen(
+                vault = vault,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            )
+
             AgeTab.NOTES -> NotesScreen(
                 vault = vault,
                 modifier = Modifier
@@ -138,43 +135,6 @@ fun AgePonyApp(vm: VaultViewModel) {
                     .fillMaxSize()
                     .padding(innerPadding),
             )
-
-            else -> PlaceholderTabContent(
-                tab = selectedTab,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-            )
         }
     }
-}
-
-@Composable
-private fun PlaceholderTabContent(tab: AgeTab, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = tab.label,
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = placeholderBlurb(tab),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-private fun placeholderBlurb(tab: AgeTab): String = when (tab) {
-    AgeTab.FILES -> "Encrypt and decrypt files. Lands in Phase 2c."
-    AgeTab.NOTES -> "Encrypted notes with per-note passphrases. Lands in Phase 2d."
-    AgeTab.TEXT -> "Encrypt and decrypt text, armor always on. Lands in Phase 2d."
-    AgeTab.IDENTITIES -> "Manage identities and saved recipients. Lands in Phase 2c."
-    AgeTab.SETTINGS -> "App settings. Lands in Phase 2d."
 }

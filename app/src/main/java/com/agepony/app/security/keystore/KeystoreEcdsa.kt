@@ -35,7 +35,17 @@ object KeystoreEcdsa {
         message: ByteArray,
         namespace: String = SSHSig.NAMESPACE_AGEPONY,
         hashAlg: String = SSHSig.HASH_SHA512,
-    ): ByteArray = SSHSig.signedData(namespace, hashAlg, SSHSig.hashMessage(message, hashAlg))
+    ): ByteArray = signedDataHashed(SSHSig.hashMessage(message, hashAlg), namespace, hashAlg)
+
+    /**
+     * [signedData] for an already-computed message hash, so a large payload can stream
+     * through [SSHSig.hashStream] instead of being held for the hardware pass.
+     */
+    fun signedDataHashed(
+        messageHash: ByteArray,
+        namespace: String = SSHSig.NAMESPACE_AGEPONY,
+        hashAlg: String = SSHSig.HASH_SHA512,
+    ): ByteArray = SSHSig.signedData(namespace, hashAlg, messageHash)
 
     /**
      * Wrap a DER ECDSA signature (produced by a Keystore `Signature` over the
@@ -50,6 +60,17 @@ object KeystoreEcdsa {
         hashAlg: String = SSHSig.HASH_SHA512,
     ): String = SSHSigner.assembleEcdsaP256(
         uncompressedPoint(pub), derSignature, message, namespace, hashAlg
+    )
+
+    /** [assemble] for an already-computed message hash; the self-check runs hashed too. */
+    fun assembleHashed(
+        pub: ECPublicKey,
+        derSignature: ByteArray,
+        messageHash: ByteArray,
+        namespace: String = SSHSig.NAMESPACE_AGEPONY,
+        hashAlg: String = SSHSig.HASH_SHA512,
+    ): String = SSHSigner.assembleEcdsaP256Hashed(
+        uncompressedPoint(pub), derSignature, messageHash, namespace, hashAlg
     )
 
     /** Left-pad / trim a non-negative coordinate to exactly [len] big-endian bytes. */

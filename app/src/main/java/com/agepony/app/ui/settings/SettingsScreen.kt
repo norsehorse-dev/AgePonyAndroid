@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -19,6 +20,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.agepony.app.review.ReviewPrompt
 import com.agepony.app.vault.FileEncryptor
@@ -54,6 +58,8 @@ fun SettingsScreen(
     var activeId by remember { mutableStateOf(vault.activeIdentityId) }
     var identityMenuOpen by remember { mutableStateOf(false) }
     var pendingReset by remember { mutableStateOf(false) }
+    var showSetPassword by remember { mutableStateOf(false) }
+    var showSetDuress by remember { mutableStateOf(false) }
 
     fun openUrl(url: String) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
@@ -98,12 +104,81 @@ fun SettingsScreen(
             subtitle = if (vm.biometricEnabled) {
                 "On — your vault locks on background and needs your fingerprint or device credential."
             } else {
-                "Off — the vault unlocks automatically. Convenient for testing; less private."
+                "Off — no lock at all: the vault opens automatically with nothing to confirm. " +
+                    "This is not \"PIN instead of biometric\"; set a password below for that."
             },
             checked = vm.biometricEnabled,
             enabled = !vm.isBusy,
             onCheckedChange = { vm.applyBiometric(it) },
         )
+
+        // App-owned password / PIN unlock (4.0.0). Coexists with biometric; also the
+        // home of the duress password.
+        if (!vm.passwordEnrolled) {
+            OutlinedButton(
+                onClick = { showSetPassword = true },
+                enabled = vm.vault.isUnlocked && !vm.isBusy,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) { Text("Set a password or PIN…") }
+            Text(
+                "A password you can use to unlock even with no biometric enrolled, and the " +
+                    "basis for a duress password.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            val noun = if (vm.unlockSecretKind == "pin") "PIN" else "password"
+            Text(
+                "Unlock $noun is set.",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Row {
+                TextButton(onClick = { showSetPassword = true }, enabled = vm.vault.isUnlocked && !vm.isBusy) {
+                    Text("Change")
+                }
+                TextButton(onClick = { vm.removePassword() }, enabled = !vm.isBusy) {
+                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                }
+            }
+
+            if (!vm.duressEnrolled) {
+                OutlinedButton(
+                    onClick = { showSetDuress = true },
+                    enabled = !vm.isBusy,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                ) { Text("Set a duress password…") }
+                Text(
+                    "A second, different password that silently wipes the vault instead of " +
+                        "opening it. Entered under coercion, it leaves an empty app with nothing " +
+                        "to reveal. There is no confirmation and no undo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(
+                    "Duress password is set — entering it wipes the vault.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Row {
+                    TextButton(onClick = { showSetDuress = true }, enabled = !vm.isBusy) { Text("Change") }
+                    TextButton(onClick = { vm.removeDuress() }, enabled = !vm.isBusy) {
+                        Text("Remove", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        }
+
+        if (vm.error != null) {
+            Text(
+                vm.error!!,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
 
         HorizontalDivider()
 
@@ -236,8 +311,24 @@ fun SettingsScreen(
         SectionLabel("About")
         AboutRow("Version", versionName)
         LinkRow("Website") { openUrl("https://agepony.com") }
+        LinkRow("Source code") { openUrl("https://github.com/norsehorse-dev/AgePonyAndroid") }
         LinkRow("age spec") { openUrl("https://age-encryption.org/v1") }
         AboutRow("Made by", "NorseHorse")
+
+        HorizontalDivider()
+
+        // More from NorseHorse — the sibling apps, each linking to its product
+        // site. AgePony itself is omitted since this is it. Mirrors PGPony's
+        // section; kept to product sites only (no store links) so it's identical
+        // in the foss and play flavors.
+        SectionLabel("More from NorseHorse")
+        MoreRow("All Pony apps", "The whole family at pony.norsehor.se") { openUrl("https://pony.norsehor.se") }
+        MoreRow("QuorumPony", "Split a secret into cards. Any few rebuild it.") { openUrl("https://quorumpony.com") }
+        MoreRow("CarrierPony", "Private messaging and file transfer, sealed end to end") { openUrl("https://carrierpony.com") }
+        MoreRow("BurnPony", "Send a secret. Encrypted on your phone, burned after reading") { openUrl("https://burnpony.app") }
+        MoreRow("VaultPony", "VeraCrypt-compatible encrypted vaults, entirely on your device") { openUrl("https://vaultpony.app") }
+        MoreRow("PassPony", "Your pass and passage store, in your pocket") { openUrl("https://passpony.app") }
+        MoreRow("RelayPony", "Encrypted file transfer, phone to phone") { openUrl("https://relaypony.app") }
 
         HorizontalDivider()
 
@@ -316,6 +407,102 @@ fun SettingsScreen(
             },
         )
     }
+
+    if (showSetPassword) {
+        SetSecretDialog(
+            title = "Set a password or PIN",
+            allowKindChoice = true,
+            onConfirm = { secret, kind ->
+                vm.enrollPassword(secret, kind)
+                showSetPassword = false
+            },
+            onDismiss = { showSetPassword = false },
+        )
+    }
+
+    if (showSetDuress) {
+        SetSecretDialog(
+            title = "Set a duress password",
+            allowKindChoice = false,
+            confirmLabel = "Set duress",
+            body = "Enter a second password, different from your real one. Entering it at " +
+                "unlock wipes the vault silently. Choose something you can recall under " +
+                "pressure but would not use by habit.",
+            onConfirm = { secret, _ ->
+                vm.setDuressSecret(secret)
+                showSetDuress = false
+            },
+            onDismiss = { showSetDuress = false },
+        )
+    }
+}
+
+@Composable
+private fun SetSecretDialog(
+    title: String,
+    allowKindChoice: Boolean,
+    confirmLabel: String = "Save",
+    body: String? = null,
+    onConfirm: (CharArray, String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var kind by remember { mutableStateOf("password") }
+    var value by remember { mutableStateOf("") }
+    var again by remember { mutableStateOf("") }
+    val isPin = kind == "pin"
+    val mismatch = again.isNotEmpty() && value != again
+    val valid = value.isNotEmpty() && value == again
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                if (body != null) {
+                    Text(body, style = MaterialTheme.typography.bodyMedium)
+                }
+                if (allowKindChoice) {
+                    Row(modifier = Modifier.padding(top = 8.dp)) {
+                        TextButton(onClick = { kind = "password" }) {
+                            Text("Password", color = if (!isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        TextButton(onClick = { kind = "pin" }) {
+                            Text("PIN", color = if (isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                val kb = KeyboardOptions(keyboardType = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password)
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    singleLine = true,
+                    label = { Text(if (isPin) "PIN" else "Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = kb,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                OutlinedTextField(
+                    value = again,
+                    onValueChange = { again = it },
+                    singleLine = true,
+                    label = { Text("Confirm") },
+                    isError = mismatch,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = kb,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                if (mismatch) {
+                    Text("They don't match.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(value.toCharArray(), kind) }, enabled = valid) {
+                Text(confirmLabel)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -362,6 +549,20 @@ private fun LinkRow(label: String, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text("Open ↗", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun MoreRow(title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Text("Open ↗", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
     }
 }

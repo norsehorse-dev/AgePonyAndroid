@@ -31,6 +31,9 @@ import java.util.UUID
  * generated with `requireAuth = false` signs headless through [sign]. [sign] inspects the
  * key's [KeyInfo] and refuses if the key actually requires auth, so the wrong path fails
  * clearly rather than at the opaque Keystore layer.
+ *
+ * Each pair has a `*Hashed` twin taking a precomputed message hash, so callers that
+ * stream a large payload past [SSHSig.hashStream] never hold the message.
  */
 object HardwareKeyService {
     class HardwareKeyException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -99,18 +102,25 @@ object HardwareKeyService {
         alias: String,
         message: ByteArray,
         namespace: String = SSHSig.NAMESPACE_AGEPONY,
+    ): String = signHashed(alias, SSHSig.hashMessage(message), namespace)
+
+    /** [sign] for an already-computed sha512 message hash. */
+    fun signHashed(
+        alias: String,
+        messageHash: ByteArray,
+        namespace: String = SSHSig.NAMESPACE_AGEPONY,
     ): String {
         if (isUserAuthRequired(alias)) throw HardwareKeyException(
             "key '$alias' requires user authentication; call signAuthenticated"
         )
         val sig = Signature.getInstance(SIGN_ALGO).apply { initSign(privateEntry(alias).privateKey) }
-        sig.update(KeystoreEcdsa.signedData(message, namespace))
+        sig.update(KeystoreEcdsa.signedDataHashed(messageHash, namespace))
         val der = try {
             sig.sign()
         } catch (e: Exception) {
             throw HardwareKeyException("hardware signing failed for '$alias'", e)
         }
-        return KeystoreEcdsa.assemble(loadPublicKey(alias), der, message, namespace)
+        return KeystoreEcdsa.assembleHashed(loadPublicKey(alias), der, messageHash, namespace)
     }
 
     /**
@@ -124,18 +134,30 @@ object HardwareKeyService {
         title: String,
         subtitle: String? = null,
         namespace: String = SSHSig.NAMESPACE_AGEPONY,
+    ): String = signAuthenticatedHashed(
+        activity, alias, SSHSig.hashMessage(message), title, subtitle, namespace
+    )
+
+    /** [signAuthenticated] for an already-computed sha512 message hash. */
+    suspend fun signAuthenticatedHashed(
+        activity: FragmentActivity,
+        alias: String,
+        messageHash: ByteArray,
+        title: String,
+        subtitle: String? = null,
+        namespace: String = SSHSig.NAMESPACE_AGEPONY,
     ): String {
         val sig = Signature.getInstance(SIGN_ALGO).apply { initSign(privateEntry(alias).privateKey) }
         val authed = BiometricGate.authenticateSignature(
             activity, title, subtitle, BiometricPrompt.CryptoObject(sig)
         )
-        authed.update(KeystoreEcdsa.signedData(message, namespace))
+        authed.update(KeystoreEcdsa.signedDataHashed(messageHash, namespace))
         val der = try {
             authed.sign()
         } catch (e: Exception) {
             throw HardwareKeyException("hardware signing failed for '$alias'", e)
         }
-        return KeystoreEcdsa.assemble(loadPublicKey(alias), der, message, namespace)
+        return KeystoreEcdsa.assembleHashed(loadPublicKey(alias), der, messageHash, namespace)
     }
 
     /** Build a vault [StoredIdentity] for a freshly generated hardware key. */

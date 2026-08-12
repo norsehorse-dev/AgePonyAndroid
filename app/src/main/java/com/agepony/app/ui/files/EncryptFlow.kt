@@ -35,16 +35,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
+import com.agepony.app.signing.FileSigner
 import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.ScryptMemoryException
-import com.agepony.app.vault.StoredIdentityType
+import com.agepony.app.vault.StoredIdentity
 import com.agepony.app.vault.Vault
-import com.agepony.app.vault.b64d
 import com.agepony.core.archive.SignedBundle
 import com.agepony.core.archive.TarArchive
 import com.agepony.core.recipients.AgeRecipient
 import com.agepony.core.signing.SSHSig
-import com.agepony.core.signing.SSHSigner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -81,12 +81,17 @@ private enum class OutputMode { BUNDLE, SEPARATE }
 /** One line of the per-file results list. */
 private class EncryptResult(val name: String, val ok: Boolean, val detail: String)
 
-/** An in-app SSH ed25519 key, unpacked once so the work loop does not touch the vault. */
-private class SignerKey(val seed: ByteArray, val publicKey: ByteArray)
+/**
+ * The chosen signing identity plus the FileSigner that routes it. Hardware keys prompt
+ * for biometrics from inside the encrypt pass (FileSigner.signHashed hops to the main
+ * thread for the prompt); security keys are excluded here and live on the Sign tab.
+ */
+private class SignChoice(val identity: StoredIdentity, val fileSigner: FileSigner)
 
 @Composable
 fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit) {
     val context = LocalContext.current
+    val activity = context as FragmentActivity
     val scope = rememberCoroutineScope()
 
     var stage by remember { mutableStateOf(EncryptStage.PICK) }
@@ -116,10 +121,10 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
     val separate = sources.size > 1 && mode == OutputMode.SEPARATE
     val hasRecipientChoice = recipients.isNotEmpty() || !passphrase.isNullOrEmpty()
 
-    fun signerKey(): SignerKey? {
+    fun signerKey(): SignChoice? {
         val id = signerId ?: return null
         val identity = vault.identities.firstOrNull { it.id == id } ?: return null
-        return SignerKey(b64d(identity.privateKeyB64), b64d(identity.publicKeyB64))
+        return SignChoice(identity, FileSigner(activity))
     }
 
     val openInput = rememberLauncherForActivityResult(
@@ -429,8 +434,9 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
 
                 HorizontalDivider()
 
-                // Optional signing — SSH Ed25519 identities sign in-process.
-                val signingIdentities = vault.identities.filter { it.type == StoredIdentityType.SSH_ED25519 }
+                // Optional signing: in-app SSH keys sign in-process; a hardware key prompts
+                // for biometrics during the encrypt. Security keys stay on the Sign tab.
+                val signingIdentities = vault.identities.filter { it.type in FileSigner.ENCRYPT_SIGNING_TYPES }
                 if (signingIdentities.isNotEmpty()) {
                     Text("Sign (optional)", style = MaterialTheme.typography.titleSmall)
                     SignerRow(selected = signerId == null, label = "Don't sign", onClick = { signerId = null })
@@ -438,7 +444,7 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                         SignerRow(selected = signerId == id.id, label = id.name, onClick = { signerId = id.id })
                     }
                     Text(
-                        "Signs the file with your SSH Ed25519 key, then encrypts. The recipient can verify " +
+                        "Signs the file with the chosen key, then encrypts. The recipient can verify " +
                             "it came from you; the signer stays hidden inside the ciphertext. Signed files " +
                             "are read twice, so this takes a little longer.",
                         style = MaterialTheme.typography.bodySmall,
@@ -590,14 +596,14 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
  * Everything that ends up as a single output document: one file, or several bundled into one
  * archive. Input streams and the output stream are the only buffers involved.
  */
-private fun encryptToDocument(
+private suspend fun encryptToDocument(
     context: Context,
     sources: List<SourceRef>,
     dest: Uri,
     bundle: Boolean,
     recipients: List<AgeRecipient>,
     passphrase: String?,
-    signer: SignerKey?,
+    signer: SignChoice?,
     armor: Boolean,
     workFactor: Int,
     onPhase: (String) -> Unit,
@@ -633,9 +639,7 @@ private fun encryptToDocument(
         } else {
             onPhase("Signing")
             val hash = openPayload(counting = true).use { SSHSig.hashStream(it) }
-            val signature = SSHSigner.signEd25519Hashed(
-                signer.seed, signer.publicKey, hash, SSHSig.NAMESPACE_AGEPONY,
-            )
+            val signature = signer.fileSigner.signHashed(signer.identity, hash)
             SignedBundle.bundleSource(payloadName, payloadSize, openPayload(counting = true), signature)
         }
 
@@ -652,13 +656,13 @@ private fun encryptToDocument(
 }
 
 /** One encrypted file per input, written into [tree]. One failure does not stop the batch. */
-private fun encryptToFolder(
+private suspend fun encryptToFolder(
     context: Context,
     sources: List<SourceRef>,
     tree: Uri,
     recipients: List<AgeRecipient>,
     passphrase: String?,
-    signer: SignerKey?,
+    signer: SignChoice?,
     armor: Boolean,
     workFactor: Int,
     onPhase: (String) -> Unit,

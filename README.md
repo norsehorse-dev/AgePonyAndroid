@@ -11,10 +11,12 @@ Website: https://agepony.com
 - Post-quantum hybrid recipients (ML-KEM-768 + X25519), encoded as `age1pq1...` keys
 - Passphrase encryption using scrypt recipients
 - Encrypt to SSH public keys (`ssh-ed25519`, `ssh-rsa`)
-- Sign and verify with SSHSIG, using software Ed25519 keys, Android Keystore hardware keys, or a FIDO2 security key over NFC
+- Sign and verify files with SSHSIG from a dedicated Sign tab, using software Ed25519 or RSA keys, Android Keystore hardware keys, or a FIDO2 security key over NFC
+- Trusted-signers list that names known keys on a valid signature, round-tripping through the OpenSSH `allowed_signers` format
 - Multi-file tar bundling, so a set of files travels as one signed and encrypted archive
 - Migration flow that batch re-encrypts existing files to a quantum-safe key, keeping originals until the new copy verifies
-- Recipient and identity vault, encrypted with a Keystore-backed master key and gated by biometrics
+- Recipient and identity vault, encrypted with a Keystore-backed master key, unlocked by biometrics or an app-owned password/PIN (so it works on devices with no screen lock)
+- Optional duress password that silently wipes the vault when entered under coercion
 - QR scanning and display for exchanging recipient keys
 - ASCII armor support
 

@@ -10,11 +10,11 @@ import java.io.File
 
 //
 // The Android counterpart of iOS's Vault.swift: the single source of truth for
-// identities, recipients, and notes, plus the persistence/crypto plumbing.
-// SwiftUI binds to the iOS @Observable Vault directly; here the equivalent
-// Compose-observable state lives on this class (mutableStateOf / state lists),
-// and a VaultViewModel owns one instance across configuration changes and
-// drives the biometric flow.
+// identities, recipients, notes, and trusted signers, plus the
+// persistence/crypto plumbing. SwiftUI binds to the iOS @Observable Vault
+// directly; here the equivalent Compose-observable state lives on this class
+// (mutableStateOf / state lists), and a VaultViewModel owns one instance across
+// configuration changes and drives the biometric flow.
 //
 // Files (app-private, filesDir/vault/):
 //   vault.key — iv(12) ‖ KEK-wrapped VK         (written once at bootstrap)
@@ -36,6 +36,7 @@ class Vault(context: Context) {
     val identities = mutableStateListOf<StoredIdentity>()
     val recipients = mutableStateListOf<StoredRecipient>()
     val notes = mutableStateListOf<StoredNote>()
+    val signers = mutableStateListOf<StoredSigner>()
 
     // Settings surfaced for binding (UserDefaults on iOS -> SharedPreferences here).
     private val prefs = context.getSharedPreferences("agepony_vault_settings", Context.MODE_PRIVATE)
@@ -65,6 +66,15 @@ class Vault(context: Context) {
     var lastTab: String?
         get() = prefs.getString(KEY_LAST_TAB, null)
         set(value) { prefs.edit().putString(KEY_LAST_TAB, value).apply() }
+
+    /**
+     * Which kind of app-owned unlock secret the user chose: "password" or "pin", null
+     * when none is set. Cosmetic only (keyboard type on the unlock screen); the crypto
+     * treats both identically.
+     */
+    var unlockSecretKind: String?
+        get() = prefs.getString(KEY_UNLOCK_SECRET_KIND, null)
+        set(value) { prefs.edit().putString(KEY_UNLOCK_SECRET_KIND, value).apply() }
 
     // Phase 2f — engagement counters for the in-app review nudge. launchCount is
     // bumped once per fresh process start (see MainActivity); reviewPromptShown
@@ -161,6 +171,8 @@ class Vault(context: Context) {
     private val vaultDir: File = File(context.filesDir, "vault")
     private val keyFile: File get() = File(vaultDir, "vault.key")
     private val plainKeyFile: File get() = File(vaultDir, "vault.key.plain")
+    private val passwordKeyFile: File get() = File(vaultDir, "vault.key.pw")
+    private val duressKeyFile: File get() = File(vaultDir, "vault.key.duress")
     private val dataFile: File get() = File(vaultDir, "vault.dat")
 
     // The in-memory vault key. Non-null only while unlocked.
@@ -168,8 +180,13 @@ class Vault(context: Context) {
 
     // MARK: - Provisioning state
 
-    /** True once a vault has been created on this device (key blob present). */
-    fun isProvisioned(): Boolean = keyFile.exists() || plainKeyFile.exists()
+    /**
+     * True once a vault has been created on this device (any unlock blob present). The
+     * password blob counts: a vault created with a password and no biometric (4.0.0) has
+     * only `vault.key.pw`, and must still read as provisioned.
+     */
+    fun isProvisioned(): Boolean =
+        keyFile.exists() || plainKeyFile.exists() || passwordKeyFile.exists()
 
     fun keyBlobExists(): Boolean = keyFile.exists()
 
@@ -196,6 +213,36 @@ class Vault(context: Context) {
         plainKeyFile.delete()
     }
 
+    // App-owned password/PIN unlock (4.0.0). The blobs are made and opened by
+    // PasswordVault; the Vault only stores them. vault.key.pw wraps the VK under
+    // the password-derived KEK; vault.key.duress is the decoy verifier.
+
+    fun passwordKeyBlobExists(): Boolean = passwordKeyFile.exists()
+
+    fun writePasswordKeyBlob(blob: ByteArray) {
+        ensureDir()
+        passwordKeyFile.writeBytes(blob)
+    }
+
+    fun readPasswordKeyBlob(): ByteArray = passwordKeyFile.readBytes()
+
+    fun deletePasswordKeyBlob() {
+        passwordKeyFile.delete()
+    }
+
+    fun duressBlobExists(): Boolean = duressKeyFile.exists()
+
+    fun writeDuressBlob(blob: ByteArray) {
+        ensureDir()
+        duressKeyFile.writeBytes(blob)
+    }
+
+    fun readDuressBlob(): ByteArray = duressKeyFile.readBytes()
+
+    fun deleteDuressBlob() {
+        duressKeyFile.delete()
+    }
+
     /** A copy of the in-memory vault key, or null if locked. Used to re-wrap under a different KEK. */
     fun snapshotVaultKey(): ByteArray? = vk?.copyOf()
 
@@ -207,6 +254,7 @@ class Vault(context: Context) {
         identities.clear()
         recipients.clear()
         notes.clear()
+        signers.clear()
         persist()
         isUnlocked = true
     }
@@ -218,6 +266,7 @@ class Vault(context: Context) {
         identities.clear(); identities.addAll(snapshot.identities)
         recipients.clear(); recipients.addAll(snapshot.recipients)
         notes.clear(); notes.addAll(snapshot.notes)
+        signers.clear(); signers.addAll(snapshot.signers)
         isUnlocked = true
     }
 
@@ -229,6 +278,7 @@ class Vault(context: Context) {
         identities.clear()
         recipients.clear()
         notes.clear()
+        signers.clear()
         isUnlocked = false
     }
 
@@ -296,6 +346,35 @@ class Vault(context: Context) {
         persist()
     }
 
+    // MARK: - Signer CRUD
+
+    /**
+     * Add a trusted signer. Returns false (and stores nothing) if a signer with the same
+     * public-key wire is already on the list — the key is the identity here, and two rows
+     * for one key would let their names disagree.
+     */
+    fun addSigner(signer: StoredSigner): Boolean {
+        if (signers.any { it.publicKeyWireB64 == signer.publicKeyWireB64 }) return false
+        signers.add(signer)
+        persist()
+        return true
+    }
+
+    /** Rename a trusted signer. A blank name is ignored, same as recipients. */
+    fun renameSigner(id: String, newName: String) {
+        val trimmed = newName.trim()
+        if (trimmed.isEmpty()) return
+        val idx = signers.indexOfFirst { it.id == id }
+        if (idx < 0) return
+        signers[idx] = signers[idx].copy(name = trimmed)
+        persist()
+    }
+
+    fun deleteSigner(id: String) {
+        signers.removeAll { it.id == id }
+        persist()
+    }
+
     // MARK: - Reset
 
     /** Destroy the on-disk vault. The KEK is deleted by the caller (VaultViewModel). */
@@ -303,11 +382,14 @@ class Vault(context: Context) {
         lock()
         keyFile.delete()
         plainKeyFile.delete()
+        passwordKeyFile.delete()
+        duressKeyFile.delete()
         dataFile.delete()
         prefs.edit()
             .remove(KEY_ACTIVE_IDENTITY)
             .remove(KEY_ONBOARDED)
             .remove(KEY_LAST_TAB)
+            .remove(KEY_UNLOCK_SECRET_KIND)
             .apply()
     }
 
@@ -318,7 +400,8 @@ class Vault(context: Context) {
         val snapshot = VaultSnapshot(
             identities = identities.toList(),
             recipients = recipients.toList(),
-            notes = notes.toList()
+            notes = notes.toList(),
+            signers = signers.toList()
         )
         val plaintext = json.encodeToString(VaultSnapshot.serializer(), snapshot).toByteArray(Charsets.UTF_8)
         val sealed = VaultCrypto.seal(key, plaintext)
@@ -351,6 +434,7 @@ class Vault(context: Context) {
         const val KEY_LAUNCH_COUNT = "launchCount"
         const val KEY_REVIEW_PROMPT_SHOWN = "reviewPromptShown"
         const val KEY_LAST_TAB = "lastTab"
+        const val KEY_UNLOCK_SECRET_KIND = "unlockSecretKind"
         const val KEY_SCRYPT_WORK_FACTOR = "scryptWorkFactor"
         const val KEY_ARMOR_DEFAULT = "armorDefault"
         const val KEY_PASSPHRASE_MODE_DEFAULT = "passphraseModeDefault"

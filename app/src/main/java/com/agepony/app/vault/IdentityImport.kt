@@ -3,14 +3,15 @@ package com.agepony.app.vault
 import com.agepony.core.recipients.HybridIdentity
 import com.agepony.core.recipients.SSHEd25519Identity
 import com.agepony.core.recipients.X25519Identity
+import com.agepony.core.signing.SSHSig
+import com.agepony.core.ssh.OpenSSHEncryptedKey
 import com.agepony.core.ssh.OpenSSHPrivateKey
 import java.util.UUID
 
 //
 // Android counterpart of iOS's SSHIdentityImporter, plus the age-secret-key
 // path. Produces a StoredIdentity ready for the vault. age X25519, age
-// post-quantum (AGE-SECRET-KEY-PQ-), and ssh-ed25519 are supported now;
-// ssh-rsa private keys are deferred.
+// post-quantum (AGE-SECRET-KEY-PQ-), ssh-ed25519, and ssh-rsa are supported.
 //
 
 class IdentityImportException(val kind: Kind, message: String) : Exception(message) {
@@ -71,7 +72,7 @@ object IdentityImport {
         )
     }
 
-    /** Import an OpenSSH private key PEM (ed25519 supported; rsa deferred). */
+    /** Import an OpenSSH private key PEM (ed25519 and rsa). */
     fun fromOpenSSHPem(pem: String, passphrase: String?, name: String): StoredIdentity {
         val parsed = try {
             OpenSSHPrivateKey.parse(pem.trim(), passphrase?.ifBlank { null })
@@ -113,10 +114,32 @@ object IdentityImport {
                 )
             }
 
-            is OpenSSHPrivateKey.RSA -> throw IdentityImportException(
-                IdentityImportException.Kind.UNSUPPORTED,
-                "SSH RSA private-key import is coming in a later update. (RSA recipients work today.)"
-            )
+            is OpenSSHPrivateKey.RSA -> {
+                // Stored form mirrors iOS: priv = UTF-8 bytes of the decrypted OpenSSH
+                // PEM (normalized to cipher=none by OpenSSHEncryptedKey, so the vault
+                // never needs the import passphrase again), pub = UTF-8 bytes of the
+                // `ssh-rsa BASE64 [comment]` line.
+                val normalizedPem = try {
+                    OpenSSHEncryptedKey.decryptedPem(pem.trim(), passphrase?.ifBlank { null })
+                } catch (e: Exception) {
+                    throw IdentityImportException(
+                        IdentityImportException.Kind.MALFORMED,
+                        "Couldn't re-serialize the RSA key (${e.message})."
+                    )
+                }
+                val wireB64 = b64e(SSHSig.rsaPublicWire(parsed.e, parsed.n))
+                val c = parsed.comment?.trim().orEmpty()
+                val line = if (c.isEmpty()) "ssh-rsa $wireB64" else "ssh-rsa $wireB64 $c"
+                StoredIdentity(
+                    id = UUID.randomUUID().toString(),
+                    name = name.trim().ifBlank { "SSH RSA" },
+                    type = StoredIdentityType.SSH_RSA,
+                    publicKeyB64 = b64e(line.toByteArray(Charsets.UTF_8)),
+                    privateKeyB64 = b64e(normalizedPem.toByteArray(Charsets.UTF_8)),
+                    sshComment = parsed.comment,
+                    createdAt = System.currentTimeMillis(),
+                )
+            }
         }
     }
 }
