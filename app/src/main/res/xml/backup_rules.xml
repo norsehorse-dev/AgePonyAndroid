@@ -1,13 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   The vault directory (filesDir/vault/) is excluded from backup on purpose.
+   It holds the KEK-wrapped vault key, and the KEK itself lives in the
+   AndroidKeyStore, which never leaves the device and cannot be restored. A
+   restored copy of the wrapped key with no KEK is unopenable, so backing it up
+   only creates a broken "provisioned but unrecoverable" state on reinstall.
+   Applies to Android 11 (API 30) and lower; see data_extraction_rules.xml for 12+.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="file" path="vault/"/>
 </full-backup-content>

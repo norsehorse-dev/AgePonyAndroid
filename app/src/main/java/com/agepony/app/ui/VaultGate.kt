@@ -25,7 +25,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -65,8 +68,8 @@ fun VaultGate(vm: VaultViewModel) {
     DisposableEffect(activity) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_STOP -> if (!vm.vault.autoLockSuppressed) vm.lock()
-                Lifecycle.Event.ON_START -> vm.vault.autoLockSuppressed = false
+                Lifecycle.Event.ON_STOP -> vm.onEnterBackground()
+                Lifecycle.Event.ON_START -> vm.onEnterForeground()
                 else -> Unit
             }
         }
@@ -172,6 +175,8 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity) {
     // When both are available, biometric leads and the password field is opt-in.
     var showPasswordField by remember { mutableStateOf(!vm.biometricEnabled) }
     var secret by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -214,8 +219,14 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity) {
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password
                             ),
-                            modifier = Modifier.fillMaxWidth().padding(top = if (vm.biometricEnabled) 24.dp else 0.dp),
+                            modifier = Modifier.fillMaxWidth()
+                                .focusRequester(focusRequester)
+                                .padding(top = if (vm.biometricEnabled) 24.dp else 0.dp),
                         )
+                        LaunchedEffect(Unit) {
+                            focusRequester.requestFocus()
+                            keyboard?.show()
+                        }
                         Button(
                             onClick = {
                                 val chars = secret.toCharArray()

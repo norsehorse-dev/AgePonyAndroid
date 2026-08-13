@@ -12,6 +12,8 @@ import com.agepony.app.security.BiometricGate
 import com.agepony.app.security.BiometricGateException
 import com.agepony.app.security.PasswordVault
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -157,6 +159,8 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 error = if (e.code == BiometricPrompt.ERROR_USER_CANCELED ||
                     e.code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
                 ) null else (e.message ?: "Authentication failed")
+            } catch (e: KekUnavailableException) {
+                recoverOrphanedVault()
             } catch (e: Exception) {
                 // A KEK invalidated by new biometric enrollment lands here.
                 error = e.message ?: "Could not unlock the vault"
@@ -180,12 +184,35 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                     val vk = KeystoreMasterKey.unwrapCipherPlain(iv).doFinal(wrapped)
                     vault.unlock(vk)
                 }
+            } catch (e: KekUnavailableException) {
+                recoverOrphanedVault()
             } catch (e: Exception) {
                 error = e.message ?: "Could not unlock the vault"
             } finally {
                 isBusy = false
             }
         }
+    }
+
+    /**
+     * Recover from an orphaned vault: the wrapped vault key is on disk but the
+     * Keystore KEK that sealed it is gone (reinstall or device-to-device restore).
+     * Android backup can carry the vault blobs, but a hardware Keystore key never
+     * leaves the device, so the VK can never be unwrapped again. Clear the dead
+     * blobs and drop back to first-run instead of crashing on the impossible
+     * unwrap. New installs are kept out of this state by excluding the vault dir
+     * from backup (see res/xml/backup_rules.xml); this rescues anyone already in it.
+     */
+    private suspend fun recoverOrphanedVault() {
+        withContext(Dispatchers.IO) {
+            KeystoreMasterKey.delete()
+            KeystoreMasterKey.deletePlain()
+            vault.reset()
+        }
+        syncSecretFlags()
+        error = "AgePony was reinstalled or restored from a backup, and the device " +
+            "key that sealed your old vault is gone, so it can't be reopened. Set up " +
+            "a new vault to continue."
     }
 
     // MARK: - App-owned password / PIN unlock (4.0.0)
@@ -414,9 +441,42 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Lock the vault (drop the VK + decrypted state). Called when the app backgrounds. */
+    /** Lock the vault (drop the VK + decrypted state) now. */
     fun lock() {
+        pendingLockJob?.cancel()
+        pendingLockJob = null
         vault.lock()
+    }
+
+    // Background auto-lock grace period. Locking the instant the app is backgrounded
+    // tore down the whole app shell on every app switch, which lost in-progress
+    // navigation and half-entered forms (issue #4) and, for no-lock vaults, flashed
+    // the unlock screen on every return (issue #5). Instead the vault stays unlocked
+    // for a short window after backgrounding and locks only if the app stays away
+    // past it, so a quick switch (copy a recipient, paste it elsewhere) keeps state.
+    private var pendingLockJob: Job? = null
+    private val autoLockGraceMillis = 30_000L
+
+    /**
+     * App went to the background. Schedule a lock after the grace period, unless an
+     * in-app SAF round trip is in flight (that exemption already existed so the file
+     * picker doesn't lock the vault out from under an active flow).
+     */
+    fun onEnterBackground() {
+        if (vault.autoLockSuppressed) return
+        pendingLockJob?.cancel()
+        pendingLockJob = viewModelScope.launch {
+            delay(autoLockGraceMillis)
+            vault.lock()
+            pendingLockJob = null
+        }
+    }
+
+    /** App returned to the foreground. Cancel any pending lock and clear the SAF exemption. */
+    fun onEnterForeground() {
+        vault.autoLockSuppressed = false
+        pendingLockJob?.cancel()
+        pendingLockJob = null
     }
 
     /** Destroy the vault and the KEK entirely. */

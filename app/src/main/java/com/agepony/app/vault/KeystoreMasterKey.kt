@@ -23,6 +23,16 @@ import javax.crypto.spec.GCMParameterSpec
 // Re-enrolling a biometric invalidates the KEK (setInvalidatedByBiometric-
 // Enrollment), which is a deliberate security property surfaced in the UI.
 //
+/**
+ * Thrown when a Keystore KEK alias is absent: the wrapped vault key exists on disk
+ * but the hardware key that sealed it does not. This is the reinstall / restore
+ * case. Android backup can carry the vault blobs, but an AndroidKeyStore key never
+ * leaves the device and cannot be restored, so the vault is unrecoverable. Callers
+ * reset to first-run rather than crash on the impossible unwrap.
+ */
+class KekUnavailableException(alias: String) :
+    IllegalStateException("Keystore key \"$alias\" is unavailable (missing after reinstall or restore).")
+
 object KeystoreMasterKey {
 
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
@@ -93,7 +103,8 @@ object KeystoreMasterKey {
 
     private fun loadKey(): SecretKey {
         val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        val entry = ks.getEntry(KEK_ALIAS, null) as KeyStore.SecretKeyEntry
+        val entry = ks.getEntry(KEK_ALIAS, null) as? KeyStore.SecretKeyEntry
+            ?: throw KekUnavailableException(KEK_ALIAS)
         return entry.secretKey
     }
 
@@ -169,7 +180,8 @@ object KeystoreMasterKey {
 
     private fun loadKeyPlain(): SecretKey {
         val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        val entry = ks.getEntry(KEK_ALIAS_PLAIN, null) as KeyStore.SecretKeyEntry
+        val entry = ks.getEntry(KEK_ALIAS_PLAIN, null) as? KeyStore.SecretKeyEntry
+            ?: throw KekUnavailableException(KEK_ALIAS_PLAIN)
         return entry.secretKey
     }
 

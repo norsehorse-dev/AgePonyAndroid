@@ -1,19 +1,16 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   The vault directory (filesDir/vault/) is excluded from both cloud backup and
+   device-to-device transfer. The KEK-wrapped vault key is useless without the
+   AndroidKeyStore KEK, which is non-exportable and cannot move to another
+   install or device. Backing it up would restore an unopenable vault. Applies
+   to Android 12 (API 31) and higher; see backup_rules.xml for 11 and lower.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="file" path="vault/"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="file" path="vault/"/>
     </device-transfer>
-    -->
 </data-extraction-rules>
