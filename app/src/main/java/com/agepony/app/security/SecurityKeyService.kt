@@ -66,7 +66,12 @@ class SecurityKeyService(
                     userId = userId,
                     userName = name.ifBlank { "agepony" },
                     algorithms = listOf(algorithm.cose),
-                    residentKey = true,
+                    // Non-resident (key-handle) credential, matching ssh-keygen's default for
+                    // sk keys. A resident credential forces user verification on CTAP2.1 keys
+                    // (YubiKey 5.7), which returned 0x36 before the PIN could even be requested.
+                    // The credentialId is stored as the key handle and replayed via
+                    // allowCredentialIds at sign time, so discoverability was never needed.
+                    residentKey = false,
                     pinUvAuthParam = pinUvAuthParam,
                     pinUvAuthProtocol = pinUvAuthParam?.let { PinProtocolV1.VERSION },
                 )

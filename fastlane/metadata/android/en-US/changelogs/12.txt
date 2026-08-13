@@ -1,0 +1,3 @@
+AgePony 4.0.2 fixes enrolling FIDO security keys.
+
+- Newer security keys, including recent YubiKey firmware, were rejected during enrollment with a CTAP error and no PIN prompt. Keys are now enrolled the same way ssh-keygen does, so a single touch is enough and the error is gone.
