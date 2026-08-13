@@ -29,6 +29,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import kotlinx.coroutines.delay
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -177,6 +182,7 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity) {
     var secret by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val view = LocalView.current
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -224,8 +230,18 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity) {
                                 .padding(top = if (vm.biometricEnabled) 24.dp else 0.dp),
                         )
                         LaunchedEffect(Unit) {
+                            // Cold start and some OEM skins (MIUI) hand the window focus late, so
+                            // an immediate requestFocus is dropped and the field never selects.
+                            // Wait for real window focus, then focus the field and force the IME up.
+                            var tries = 0
+                            while (!view.hasWindowFocus() && tries < 50) {
+                                delay(20)
+                                tries++
+                            }
                             focusRequester.requestFocus()
                             keyboard?.show()
+                            WindowInsetsControllerCompat(activity.window, view)
+                                .show(WindowInsetsCompat.Type.ime())
                         }
                         Button(
                             onClick = {
@@ -271,6 +287,9 @@ private fun CreateSecretDialog(
     var kind by remember { mutableStateOf("password") }
     var value by remember { mutableStateOf("") }
     var again by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val view = LocalView.current
     val isPin = kind == "pin"
     val mismatch = again.isNotEmpty() && value != again
     val valid = value.isNotEmpty() && value == again
@@ -309,8 +328,21 @@ private fun CreateSecretDialog(
                     label = { Text(if (isPin) "PIN" else "Password") },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = kb,
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = 8.dp).focusRequester(focusRequester),
                 )
+                LaunchedEffect(Unit) {
+                    // The dialog window takes focus a beat after it opens; wait for it,
+                    // then focus the first field and force the IME up. getWindowInsetsController
+                    // targets the dialog's own window, not the activity's.
+                    var tries = 0
+                    while (!view.hasWindowFocus() && tries < 50) {
+                        delay(20)
+                        tries++
+                    }
+                    focusRequester.requestFocus()
+                    keyboard?.show()
+                    ViewCompat.getWindowInsetsController(view)?.show(WindowInsetsCompat.Type.ime())
+                }
                 OutlinedTextField(
                     value = again,
                     onValueChange = { again = it },

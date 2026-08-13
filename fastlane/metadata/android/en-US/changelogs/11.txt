@@ -1,0 +1,5 @@
+AgePony 4.0.1 fixes crashes and rough edges from 4.0.0.
+
+- Fixes a lock-screen crash after reinstalling or restoring the app from a backup; the vault now resets cleanly instead of failing to open.
+- The vault no longer locks the instant you switch apps. A quick trip to another app keeps your place and any half-entered recipient.
+- The keyboard now opens on its own when a password or PIN is needed.
