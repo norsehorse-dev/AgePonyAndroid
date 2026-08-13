@@ -25,7 +25,6 @@ import java.io.InputStream
  */
 class FileSigner(
     private val activity: FragmentActivity,
-    private val pinProvider: SecurityKeyService.PinProvider? = null,
 ) {
     class FileSignerException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
@@ -33,6 +32,7 @@ class FileSigner(
         identity: StoredIdentity,
         message: ByteArray,
         namespace: String = SSHSig.NAMESPACE_AGEPONY,
+        pin: String? = null,
     ): String = when (identity.type) {
         StoredIdentityType.SSH_ED25519 ->
             SSHSigner.signEd25519(b64d(identity.privateKeyB64), b64d(identity.publicKeyB64), message, namespace)
@@ -67,7 +67,7 @@ class FileSigner(
         }
 
         StoredIdentityType.SK_ED25519, StoredIdentityType.SK_ECDSA_P256 ->
-            SecurityKeyService(activity, pinProvider).signSSHSIG(identity, message, namespace)
+            SecurityKeyService(activity).signSSHSIG(identity, message, namespace, pin)
     }
 
     /**
@@ -131,6 +131,7 @@ class FileSigner(
     suspend fun signStream(
         identity: StoredIdentity,
         namespace: String = SSHSig.NAMESPACE_AGEPONY,
+        pin: String? = null,
         open: () -> InputStream,
     ): String = when (identity.type) {
         StoredIdentityType.SSH_ED25519,
@@ -143,7 +144,7 @@ class FileSigner(
 
         else -> {
             val message = withContext(Dispatchers.IO) { open().use { it.readBytes() } }
-            sign(identity, message, namespace)
+            sign(identity, message, namespace, pin)
         }
     }
 

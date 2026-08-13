@@ -43,8 +43,9 @@ import androidx.fragment.app.FragmentActivity
 import com.agepony.app.security.SecurityKeyService
 import com.agepony.app.security.keystore.HardwareKeyService
 import com.agepony.app.ui.components.PostQuantumBadge
-import com.agepony.app.ui.security.PinPromptController
-import com.agepony.app.ui.security.SecurityKeyPinPrompt
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.agepony.app.vault.IdentityImport
 import com.agepony.app.vault.IdentityImportException
 import com.agepony.app.vault.StoredIdentity
@@ -544,9 +545,8 @@ private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit, onCancel: () -
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val pinController = remember { PinPromptController() }
-
-    SecurityKeyPinPrompt(pinController)
+    var pin by rememberSaveable { mutableStateOf("") }
+    var needsPin by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().padding(24.dp),
@@ -570,9 +570,20 @@ private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit, onCancel: () -
             Switch(checked = useP256, onCheckedChange = { useP256 = it })
             Text("Use NIST P-256 (default is Ed25519)", modifier = Modifier.padding(start = 12.dp))
         }
+        if (needsPin) {
+            OutlinedTextField(
+                value = pin,
+                onValueChange = { pin = it },
+                label = { Text("Security key PIN") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         Text(
-            "When you tap Enroll, hold your security key to the back of the phone. Enter its PIN if " +
-                "prompted, then touch the key.",
+            "When you tap Enroll, hold your security key to the back of the phone until it finishes. " +
+                "If the key has a PIN, you'll be asked for it first.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -588,14 +599,21 @@ private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit, onCancel: () -
                     scope.launch {
                         try {
                             val stored = withContext(Dispatchers.IO) {
-                                val service = SecurityKeyService(act, pinController)
+                                val service = SecurityKeyService(act)
                                 val algo = if (useP256) SecurityKeyService.Algorithm.ECDSA_P256
                                 else SecurityKeyService.Algorithm.ED25519
-                                service.enroll(name.trim().ifBlank { "security key" }, algo)
+                                service.enroll(name.trim().ifBlank { "security key" }, algo, pin = pin.ifBlank { null })
                             }
                             vault.addIdentity(stored)
                             busy = false
                             onDone()
+                        } catch (e: SecurityKeyService.PinRequiredException) {
+                            needsPin = true
+                            error = "This key needs a PIN. Enter it above and tap Enroll again."
+                            busy = false
+                        } catch (e: SecurityKeyService.WrongPinException) {
+                            error = "Incorrect PIN. Try again."
+                            busy = false
                         } catch (e: Exception) {
                             error = e.message ?: "Enrollment failed. Make sure NFC is on and hold the key steady."
                             busy = false

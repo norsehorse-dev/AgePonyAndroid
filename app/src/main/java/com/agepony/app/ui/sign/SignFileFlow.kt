@@ -17,6 +17,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,16 +29,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
+import com.agepony.app.security.SecurityKeyService
 import com.agepony.app.signing.FileSigner
 import com.agepony.app.ui.files.SafIo
 import com.agepony.app.ui.files.SourceRef
-import com.agepony.app.ui.security.PinPromptController
-import com.agepony.app.ui.security.SecurityKeyPinPrompt
 import com.agepony.app.vault.StoredIdentity
 import com.agepony.app.vault.StoredIdentityType
 import com.agepony.app.vault.Vault
@@ -63,7 +66,8 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
     val context = LocalContext.current
     val activity = context as FragmentActivity
     val scope = rememberCoroutineScope()
-    val pinController = remember { PinPromptController() }
+    var skPin by remember { mutableStateOf("") }
+    var needsPin by remember { mutableStateOf(false) }
 
     var stage by remember { mutableStateOf(SignStage.CONFIGURE) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -84,8 +88,8 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
         stage = SignStage.WORKING
         scope.launch {
             try {
-                val armored = FileSigner(activity, pinController)
-                    .signStream(identity) { SafIo.openInput(context, src.uri) }
+                val armored = FileSigner(activity)
+                    .signStream(identity, pin = skPin.ifBlank { null }) { SafIo.openInput(context, src.uri) }
                 withContext(Dispatchers.IO) {
                     SafIo.openOutput(context, uri).use { out ->
                         out.write(armored.toByteArray(Charsets.US_ASCII))
@@ -94,6 +98,13 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
                 }
                 doneSigName = FileSigner(activity).signedName(src.name)
                 stage = SignStage.DONE
+            } catch (e: SecurityKeyService.PinRequiredException) {
+                needsPin = true
+                error = "This security key needs a PIN. Enter it below and sign again."
+                stage = SignStage.CONFIGURE
+            } catch (e: SecurityKeyService.WrongPinException) {
+                error = "Incorrect PIN. Try again."
+                stage = SignStage.CONFIGURE
             } catch (e: Exception) {
                 error = e.message ?: "Signing failed."
                 stage = SignStage.CONFIGURE
@@ -113,8 +124,6 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
             createOutput.launch("${ref.name}.sig")
         }
     }
-
-    SecurityKeyPinPrompt(pinController)
 
     when (stage) {
         SignStage.CONFIGURE -> Column(
@@ -149,6 +158,18 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
                     )
                     HorizontalDivider()
                 }
+            }
+
+            if (needsPin) {
+                OutlinedTextField(
+                    value = skPin,
+                    onValueChange = { skPin = it },
+                    singleLine = true,
+                    label = { Text("Security key PIN") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             if (error != null) {

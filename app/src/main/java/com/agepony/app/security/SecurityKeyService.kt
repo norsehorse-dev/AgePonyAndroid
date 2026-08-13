@@ -32,6 +32,7 @@ class SecurityKeyService(
 ) {
     class SecurityKeyException(message: String, cause: Throwable? = null) : Exception(message, cause)
     class PinRequiredException(message: String = "security key requires a PIN") : Exception(message)
+    class WrongPinException(message: String = "Incorrect PIN.") : Exception(message)
 
     /** Supplies a PIN on demand. [wrongPreviousAttempt] is true when re-prompting after 0x31. */
     fun interface PinProvider {
@@ -53,13 +54,14 @@ class SecurityKeyService(
         name: String,
         algorithm: Algorithm,
         application: String = Ctap2.APPLICATION_DEFAULT,
+        pin: String? = null,
     ): StoredIdentity {
         val clientDataHash = ByteArray(32).also { rng.nextBytes(it) }
         val userId = ByteArray(32).also { rng.nextBytes(it) }
 
         val transport = SecurityKeyTransport(activity)
         val result = transport.withSecurityKey { session ->
-            val response = runCommand(session, clientDataHash) { pinUvAuthParam ->
+            val response = runCommand(session, clientDataHash, pin) { pinUvAuthParam ->
                 Ctap2.buildMakeCredential(
                     clientDataHash = clientDataHash,
                     rpId = application,
@@ -114,6 +116,7 @@ class SecurityKeyService(
         identity: StoredIdentity,
         message: ByteArray,
         namespace: String = SSHSig.NAMESPACE_AGEPONY,
+        pin: String? = null,
     ): String {
         require(identity.type == StoredIdentityType.SK_ED25519 ||
             identity.type == StoredIdentityType.SK_ECDSA_P256) {
@@ -130,7 +133,7 @@ class SecurityKeyService(
 
         val transport = SecurityKeyTransport(activity)
         val assertion = transport.withSecurityKey { session ->
-            val response = runCommand(session, clientDataHash) { pinUvAuthParam ->
+            val response = runCommand(session, clientDataHash, pin) { pinUvAuthParam ->
                 Ctap2.buildGetAssertion(
                     rpId = application,
                     clientDataHash = clientDataHash,
@@ -172,26 +175,32 @@ class SecurityKeyService(
     private suspend fun runCommand(
         session: SecurityKeyTransport.Session,
         clientDataHash: ByteArray,
+        pin: String?,
         build: (pinUvAuthParam: ByteArray?) -> ByteArray,
     ): ByteArray {
-        try {
-            return session.ctap(build(null))
-        } catch (e: Ctap2.CtapError) {
-            if (e.code != Ctap2.ERR_PIN_REQUIRED) throw mapCtapError(e)
-        }
-        val provider = pinProvider ?: throw PinRequiredException()
-
-        var wrongPrevious = false
-        while (true) {
-            val pin = provider.providePin(wrongPrevious)
-                ?: throw SecurityKeyException("PIN entry was cancelled")
-            val pinUvAuthParam = obtainPinUvAuthParam(session, pin, clientDataHash)
-            try {
-                return session.ctap(build(pinUvAuthParam))
+        // Over NFC the clientPin handshake and the command it authorizes must run in one
+        // uninterrupted tap: the PIN token is bound to that tap's power cycle, and a tap
+        // cannot survive the user moving the key to type a PIN. So the PIN is collected up
+        // front (see the enroll/sign screens). With a PIN we run the handshake proactively;
+        // without one we try touch-only and raise PinRequiredException so the UI can ask for
+        // the PIN and retry in a fresh single tap.
+        if (pin != null) {
+            val pinUvAuthParam = try {
+                obtainPinUvAuthParam(session, pin, clientDataHash)
             } catch (e: Ctap2.CtapError) {
-                if (e.code == Ctap2.ERR_PIN_INVALID) { wrongPrevious = true; continue }
+                throw if (e.code == Ctap2.ERR_PIN_INVALID) WrongPinException() else mapCtapError(e)
+            }
+            return try {
+                session.ctap(build(pinUvAuthParam))
+            } catch (e: Ctap2.CtapError) {
                 throw mapCtapError(e)
             }
+        }
+        return try {
+            session.ctap(build(null))
+        } catch (e: Ctap2.CtapError) {
+            if (e.code == Ctap2.ERR_PIN_REQUIRED) throw PinRequiredException()
+            throw mapCtapError(e)
         }
     }
 
@@ -215,9 +224,16 @@ class SecurityKeyService(
         return PinProtocolV1.authenticate(pinToken, clientDataHash)
     }
 
-    private fun mapCtapError(e: Ctap2.CtapError): Exception =
-        if (e.code == Ctap2.ERR_PIN_REQUIRED) PinRequiredException()
-        else SecurityKeyException("security key error: 0x%02x".format(e.code), e)
+    private fun mapCtapError(e: Ctap2.CtapError): Exception = when (e.code) {
+        Ctap2.ERR_PIN_REQUIRED -> PinRequiredException()
+        // 0x35 = CTAP2_ERR_PIN_NOT_SET: the key demands user verification but has no PIN
+        // enrolled, so there is nothing to verify against. The user has to set a PIN on the
+        // key itself first (e.g. in the browser's security-key settings).
+        0x35 -> SecurityKeyException(
+            "This security key has no PIN set. Set a FIDO2 PIN on the key first, then try again."
+        )
+        else -> SecurityKeyException("security key error: 0x%02x".format(e.code), e)
+    }
 
     private fun parseSkEd25519(wire: ByteArray): Pair<ByteArray, String> {
         val buf = SSHSig.reader(wire)

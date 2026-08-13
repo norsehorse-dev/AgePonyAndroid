@@ -4,6 +4,7 @@ import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
 import androidx.fragment.app.FragmentActivity
+import com.agepony.core.fido.Ctap2
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -96,7 +97,19 @@ class SecurityKeyTransport(private val activity: FragmentActivity) {
             acc.write(data)
             while (true) {
                 when {
-                    sw == 0x9000 -> return acc.toByteArray()
+                    sw == 0x9000 -> {
+                        val resp = acc.toByteArray()
+                        // The ISO layer succeeded; surface a CTAP-level error status (the first
+                        // byte of the response) as a CtapError here so callers can act on it,
+                        // notably the clientPin / PIN-prompt path in SecurityKeyService.runCommand.
+                        // Previously the status byte was returned buried in the payload and only
+                        // thrown later by the parsers, which bypassed the PIN flow entirely (an
+                        // authenticator asking for a PIN with 0x36 surfaced as a raw error with
+                        // no prompt).
+                        val status = if (resp.isNotEmpty()) resp[0].toInt() and 0xff else Ctap2.STATUS_OK
+                        if (status != Ctap2.STATUS_OK) throw Ctap2.CtapError(status)
+                        return resp
+                    }
                     sw == 0x9100 -> {
                         // keepalive: poll for the result
                         val poll = buildApdu(0x80, 0x11, 0x00, 0x00, ByteArray(0), le = 65536)
