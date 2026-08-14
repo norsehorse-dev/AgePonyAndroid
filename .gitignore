@@ -25,3 +25,7 @@ build/
 */build/
 .gradle/
 .kotlin/
+
+*.apk
+*.apk.asc
+*.apk.sha256
