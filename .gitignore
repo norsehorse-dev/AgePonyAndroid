@@ -29,3 +29,4 @@ build/
 *.apk
 *.apk.asc
 *.apk.sha256
+/.idea/

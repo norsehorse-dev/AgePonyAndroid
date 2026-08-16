@@ -1,5 +1,9 @@
 package com.agepony.app.ui
 
+import android.app.Activity
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,6 +46,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.agepony.app.security.BiometricGate
+import com.agepony.app.vault.LockMode
 import com.agepony.app.vault.VaultViewModel
 
 //
@@ -84,8 +89,8 @@ fun VaultGate(vm: VaultViewModel) {
 
     // "No lock" mode only: biometric off and a plain (non-auth) blob present.
     // Password-enrolled vaults are NOT auto-unlocked — the password is the gate.
-    LaunchedEffect(vm.provisioned, vm.vault.isUnlocked, vm.biometricEnabled, vm.isBusy, vm.error) {
-        if (vm.provisioned && !vm.vault.isUnlocked && !vm.biometricEnabled &&
+    LaunchedEffect(vm.provisioned, vm.vault.isUnlocked, vm.lockMode, vm.isBusy, vm.error) {
+        if (vm.provisioned && !vm.vault.isUnlocked && vm.lockMode == LockMode.OFF &&
             vm.vault.plainKeyBlobExists() && !vm.isBusy && vm.error == null
         ) {
             vm.unlock(activity)
@@ -145,8 +150,21 @@ private fun WelcomeScreen(vm: VaultViewModel, activity: FragmentActivity) {
                     modifier = Modifier.padding(top = 12.dp),
                 ) { Text("Use a password instead") }
             } else {
-                Button(onClick = { showCreatePassword = true }, modifier = Modifier.width(260.dp)) {
-                    Text("Create with a password")
+                val credentialCreate = Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&
+                    BiometricGate.isDeviceSecure(activity)
+                if (credentialCreate) {
+                    Button(
+                        onClick = { vm.bootstrapWithDeviceCredential() },
+                        modifier = Modifier.width(260.dp),
+                    ) { Text("Use device PIN or password") }
+                    TextButton(
+                        onClick = { showCreatePassword = true },
+                        modifier = Modifier.padding(top = 12.dp),
+                    ) { Text("Use an app password instead") }
+                } else {
+                    Button(onClick = { showCreatePassword = true }, modifier = Modifier.width(260.dp)) {
+                        Text("Create with a password")
+                    }
                 }
             }
 
@@ -177,8 +195,14 @@ private fun WelcomeScreen(vm: VaultViewModel, activity: FragmentActivity) {
 private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity) {
     val isPin = vm.unlockSecretKind == "pin"
     val secretNoun = if (isPin) "PIN" else "password"
-    // When both are available, biometric leads and the password field is opt-in.
-    var showPasswordField by remember { mutableStateOf(!vm.biometricEnabled) }
+    // With an OS gate, that gate leads and the password field is opt-in; a no-lock
+    // (OFF) vault shows the password field straight away.
+    var showPasswordField by remember { mutableStateOf(vm.lockMode == LockMode.OFF) }
+    val credentialLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) vm.unlockAfterDeviceCredential()
+    }
     var secret by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -197,8 +221,12 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity) {
                 textAlign = TextAlign.Center,
             )
             Text(
-                if (vm.biometricEnabled) "Unlock your vault to access your keys and notes."
-                else "Enter your $secretNoun to unlock.",
+                when (vm.lockMode) {
+                    LockMode.BIOMETRIC -> "Unlock your vault to access your keys and notes."
+                    LockMode.DEVICE_CREDENTIAL ->
+                        "Confirm your device PIN, pattern, or password to unlock."
+                    LockMode.OFF -> "Enter your $secretNoun to unlock."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
@@ -208,10 +236,29 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity) {
             if (vm.isBusy) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             } else {
-                if (vm.biometricEnabled) {
-                    Button(onClick = { vm.unlock(activity) }, modifier = Modifier.width(240.dp)) {
-                        Text("Unlock")
-                    }
+                when (vm.lockMode) {
+                    LockMode.BIOMETRIC ->
+                        Button(onClick = { vm.unlock(activity) }, modifier = Modifier.width(240.dp)) {
+                            Text("Unlock")
+                        }
+                    LockMode.DEVICE_CREDENTIAL ->
+                        Button(
+                            onClick = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                    vm.unlock(activity)
+                                } else {
+                                    val intent = BiometricGate.deviceCredentialIntent(
+                                        activity,
+                                        "Unlock AgePony",
+                                        "Confirm your PIN, pattern, or password",
+                                    )
+                                    if (intent != null) credentialLauncher.launch(intent)
+                                    else vm.noteError("No device PIN, pattern, or password is set.")
+                                }
+                            },
+                            modifier = Modifier.width(240.dp),
+                        ) { Text("Unlock") }
+                    LockMode.OFF -> Unit
                 }
 
                 if (vm.passwordEnrolled) {
@@ -227,7 +274,7 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity) {
                             ),
                             modifier = Modifier.fillMaxWidth()
                                 .focusRequester(focusRequester)
-                                .padding(top = if (vm.biometricEnabled) 24.dp else 0.dp),
+                                .padding(top = if (vm.lockMode != LockMode.OFF) 24.dp else 0.dp),
                         )
                         LaunchedEffect(Unit) {
                             // Cold start and some OEM skins (MIUI) hand the window focus late, so

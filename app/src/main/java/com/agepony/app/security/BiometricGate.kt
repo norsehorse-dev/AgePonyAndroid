@@ -1,5 +1,8 @@
 package com.agepony.app.security
 
+import android.app.KeyguardManager
+import android.content.Context
+import android.content.Intent
 import android.os.Build
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -51,8 +54,12 @@ object BiometricGate {
         activity: FragmentActivity,
         title: String,
         subtitle: String?,
-        cryptoObject: BiometricPrompt.CryptoObject
+        cryptoObject: BiometricPrompt.CryptoObject,
+        deviceCredentialOnly: Boolean = false,
     ): Cipher = suspendCancellableCoroutine { cont ->
+        val authenticators =
+            if (deviceCredentialOnly) BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            else allowedAuthenticators()
         val executor: Executor = ContextCompat.getMainExecutor(activity)
         val callback = object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -79,9 +86,9 @@ object BiometricGate {
         val prompt = BiometricPrompt(activity, executor, callback)
         val infoBuilder = BiometricPrompt.PromptInfo.Builder()
             .setTitle(title)
-            .setAllowedAuthenticators(allowedAuthenticators())
+            .setAllowedAuthenticators(authenticators)
         if (subtitle != null) infoBuilder.setSubtitle(subtitle)
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+        if (authenticators and BiometricManager.Authenticators.DEVICE_CREDENTIAL == 0) {
             // A negative button is required when DEVICE_CREDENTIAL is not allowed.
             infoBuilder.setNegativeButtonText("Cancel")
         }
@@ -169,4 +176,26 @@ object BiometricGate {
 
         prompt.authenticate(infoBuilder.build())
     }
+
+    /** True if the device has a secure lock screen (PIN, pattern, or password) set. */
+    fun isDeviceSecure(context: Context): Boolean =
+        (context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).isDeviceSecure
+
+    /** True if a strong biometric is enrolled and usable right now. */
+    fun hasBiometric(context: Context): Boolean =
+        BiometricManager.from(context)
+            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+            BiometricManager.BIOMETRIC_SUCCESS
+
+    /**
+     * Pre-30 device-credential prompt intent (KeyguardManager). Launch it for a result;
+     * RESULT_OK means the credential was confirmed. Returns null if no secure lock screen
+     * is set. Deprecated on newer APIs in favor of BiometricPrompt's DEVICE_CREDENTIAL,
+     * but that form needs a CryptoObject binding unavailable below API 30, so this is the
+     * pre-30 path.
+     */
+    @Suppress("DEPRECATION")
+    fun deviceCredentialIntent(context: Context, title: String, description: String?): Intent? =
+        (context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager)
+            .createConfirmDeviceCredentialIntent(title, description)
 }

@@ -21,6 +21,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,15 +36,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import com.agepony.app.review.ReviewPrompt
+import com.agepony.app.security.BiometricGate
 import com.agepony.app.vault.FileEncryptor
+import com.agepony.app.vault.LockMode
 import com.agepony.app.vault.VaultViewModel
 
 //
 // Settings tab (expanded in Phase 2d-3a). Android counterpart of iOS's
-// SettingsView: security (biometric), encryption default, active identity,
-// about, and a guarded reset. The biometric toggle re-wraps the vault key under
-// a non-auth keystore key when turned off (see VaultViewModel.applyBiometric).
+// SettingsView: security lock mode, encryption default, active identity,
+// about, and a guarded reset. The lock-mode selector picks the Keystore/OS gate
+// (Off / device credential / biometric) via VaultViewModel.applyLockMode.
 //
 @Composable
 fun SettingsScreen(
@@ -99,17 +103,48 @@ fun SettingsScreen(
 
         // Security
         SectionLabel("Security")
-        SettingRow(
-            title = "Require biometric to unlock",
-            subtitle = if (vm.biometricEnabled) {
-                "On — your vault locks on background and needs your fingerprint or device credential."
+        val activity = context as FragmentActivity
+        val hasBiometric = remember(vm.isBusy) { BiometricGate.hasBiometric(context) }
+        val deviceSecure = remember(vm.isBusy) { BiometricGate.isDeviceSecure(context) }
+        val legacy = Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+        Text(
+            "How AgePony's vault is locked. This is separate from any password you set below, " +
+                "which is its own lock whichever mode you pick.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        LockModeRow(
+            selected = vm.lockMode == LockMode.BIOMETRIC,
+            title = "Biometric",
+            subtitle = if (hasBiometric) {
+                "Your fingerprint or face unlocks the vault, with your device credential as a fallback."
             } else {
-                "Off — no lock at all: the vault opens automatically with nothing to confirm. " +
-                    "This is not \"PIN instead of biometric\"; set a password below for that."
+                "Needs a fingerprint or face enrolled on this device."
             },
-            checked = vm.biometricEnabled,
+            enabled = !vm.isBusy && hasBiometric,
+            onClick = { vm.applyLockMode(activity, LockMode.BIOMETRIC) },
+        )
+        LockModeRow(
+            selected = vm.lockMode == LockMode.DEVICE_CREDENTIAL,
+            title = "Device PIN, pattern, or password",
+            subtitle = when {
+                !deviceSecure -> "Set a screen lock in Android settings to use this."
+                legacy -> "Required at every unlock. On this Android version it gates access but " +
+                    "does not add hardware-backed encryption; a vault password below does."
+                else -> "Your device PIN, pattern, or password is required at every unlock, " +
+                    "checked against the key in hardware."
+            },
+            enabled = !vm.isBusy && deviceSecure,
+            onClick = { vm.applyLockMode(activity, LockMode.DEVICE_CREDENTIAL) },
+        )
+        LockModeRow(
+            selected = vm.lockMode == LockMode.OFF,
+            title = "No lock",
+            subtitle = "The vault opens with nothing to confirm. If you set a password below it " +
+                "becomes the gate; with neither, anyone who opens the app is in.",
             enabled = !vm.isBusy,
-            onCheckedChange = { vm.applyBiometric(it) },
+            onClick = { vm.applyLockMode(activity, LockMode.OFF) },
         )
 
         // App-owned password / PIN unlock (4.0.0). Coexists with biometric; also the
@@ -532,6 +567,32 @@ private fun SettingRow(
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+    }
+}
+
+@Composable
+private fun LockModeRow(
+    selected: Boolean,
+    title: String,
+    subtitle: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = onClick, enabled = enabled)
+        Column(Modifier.weight(1f).padding(start = 4.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

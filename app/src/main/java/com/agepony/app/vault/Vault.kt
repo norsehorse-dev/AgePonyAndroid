@@ -45,9 +45,27 @@ class Vault(context: Context) {
         get() = prefs.getString(KEY_ACTIVE_IDENTITY, null)
         set(value) { prefs.edit().putString(KEY_ACTIVE_IDENTITY, value).apply() }
 
+    // The Keystore/OS gate mode (4.1.0), replacing the pre-4.1.0 biometricEnabled
+    // boolean. Migrated on first read: legacy true -> BIOMETRIC, false -> OFF, which
+    // preserves the exact behavior each existing user already had. New installs get
+    // BIOMETRIC by default (unchanged from the old boolean's default of true).
+    var lockMode: LockMode
+        get() {
+            prefs.getString(KEY_LOCK_MODE, null)?.let { return LockMode.fromKey(it) }
+            val migrated =
+                if (prefs.getBoolean(KEY_BIOMETRIC_ENABLED, true)) LockMode.BIOMETRIC else LockMode.OFF
+            prefs.edit().putString(KEY_LOCK_MODE, migrated.key).apply()
+            return migrated
+        }
+        set(value) { prefs.edit().putString(KEY_LOCK_MODE, value.key).apply() }
+
+    // Compat shim for call sites still phrased in terms of the old boolean. "On"
+    // means BIOMETRIC; turning it off means OFF. DEVICE_CREDENTIAL is not
+    // expressible here, so it reads as false; never round-trip a DEVICE_CREDENTIAL
+    // vault through this setter.
     var biometricEnabled: Boolean
-        get() = prefs.getBoolean(KEY_BIOMETRIC_ENABLED, true)
-        set(value) { prefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, value).apply() }
+        get() = lockMode == LockMode.BIOMETRIC
+        set(value) { lockMode = if (value) LockMode.BIOMETRIC else LockMode.OFF }
 
     var encryptToSelfDefault: Boolean
         get() = prefs.getBoolean(KEY_ENCRYPT_TO_SELF, true)
@@ -429,6 +447,7 @@ class Vault(context: Context) {
     private companion object {
         const val KEY_ACTIVE_IDENTITY = "activeIdentityId"
         const val KEY_BIOMETRIC_ENABLED = "biometricEnabled"
+        const val KEY_LOCK_MODE = "lockMode"
         const val KEY_ENCRYPT_TO_SELF = "encryptToSelfDefault"
         const val KEY_ONBOARDED = "hasCompletedOnboarding"
         const val KEY_LAUNCH_COUNT = "launchCount"

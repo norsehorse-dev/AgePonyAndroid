@@ -18,11 +18,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.agepony.app.security.ClipboardGuard
 import kotlinx.coroutines.delay
 
 //
@@ -38,8 +39,9 @@ fun KeyBlock(
     modifier: Modifier = Modifier,
     label: String? = null,
     isSensitive: Boolean = false,
+    copyable: Boolean = true,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     var copied by remember { mutableStateOf(false) }
     var revealed by remember(value) { mutableStateOf(!isSensitive) }
 
@@ -79,19 +81,23 @@ fun KeyBlock(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            TextButton(onClick = {
-                clipboard.setText(AnnotatedString(value))
-                copied = true
-            }) {
-                Text(if (copied) "Copied" else "Copy")
-            }
-            if (isSensitive) {
-                TextButton(onClick = { revealed = !revealed }) {
-                    Text(if (revealed) "Hide" else "Reveal")
+        if (copyable || isSensitive) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (copyable) {
+                    TextButton(onClick = {
+                        ClipboardGuard.copySensitive(context, value)
+                        copied = true
+                    }) {
+                        Text(if (copied) "Copied" else "Copy")
+                    }
+                }
+                if (isSensitive) {
+                    TextButton(onClick = { revealed = !revealed }) {
+                        Text(if (revealed) "Hide" else "Reveal")
+                    }
                 }
             }
         }

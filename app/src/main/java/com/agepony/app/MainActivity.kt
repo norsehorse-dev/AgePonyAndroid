@@ -5,6 +5,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.fragment.app.FragmentActivity
+import com.agepony.app.security.ClipboardGuard
 import com.agepony.app.ui.VaultGate
 import com.agepony.app.ui.theme.AgePonyTheme
 import com.agepony.app.vault.VaultViewModel
@@ -12,6 +13,13 @@ import com.agepony.app.vault.VaultViewModel
 class MainActivity : FragmentActivity() {
 
     private val vaultViewModel: VaultViewModel by viewModels()
+
+    override fun onStart() {
+        super.onStart()
+        // Clear a sensitive clipboard copy that came due while AgePony was backgrounded
+        // (the clipboard can only be read/cleared while we are foreground on API 29+).
+        ClipboardGuard.onForeground(this)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

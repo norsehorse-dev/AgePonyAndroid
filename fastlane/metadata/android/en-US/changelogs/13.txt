@@ -1,0 +1,6 @@
+AgePony 4.1.0 adds new lock options, clipboard auto-clear, QR public keys, and a safer private-key screen.
+
+- Choose how the vault locks: biometric, your device PIN, pattern, or password, or no lock. A device with no fingerprint sensor can now unlock with the device credential.
+- Copied keys and text clear from the clipboard after 60 seconds, even when AgePony is backgrounded.
+- Show any public key as a QR code to share it.
+- The private key screen blocks screenshots while a key is on screen.

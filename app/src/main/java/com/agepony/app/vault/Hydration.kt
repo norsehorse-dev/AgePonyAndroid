@@ -116,6 +116,19 @@ fun StoredIdentity.privateDisplayString(): String = when (type) {
         "(security key — signing happens on the FIDO device over NFC; no exportable private key)"
 }
 
+/**
+ * Whether [privateDisplayString] returns real, copyable key material rather than a
+ * "not exportable" placeholder note. True only for identities whose private key is stored
+ * as text in the vault (age X25519, post-quantum, ssh-rsa); false for keys that live in the
+ * Keystore or on a FIDO device.
+ */
+fun StoredIdentity.isPrivateKeyExportable(): Boolean = when (type) {
+    StoredIdentityType.X25519,
+    StoredIdentityType.MLKEM768X25519,
+    StoredIdentityType.SSH_RSA -> true
+    else -> false
+}
+
 /** Render an sk authorized-keys line: `<keytype> <base64 wire>`. */
 private fun StoredIdentity.skLine(keyType: String): String = "$keyType $publicKeyB64"
 

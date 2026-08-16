@@ -1,6 +1,7 @@
 package com.agepony.app.vault
 
 import android.app.Application
+import android.os.Build
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +39,10 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     var error by mutableStateOf<String?>(null)
+        private set
+
+    /** Observable mirror of the vault's lock mode (prefs aren't Compose-observable). */
+    var lockMode by mutableStateOf(vault.lockMode)
         private set
 
     /** Observable mirror of the vault's biometric preference (prefs aren't Compose-observable). */
@@ -114,7 +119,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                     // gate will require the password at every unlock (never auto-unlocks).
                     vault.writePasswordKeyBlob(PasswordVault.wrapVaultKey(secret, vk))
                     vault.unlockSecretKind = kind
-                    vault.biometricEnabled = false
+                    vault.lockMode = LockMode.OFF
                     vault.bootstrap(vk)
                     vk.fill(0)
                 }
@@ -129,14 +134,64 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Unlock an existing vault: unwrap the VK via biometric, then open vault.dat. */
+    /**
+     * Create a brand-new vault gated by the device credential, for pre-30 devices with
+     * a secure lock screen but no biometric (where [bootstrap] can't run, because the
+     * Cipher-bound device-credential form isn't available below API 30). The VK is
+     * wrapped under the non-auth KEK; the KeyguardManager confirm at unlock is the gate.
+     */
+    fun bootstrapWithDeviceCredential() {
+        if (isBusy) return
+        viewModelScope.launch {
+            isBusy = true
+            error = null
+            try {
+                withContext(Dispatchers.IO) {
+                    val vk = VaultCrypto.randomKey()
+                    KeystoreMasterKey.generatePlain()
+                    val cipher = KeystoreMasterKey.wrapCipherPlain()
+                    vault.writePlainKeyBlob(cipher.iv + cipher.doFinal(vk))
+                    vault.lockMode = LockMode.DEVICE_CREDENTIAL
+                    vault.bootstrap(vk)
+                    vk.fill(0)
+                }
+                provisioned = true
+            } catch (e: Exception) {
+                error = e.message ?: "Could not create the vault"
+            } finally {
+                syncSecretFlags()
+                isBusy = false
+            }
+        }
+    }
+
+    /**
+     * Unlock an existing vault. Routes on the lock mode:
+     *   - OFF: unwrap with the non-auth KEK, no prompt (only when a plain blob exists;
+     *     a password-only vault unlocks via [unlockWithPassword] instead).
+     *   - DEVICE_CREDENTIAL on API 30+: device-credential prompt on the auth KEK.
+     *   - DEVICE_CREDENTIAL pre-30: driven from the UI via a KeyguardManager confirm
+     *     that calls [unlockAfterDeviceCredential] on success; nothing to do here.
+     *   - BIOMETRIC: biometric (with device-credential fallback) on the auth KEK.
+     */
     fun unlock(activity: FragmentActivity) {
         if (isBusy) return
-        // Biometric disabled: unwrap with the non-auth KEK, no prompt.
-        if (!vault.biometricEnabled && vault.plainKeyBlobExists()) {
-            unlockPlain()
-            return
+        when (vault.lockMode) {
+            LockMode.OFF -> if (vault.plainKeyBlobExists()) unlockPlain()
+            LockMode.DEVICE_CREDENTIAL ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    unlockWithPrompt(activity, deviceCredentialOnly = true)
+                }
+            LockMode.BIOMETRIC -> unlockWithPrompt(activity, deviceCredentialOnly = false)
         }
+    }
+
+    /**
+     * The BiometricPrompt-gated unlock on the auth KEK, shared by BIOMETRIC and (on
+     * API 30+) DEVICE_CREDENTIAL. [deviceCredentialOnly] drops biometric from the
+     * allowed authenticators so only the device credential is offered.
+     */
+    private fun unlockWithPrompt(activity: FragmentActivity, deviceCredentialOnly: Boolean) {
         viewModelScope.launch {
             isBusy = true
             error = null
@@ -149,7 +204,8 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                     activity,
                     title = "Unlock AgePony",
                     subtitle = "Confirm it's you",
-                    cryptoObject = BiometricPrompt.CryptoObject(cipher)
+                    cryptoObject = BiometricPrompt.CryptoObject(cipher),
+                    deviceCredentialOnly = deviceCredentialOnly,
                 )
                 withContext(Dispatchers.IO) {
                     val vk = authed.doFinal(wrapped)
@@ -169,6 +225,12 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    /**
+     * Pre-30 DEVICE_CREDENTIAL: the UI has already confirmed the device credential via
+     * KeyguardManager, so open with the non-auth KEK sitting behind that gate.
+     */
+    fun unlockAfterDeviceCredential() = unlockPlain()
 
     /** Unlock without any prompt, using the non-auth KEK (biometric disabled). */
     private fun unlockPlain() {
@@ -360,6 +422,36 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Verify [secret] against the real password blob without unlocking or wiping, for
+     * in-app re-auth (revealing a private key) on a vault with no biometric/credential.
+     * The duress blob is deliberately not consulted, so entering the duress password
+     * here just fails rather than triggering a wipe. [secret] is zeroed before returning.
+     */
+    fun confirmPassword(secret: CharArray, onVerified: () -> Unit) {
+        if (isBusy) return
+        viewModelScope.launch {
+            isBusy = true
+            error = null
+            try {
+                val ok = withContext(Dispatchers.IO) {
+                    val real = if (vault.passwordKeyBlobExists()) vault.readPasswordKeyBlob() else null
+                    real != null &&
+                        PasswordVault.tryUnlock(secret, real, null) is PasswordVault.Outcome.Real
+                }
+                if (ok) onVerified() else error = "Wrong ${secretNoun()}."
+            } catch (e: Exception) {
+                error = e.message ?: "Couldn't verify the ${secretNoun()}"
+            } finally {
+                secret.fill(' ')
+                isBusy = false
+            }
+        }
+    }
+
+    /** Surface a one-off error to the UI (e.g. a missing device credential). */
+    fun noteError(message: String) { error = message }
+
+    /**
      * The decoy path. Runs on an IO dispatcher (caller already switched). Everything the
      * old vault held is destroyed, then a fresh empty vault is created whose sole unlock
      * is [decoy] — the very secret just entered, so a coerced retry keeps working and any
@@ -385,7 +477,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
         // 3. The decoy becomes the real (and only) password of the new vault.
         vault.writePasswordKeyBlob(PasswordVault.wrapVaultKey(decoy, vk))
-        vault.biometricEnabled = false
+        vault.lockMode = LockMode.OFF
         vk.fill(0)
     }
 
@@ -393,6 +485,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun syncSecretFlags() {
         provisioned = vault.isProvisioned()
+        lockMode = vault.lockMode
         biometricEnabled = vault.biometricEnabled
         passwordEnrolled = vault.passwordKeyBlobExists()
         duressEnrolled = vault.duressBlobExists()
@@ -400,44 +493,102 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Turn biometric unlock on or off. The vault must be unlocked (the VK is
-     * needed to create the non-auth blob when disabling). Enabling just flips
-     * back to the existing biometric blob and drops the plain one; no prompt
-     * either way, since the VK never changes.
+     * Switch the Keystore/OS gate to [target]. The vault must be unlocked (its VK is
+     * what each mode wraps). The VK is never re-keyed, so switching only changes which
+     * KEK/blob a later unlock reads.
+     *
+     *   - OFF: (re)create the non-auth plain KEK and wrap the VK under it.
+     *   - DEVICE_CREDENTIAL, API 30+: use the auth KEK (device-credential prompt at
+     *     unlock). Enroll one first if the vault has none, then drop the plain blob.
+     *   - DEVICE_CREDENTIAL, pre-30: gate the non-auth plain KEK behind a KeyguardManager
+     *     confirm at unlock; requires a secure lock screen.
+     *   - BIOMETRIC: use the auth KEK, enrolling one first if the vault has none.
      */
-    fun applyBiometric(enabled: Boolean) {
-        if (isBusy || enabled == vault.biometricEnabled) return
+    fun applyLockMode(activity: FragmentActivity, target: LockMode) {
+        if (isBusy || target == vault.lockMode) return
         viewModelScope.launch {
             isBusy = true
             error = null
             try {
-                if (enabled) {
-                    if (!vault.keyBlobExists()) {
-                        throw IllegalStateException("No biometric key on this device.")
+                when (target) {
+                    LockMode.OFF -> writePlainBlobFromCurrentVk()
+                    LockMode.DEVICE_CREDENTIAL -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            if (!vault.keyBlobExists()) {
+                                enrollAuthKek(activity, deviceCredentialOnly = true)
+                            }
+                            withContext(Dispatchers.IO) {
+                                vault.deletePlainKeyBlob()
+                                KeystoreMasterKey.deletePlain()
+                            }
+                        } else {
+                            if (!BiometricGate.isDeviceSecure(activity)) {
+                                throw IllegalStateException(
+                                    "Set a device PIN, pattern, or password in Android settings first."
+                                )
+                            }
+                            writePlainBlobFromCurrentVk()
+                        }
                     }
-                    withContext(Dispatchers.IO) {
-                        vault.deletePlainKeyBlob()
-                        KeystoreMasterKey.deletePlain()
+                    LockMode.BIOMETRIC -> {
+                        if (!vault.keyBlobExists()) {
+                            enrollAuthKek(activity, deviceCredentialOnly = false)
+                        }
+                        withContext(Dispatchers.IO) {
+                            vault.deletePlainKeyBlob()
+                            KeystoreMasterKey.deletePlain()
+                        }
                     }
-                    vault.biometricEnabled = true
-                } else {
-                    val vk = vault.snapshotVaultKey()
-                        ?: throw IllegalStateException("Unlock the vault first.")
-                    withContext(Dispatchers.IO) {
-                        KeystoreMasterKey.generatePlain()
-                        val cipher = KeystoreMasterKey.wrapCipherPlain()
-                        val wrapped = cipher.doFinal(vk)
-                        vault.writePlainKeyBlob(cipher.iv + wrapped)
-                        vk.fill(0)
-                    }
-                    vault.biometricEnabled = false
                 }
+                vault.lockMode = target
+                lockMode = target
                 biometricEnabled = vault.biometricEnabled
+            } catch (e: BiometricGateException) {
+                error = if (e.code == BiometricPrompt.ERROR_USER_CANCELED ||
+                    e.code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
+                ) null else (e.message ?: "Authentication failed")
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't change the biometric setting"
+                error = e.message ?: "Couldn't change the lock setting"
             } finally {
                 isBusy = false
             }
+        }
+    }
+
+    /** Wrap the current in-memory VK under a fresh non-auth plain KEK. */
+    private suspend fun writePlainBlobFromCurrentVk() {
+        val vk = vault.snapshotVaultKey()
+            ?: throw IllegalStateException("Unlock the vault first.")
+        withContext(Dispatchers.IO) {
+            KeystoreMasterKey.generatePlain()
+            val cipher = KeystoreMasterKey.wrapCipherPlain()
+            val wrapped = cipher.doFinal(vk)
+            vault.writePlainKeyBlob(cipher.iv + wrapped)
+            vk.fill(0)
+        }
+    }
+
+    /**
+     * Create the auth KEK and wrap the current VK under it, prompting once. Adds a
+     * hardware-bound gate to a vault created without one (e.g. a password-only vault).
+     * [deviceCredentialOnly] restricts the prompt to the device credential.
+     */
+    private suspend fun enrollAuthKek(activity: FragmentActivity, deviceCredentialOnly: Boolean) {
+        val vk = vault.snapshotVaultKey()
+            ?: throw IllegalStateException("Unlock the vault first.")
+        KeystoreMasterKey.generate()
+        val cipher = KeystoreMasterKey.wrapCipher()
+        val authed = BiometricGate.authenticate(
+            activity,
+            title = "Confirm it's you",
+            subtitle = "Add this lock to your AgePony vault",
+            cryptoObject = BiometricPrompt.CryptoObject(cipher),
+            deviceCredentialOnly = deviceCredentialOnly,
+        )
+        withContext(Dispatchers.IO) {
+            val wrapped = authed.doFinal(vk)
+            vault.writeKeyBlob(authed.iv + wrapped)
+            vk.fill(0)
         }
     }
 
