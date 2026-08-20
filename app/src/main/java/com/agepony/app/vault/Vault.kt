@@ -268,7 +268,10 @@ class Vault(context: Context) {
 
     /** Bootstrap a fresh, empty vault with a freshly-generated VK and persist it. */
     fun bootstrap(vaultKey: ByteArray) {
-        vk = vaultKey
+        // Copy: bootstrap callers wipe their transient VK buffer right after this
+        // returns, so the vault must not alias it or persist() would later seal
+        // vault.dat under a zeroed key.
+        vk = vaultKey.copyOf()
         identities.clear()
         recipients.clear()
         notes.clear()
@@ -280,7 +283,8 @@ class Vault(context: Context) {
     /** Unlock an existing vault: open vault.dat with the (already-unwrapped) VK. */
     fun unlock(vaultKey: ByteArray) {
         val snapshot = loadSnapshot(vaultKey)
-        vk = vaultKey
+        // Copy so the vault owns its key independently of the caller's buffer.
+        vk = vaultKey.copyOf()
         identities.clear(); identities.addAll(snapshot.identities)
         recipients.clear(); recipients.addAll(snapshot.recipients)
         notes.clear(); notes.addAll(snapshot.notes)

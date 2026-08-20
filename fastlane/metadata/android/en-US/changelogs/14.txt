@@ -1,0 +1,3 @@
+AgePony 4.1.1 fixes a lockout on password and PIN vaults.
+
+- A vault protected by a password or device PIN, rather than a fingerprint, could fail to reopen after the app locked itself, showing a decryption error. The vault key was cleared from memory right after setup, so the first thing you saved was written under a blank key. It is fixed and covered by a test. A vault already affected by this cannot be opened by the new build and must be reset and set up again.
