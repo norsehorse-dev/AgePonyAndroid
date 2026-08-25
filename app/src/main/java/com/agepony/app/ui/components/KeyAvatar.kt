@@ -1,5 +1,5 @@
 // KeyAvatar.kt
-// AgePony Android 4.3.0
+// AgePony Android 4.2.0
 //
 // A small circular avatar for an identity or recipient. age keys present as
 // opaque "age1..." strings, so two entries can be hard to tell apart at a

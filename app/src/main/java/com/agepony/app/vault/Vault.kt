@@ -37,7 +37,7 @@ class Vault(context: Context) {
     val recipients = mutableStateListOf<StoredRecipient>()
     val notes = mutableStateListOf<StoredNote>()
     val signers = mutableStateListOf<StoredSigner>()
-    // 4.3.0 recycle bin: soft-deleted identities/recipients, newest first.
+    // 4.2.0 recycle bin: soft-deleted identities/recipients, newest first.
     val trashedIdentities = mutableStateListOf<TrashedIdentity>()
     val trashedRecipients = mutableStateListOf<TrashedRecipient>()
 
@@ -434,7 +434,7 @@ class Vault(context: Context) {
         persist()
     }
 
-    // MARK: - Recycle bin (4.3.0)
+    // MARK: - Recycle bin (4.2.0)
 
     /** Move a soft-deleted identity back into the active list. */
     fun restoreIdentity(id: String) {

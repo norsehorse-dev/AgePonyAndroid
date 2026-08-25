@@ -1,5 +1,5 @@
 // LicensesScreen.kt
-// AgePony Android 4.3.0
+// AgePony Android 4.2.0
 //
 // Open-source and third-party notices. AgePony's own age implementation lives
 // in agepony-core; the libraries below are what the app builds on. Reached

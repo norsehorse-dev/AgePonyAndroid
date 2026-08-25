@@ -1,5 +1,5 @@
 // SecurityInfoScreen.kt
-// AgePony Android 4.3.0
+// AgePony Android 4.2.0
 //
 // A plain, consolidated account of how AgePony protects your files, and what
 // it does not do. The knowledge was scattered across inline hints; this is the

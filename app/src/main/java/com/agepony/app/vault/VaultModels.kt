@@ -126,7 +126,7 @@ data class StoredNote(
  * A soft-deleted identity or recipient, held in the recycle bin until restored,
  * purged by hand, or aged out (Vault.TRASH_RETENTION_DAYS). Deleting an identity
  * destroys a private key, which cannot be recovered once gone for good, so the bin
- * gives a window to undo an accidental delete. Both are new in 4.3.0 and default to
+ * gives a window to undo an accidental delete. Both are new in 4.2.0 and default to
  * empty in the snapshot, so old vault.dat files load and old apps ignore them.
  */
 @Serializable

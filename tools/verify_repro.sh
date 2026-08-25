@@ -139,7 +139,12 @@ build_leg() {
     ( cd "$work/src$leg" && \
       env GRADLE_USER_HOME="$work/gradle$leg" ANDROID_HOME="$ANDROID_HOME" \
           ./gradlew --no-daemon "$GRADLE_TASK" )
-    cp "$work/src$leg/$APK_REL_PATH" "$work/build$leg.apk"
+    local apk="$work/src$leg/$APK_REL_PATH"
+    if [ ! -f "$apk" ]; then
+        apk="$(ls "$work/src$leg"/app/build/outputs/apk/foss/release/app-foss-release*.apk 2>/dev/null | head -1)"
+    fi
+    [ -n "$apk" ] && [ -f "$apk" ] || fail "[$leg] no foss release APK found (looked for $APK_REL_PATH and app-foss-release*.apk)"
+    cp "$apk" "$work/build$leg.apk"
     say "[$leg] built $work/build$leg.apk"
 }
 

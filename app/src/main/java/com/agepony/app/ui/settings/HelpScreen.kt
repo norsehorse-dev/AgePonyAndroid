@@ -1,5 +1,5 @@
 // HelpScreen.kt
-// AgePony Android 4.3.0
+// AgePony Android 4.2.0
 //
 // In-app FAQ. Plain-language answers to the questions testers actually ask,
 // so the app can answer them without an email round-trip. Reached from

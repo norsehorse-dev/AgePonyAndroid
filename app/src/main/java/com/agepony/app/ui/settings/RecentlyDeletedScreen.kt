@@ -1,5 +1,5 @@
 // RecentlyDeletedScreen.kt
-// AgePony Android 4.3.0
+// AgePony Android 4.2.0
 //
 // The recycle bin. Lists soft-deleted identities and recipients so an
 // accidental delete can be undone. Deleting an identity destroys a private

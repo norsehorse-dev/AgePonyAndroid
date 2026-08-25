@@ -1,5 +1,5 @@
 // Haptics.kt
-// AgePony Android 4.3.0
+// AgePony Android 4.2.0
 //
 // Lightweight haptic helpers usable from any Composable. Compose's
 // LocalHapticFeedback only exposes LongPress/TextHandleMove, which can't tell
