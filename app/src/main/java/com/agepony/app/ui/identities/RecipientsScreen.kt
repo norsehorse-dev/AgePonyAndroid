@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.agepony.app.ui.components.KeyAvatar
 import com.agepony.app.ui.components.KeyBlock
 import com.agepony.app.ui.components.PostQuantumBadge
 import com.agepony.app.ui.scan.QrScanner
@@ -70,6 +71,7 @@ internal fun RecipientList(
     vault: Vault,
     onAdd: () -> Unit,
     onOpen: (String) -> Unit,
+    onRecentlyDeleted: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -79,6 +81,7 @@ internal fun RecipientList(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Spacer(Modifier.weight(1f))
+            TextButton(onClick = onRecentlyDeleted) { Text("Recently deleted") }
             TextButton(onClick = onAdd) { Text("Add") }
         }
 
@@ -106,7 +109,9 @@ private fun RecipientRow(recipient: StoredRecipient, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        KeyAvatar(seed = recipient.publicKeyB64, name = recipient.name)
         Column(Modifier.weight(1f)) {
             Text(recipient.name, style = MaterialTheme.typography.bodyLarge)
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -391,7 +396,10 @@ internal fun AddRecipientFlow(
                         inputError = null
                         scope.launch {
                             try {
-                                val found = RecipientImport.fetchFromGitHub(githubUser)
+                                val found = RecipientImport.fetchFromGitHub(
+                                    githubUser,
+                                    vault.proxyConfig,
+                                )
                                 found.forEach { candidates.add(EditableCandidate(it)) }
                             } catch (e: Exception) {
                                 inputError = e.message
@@ -513,7 +521,7 @@ private fun candidateKeySummary(candidate: RecipientCandidate): String {
     val full = runCatching { candidate.publicDisplayString() }.getOrNull()
         ?: return candidate.defaultName
     return when (candidate.type) {
-        StoredRecipientType.X25519, StoredRecipientType.MLKEM768X25519 ->
+        StoredRecipientType.X25519, StoredRecipientType.MLKEM768X25519, StoredRecipientType.YUBIKEY_P256 ->
             if (full.length <= 24) full else "${full.take(14)}…${full.takeLast(5)}"
 
         StoredRecipientType.SSH_ED25519, StoredRecipientType.SSH_RSA -> {
@@ -535,6 +543,7 @@ private fun typeLabel(t: StoredRecipientType): String = when (t) {
     StoredRecipientType.MLKEM768X25519 -> "Quantum-safe (ML-KEM-768 + X25519)"
     StoredRecipientType.SSH_ED25519 -> "SSH Ed25519"
     StoredRecipientType.SSH_RSA -> "SSH RSA"
+    StoredRecipientType.YUBIKEY_P256 -> "YubiKey (P-256)"
 }
 
 private fun sourceLabel(s: StoredRecipientSource): String = when (s) {

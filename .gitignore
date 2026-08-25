@@ -30,3 +30,8 @@ build/
 *.apk.asc
 *.apk.sha256
 /.idea/
+
+# Working artifacts (issue dumps, scratch) — never part of the app
+/issues/
+issues.md
+/_to_delete/

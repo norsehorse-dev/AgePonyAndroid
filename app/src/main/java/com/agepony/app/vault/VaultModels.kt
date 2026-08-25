@@ -57,7 +57,8 @@ enum class StoredRecipientType {
     @SerialName("x25519") X25519,
     @SerialName("mlkem768x25519") MLKEM768X25519,
     @SerialName("sshEd25519") SSH_ED25519,
-    @SerialName("sshRSA") SSH_RSA
+    @SerialName("sshRSA") SSH_RSA,
+    @SerialName("yubikeyP256") YUBIKEY_P256
 }
 
 /** True for post-quantum (MLKEM768-X25519 hybrid) recipient types. */
@@ -122,6 +123,19 @@ data class StoredNote(
 )
 
 /**
+ * A soft-deleted identity or recipient, held in the recycle bin until restored,
+ * purged by hand, or aged out (Vault.TRASH_RETENTION_DAYS). Deleting an identity
+ * destroys a private key, which cannot be recovered once gone for good, so the bin
+ * gives a window to undo an accidental delete. Both are new in 4.3.0 and default to
+ * empty in the snapshot, so old vault.dat files load and old apps ignore them.
+ */
+@Serializable
+data class TrashedIdentity(val identity: StoredIdentity, val deletedAt: Long)
+
+@Serializable
+data class TrashedRecipient(val recipient: StoredRecipient, val deletedAt: Long)
+
+/**
  * Full vault contents — the unit that is serialized and sealed to vault.dat.
  *
  * `signers` was added in 4.0.0. The default keeps both directions safe: an older
@@ -133,5 +147,7 @@ data class VaultSnapshot(
     val identities: List<StoredIdentity> = emptyList(),
     val recipients: List<StoredRecipient> = emptyList(),
     val notes: List<StoredNote> = emptyList(),
-    val signers: List<StoredSigner> = emptyList()
+    val signers: List<StoredSigner> = emptyList(),
+    val trashedIdentities: List<TrashedIdentity> = emptyList(),
+    val trashedRecipients: List<TrashedRecipient> = emptyList()
 )

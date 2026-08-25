@@ -1,0 +1,5 @@
+AgePony 4.2.0 adds a proxy for key lookup, and two fixes.
+
+- Fetch a recipient's GitHub keys over a SOCKS5 or HTTP proxy, set in Settings > Network. Point it at Tor/Orbot to pull keys over Tor, or past a network block. Off by default.
+- Passphrase fields are now hidden as you type.
+- Decrypting a multi-file bundle can extract the files into a folder instead of leaving a .tar.

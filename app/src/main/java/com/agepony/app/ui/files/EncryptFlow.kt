@@ -25,7 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import com.agepony.app.ui.util.rememberHaptics
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -288,6 +290,9 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         vault.forgetSessionPassphrase()
         stage = EncryptStage.PICK
     }
+
+    val haptics = rememberHaptics()
+    LaunchedEffect(stage) { if (stage == EncryptStage.DONE) haptics.success() }
 
     Column(modifier.fillMaxSize()) {
         when (stage) {

@@ -606,7 +606,6 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     // for a short window after backgrounding and locks only if the app stays away
     // past it, so a quick switch (copy a recipient, paste it elsewhere) keeps state.
     private var pendingLockJob: Job? = null
-    private val autoLockGraceMillis = 30_000L
 
     /**
      * App went to the background. Schedule a lock after the grace period, unless an
@@ -616,8 +615,9 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     fun onEnterBackground() {
         if (vault.autoLockSuppressed) return
         pendingLockJob?.cancel()
+        val graceMillis = vault.autoLockGraceSeconds.toLong() * 1000L
         pendingLockJob = viewModelScope.launch {
-            delay(autoLockGraceMillis)
+            delay(graceMillis)
             vault.lock()
             pendingLockJob = null
         }

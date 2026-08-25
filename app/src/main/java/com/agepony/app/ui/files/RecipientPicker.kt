@@ -560,4 +560,5 @@ private fun recipientTypeLabel(t: StoredRecipientType): String = when (t) {
     StoredRecipientType.MLKEM768X25519 -> "Quantum-safe (ML-KEM-768 + X25519)"
     StoredRecipientType.SSH_ED25519 -> "SSH Ed25519"
     StoredRecipientType.SSH_RSA -> "SSH RSA"
+    StoredRecipientType.YUBIKEY_P256 -> "YubiKey (P-256)"
 }

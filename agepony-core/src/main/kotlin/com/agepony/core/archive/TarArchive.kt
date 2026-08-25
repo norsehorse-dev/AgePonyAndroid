@@ -243,6 +243,21 @@ object TarArchive {
     }
 
     /**
+     * True if [firstBlock] begins with a valid USTAR header. A cheap way to tell whether a
+     * decrypted payload is a tar bundle worth offering to extract, without reading the whole
+     * archive. Needs at least [BLOCK_SIZE] bytes; fewer, the all-zero marker, or a non-tar
+     * payload all return false.
+     */
+    fun looksLikeTar(firstBlock: ByteArray): Boolean {
+        if (firstBlock.size < BLOCK) return false
+        return try {
+            parseHeaderBlock(firstBlock.copyOfRange(0, BLOCK)) != null
+        } catch (_: TarException) {
+            false
+        }
+    }
+
+    /**
      * Walk [input] entry by entry without materializing the archive. [handler] receives each
      * entry's name, size, and a stream bounded to that entry's bytes; whatever the handler
      * leaves unread is skipped before the next entry. The handler must not close the stream it

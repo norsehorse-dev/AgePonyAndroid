@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import com.agepony.app.ui.settings.RecentlyDeletedScreen
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.security.SecurityKeyService
 import com.agepony.app.security.keystore.HardwareKeyService
+import com.agepony.app.ui.components.KeyAvatar
 import com.agepony.app.ui.components.PostQuantumBadge
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
@@ -81,6 +83,7 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
     var segment by rememberSaveable { mutableStateOf(IdSegment.IDENTITIES) }
     var mode by rememberSaveable { mutableStateOf(PaneMode.LIST) }
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showTrash by rememberSaveable { mutableStateOf(false) }
 
     fun toList() {
         mode = PaneMode.LIST
@@ -88,6 +91,10 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
     }
 
     Column(modifier) {
+        if (showTrash) {
+            RecentlyDeletedScreen(vault = vault, onBack = { showTrash = false })
+            return@Column
+        }
         if (mode == PaneMode.LIST) {
             TabRow(selectedTabIndex = segment.ordinal) {
                 IdSegment.entries.forEach { s ->
@@ -106,6 +113,7 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
                     vault = vault,
                     onAdd = { mode = PaneMode.ADD },
                     onOpen = { detailId = it; mode = PaneMode.DETAIL },
+                    onRecentlyDeleted = { showTrash = true },
                 )
 
                 PaneMode.ADD -> AddIdentityFlow(
@@ -126,6 +134,7 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
                     vault = vault,
                     onAdd = { mode = PaneMode.ADD },
                     onOpen = { detailId = it; mode = PaneMode.DETAIL },
+                    onRecentlyDeleted = { showTrash = true },
                 )
 
                 PaneMode.ADD -> AddRecipientFlow(
@@ -151,6 +160,7 @@ private fun IdentityList(
     vault: Vault,
     onAdd: () -> Unit,
     onOpen: (String) -> Unit,
+    onRecentlyDeleted: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -160,6 +170,7 @@ private fun IdentityList(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Spacer(Modifier.weight(1f))
+            TextButton(onClick = onRecentlyDeleted) { Text("Recently deleted") }
             TextButton(onClick = onAdd) { Text("Add") }
         }
 
@@ -191,7 +202,9 @@ private fun IdentityRow(identity: StoredIdentity, isActive: Boolean, onClick: ()
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        KeyAvatar(seed = identity.publicKeyB64, name = identity.name)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(identity.name, style = MaterialTheme.typography.bodyLarge)

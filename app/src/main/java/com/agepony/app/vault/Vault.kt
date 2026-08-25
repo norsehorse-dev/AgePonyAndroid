@@ -37,6 +37,9 @@ class Vault(context: Context) {
     val recipients = mutableStateListOf<StoredRecipient>()
     val notes = mutableStateListOf<StoredNote>()
     val signers = mutableStateListOf<StoredSigner>()
+    // 4.3.0 recycle bin: soft-deleted identities/recipients, newest first.
+    val trashedIdentities = mutableStateListOf<TrashedIdentity>()
+    val trashedRecipients = mutableStateListOf<TrashedRecipient>()
 
     // Settings surfaced for binding (UserDefaults on iOS -> SharedPreferences here).
     private val prefs = context.getSharedPreferences("agepony_vault_settings", Context.MODE_PRIVATE)
@@ -150,6 +153,68 @@ class Vault(context: Context) {
             passphraseModeDefaultState = value
             prefs.edit().putBoolean(KEY_PASSPHRASE_MODE_DEFAULT, value).apply()
         }
+
+    // Background auto-lock grace period, in seconds. How long the vault stays
+    // unlocked after the app is backgrounded before it locks. 30s default; 0 means
+    // lock immediately on leaving the app. User-configurable in Settings (issue #3).
+    private var autoLockGraceState by mutableStateOf(prefs.getInt(KEY_AUTO_LOCK_GRACE_SECONDS, 30))
+    var autoLockGraceSeconds: Int
+        get() = autoLockGraceState
+        set(value) {
+            autoLockGraceState = value
+            prefs.edit().putInt(KEY_AUTO_LOCK_GRACE_SECONDS, value).apply()
+        }
+
+    // 4.2.0 — optional proxy for the one network key lookup (RecipientImport's
+    // GitHub .keys fetch). Mirrored into Compose state like the defaults above so
+    // Settings never shows a stale value. NONE (the default) is a direct
+    // connection and behaves exactly as before.
+    private var proxyTypeState by mutableStateOf(ProxyType.fromKey(prefs.getString(KEY_PROXY_TYPE, null)))
+    var proxyType: ProxyType
+        get() = proxyTypeState
+        set(value) {
+            proxyTypeState = value
+            prefs.edit().putString(KEY_PROXY_TYPE, value.key).apply()
+        }
+
+    private var proxyHostState by mutableStateOf(prefs.getString(KEY_PROXY_HOST, "").orEmpty())
+    var proxyHost: String
+        get() = proxyHostState
+        set(value) {
+            proxyHostState = value
+            prefs.edit().putString(KEY_PROXY_HOST, value).apply()
+        }
+
+    private var proxyPortState by mutableStateOf(prefs.getInt(KEY_PROXY_PORT, 0))
+    var proxyPort: Int
+        get() = proxyPortState
+        set(value) {
+            proxyPortState = value
+            prefs.edit().putInt(KEY_PROXY_PORT, value).apply()
+        }
+
+    // Optional SOCKS5 / proxy credentials. For Tor/Orbot these are the stream
+    // isolation token (distinct pairs -> distinct circuits); for a real proxy
+    // they are ordinary auth. Blank by default.
+    private var proxyUsernameState by mutableStateOf(prefs.getString(KEY_PROXY_USERNAME, "").orEmpty())
+    var proxyUsername: String
+        get() = proxyUsernameState
+        set(value) {
+            proxyUsernameState = value
+            prefs.edit().putString(KEY_PROXY_USERNAME, value).apply()
+        }
+
+    private var proxyPasswordState by mutableStateOf(prefs.getString(KEY_PROXY_PASSWORD, "").orEmpty())
+    var proxyPassword: String
+        get() = proxyPasswordState
+        set(value) {
+            proxyPasswordState = value
+            prefs.edit().putString(KEY_PROXY_PASSWORD, value).apply()
+        }
+
+    /** The full proxy config for the one network key fetch. */
+    val proxyConfig: ProxyConfig
+        get() = ProxyConfig(proxyType, proxyHost, proxyPort, proxyUsername, proxyPassword)
 
     /**
      * The passphrase last confirmed in the encrypt flow, so encrypting a run of files asks for it
@@ -276,6 +341,8 @@ class Vault(context: Context) {
         recipients.clear()
         notes.clear()
         signers.clear()
+        trashedIdentities.clear()
+        trashedRecipients.clear()
         persist()
         isUnlocked = true
     }
@@ -289,7 +356,10 @@ class Vault(context: Context) {
         recipients.clear(); recipients.addAll(snapshot.recipients)
         notes.clear(); notes.addAll(snapshot.notes)
         signers.clear(); signers.addAll(snapshot.signers)
+        trashedIdentities.clear(); trashedIdentities.addAll(snapshot.trashedIdentities)
+        trashedRecipients.clear(); trashedRecipients.addAll(snapshot.trashedRecipients)
         isUnlocked = true
+        purgeExpiredTrash()
     }
 
     /** Drop the VK and all decrypted state from memory (called on background). */
@@ -301,6 +371,8 @@ class Vault(context: Context) {
         recipients.clear()
         notes.clear()
         signers.clear()
+        trashedIdentities.clear()
+        trashedRecipients.clear()
         isUnlocked = false
     }
 
@@ -320,7 +392,10 @@ class Vault(context: Context) {
     }
 
     fun deleteIdentity(id: String) {
-        identities.removeAll { it.id == id }
+        val idx = identities.indexOfFirst { it.id == id }
+        if (idx < 0) return
+        val removed = identities.removeAt(idx)
+        trashedIdentities.add(0, TrashedIdentity(removed, System.currentTimeMillis()))
         if (activeIdentityId == id) activeIdentityId = identities.firstOrNull()?.id
         persist()
     }
@@ -352,8 +427,57 @@ class Vault(context: Context) {
     }
 
     fun deleteRecipient(id: String) {
-        recipients.removeAll { it.id == id }
+        val idx = recipients.indexOfFirst { it.id == id }
+        if (idx < 0) return
+        val removed = recipients.removeAt(idx)
+        trashedRecipients.add(0, TrashedRecipient(removed, System.currentTimeMillis()))
         persist()
+    }
+
+    // MARK: - Recycle bin (4.3.0)
+
+    /** Move a soft-deleted identity back into the active list. */
+    fun restoreIdentity(id: String) {
+        val idx = trashedIdentities.indexOfFirst { it.identity.id == id }
+        if (idx < 0) return
+        val restored = trashedIdentities.removeAt(idx).identity
+        identities.add(restored)
+        if (activeIdentityId == null) activeIdentityId = restored.id
+        persist()
+    }
+
+    /** Permanently remove one identity from the recycle bin. */
+    fun purgeIdentity(id: String) {
+        if (trashedIdentities.removeAll { it.identity.id == id }) persist()
+    }
+
+    /** Move a soft-deleted recipient back into the active list. */
+    fun restoreRecipient(id: String) {
+        val idx = trashedRecipients.indexOfFirst { it.recipient.id == id }
+        if (idx < 0) return
+        recipients.add(trashedRecipients.removeAt(idx).recipient)
+        persist()
+    }
+
+    /** Permanently remove one recipient from the recycle bin. */
+    fun purgeRecipient(id: String) {
+        if (trashedRecipients.removeAll { it.recipient.id == id }) persist()
+    }
+
+    /** Empty the whole recycle bin now. */
+    fun emptyTrash() {
+        if (trashedIdentities.isEmpty() && trashedRecipients.isEmpty()) return
+        trashedIdentities.clear()
+        trashedRecipients.clear()
+        persist()
+    }
+
+    /** Drop bin entries older than TRASH_RETENTION_DAYS. Persists only if something changed. */
+    fun purgeExpiredTrash() {
+        val cutoff = System.currentTimeMillis() - TRASH_RETENTION_DAYS * 24L * 60L * 60L * 1000L
+        val a = trashedIdentities.removeAll { it.deletedAt < cutoff }
+        val b = trashedRecipients.removeAll { it.deletedAt < cutoff }
+        if (a || b) persist()
     }
 
     // MARK: - Note CRUD
@@ -423,7 +547,9 @@ class Vault(context: Context) {
             identities = identities.toList(),
             recipients = recipients.toList(),
             notes = notes.toList(),
-            signers = signers.toList()
+            signers = signers.toList(),
+            trashedIdentities = trashedIdentities.toList(),
+            trashedRecipients = trashedRecipients.toList()
         )
         val plaintext = json.encodeToString(VaultSnapshot.serializer(), snapshot).toByteArray(Charsets.UTF_8)
         val sealed = VaultCrypto.seal(key, plaintext)
@@ -449,6 +575,8 @@ class Vault(context: Context) {
     }
 
     private companion object {
+        // Recycle-bin retention: soft-deleted entries older than this are purged on unlock.
+        const val TRASH_RETENTION_DAYS = 30L
         const val KEY_ACTIVE_IDENTITY = "activeIdentityId"
         const val KEY_BIOMETRIC_ENABLED = "biometricEnabled"
         const val KEY_LOCK_MODE = "lockMode"
@@ -461,5 +589,11 @@ class Vault(context: Context) {
         const val KEY_SCRYPT_WORK_FACTOR = "scryptWorkFactor"
         const val KEY_ARMOR_DEFAULT = "armorDefault"
         const val KEY_PASSPHRASE_MODE_DEFAULT = "passphraseModeDefault"
+        const val KEY_PROXY_TYPE = "proxyType"
+        const val KEY_PROXY_HOST = "proxyHost"
+        const val KEY_PROXY_PORT = "proxyPort"
+        const val KEY_PROXY_USERNAME = "proxyUsername"
+        const val KEY_PROXY_PASSWORD = "proxyPassword"
+        const val KEY_AUTO_LOCK_GRACE_SECONDS = "autoLockGraceSeconds"
     }
 }

@@ -291,6 +291,11 @@ private fun describe(stanza: Stanza): StanzaInfo = when (stanza.type) {
         detail = "key tag " + shortArg(stanza.args.getOrNull(0)),
         postQuantum = false,
     )
+    "piv-p256" -> StanzaInfo(
+        title = "YubiKey recipient (PIV P-256)",
+        detail = "key tag " + shortArg(stanza.args.getOrNull(0)),
+        postQuantum = false,
+    )
     else -> StanzaInfo(
         title = "Unrecognised stanza: ${stanza.type}",
         detail = "Written by a newer or different age implementation. " +

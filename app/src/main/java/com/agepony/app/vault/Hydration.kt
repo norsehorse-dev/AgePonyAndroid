@@ -4,6 +4,7 @@ import com.agepony.core.recipients.AgeIdentity
 import com.agepony.core.recipients.AgeRecipient
 import com.agepony.core.recipients.HybridIdentity
 import com.agepony.core.recipients.HybridRecipient
+import com.agepony.core.recipients.P256Recipient
 import com.agepony.core.recipients.SSHEd25519Identity
 import com.agepony.core.recipients.SSHEd25519Recipient
 import com.agepony.core.recipients.SSHRSAIdentity
@@ -145,6 +146,7 @@ fun StoredRecipient.toAgeRecipient(): AgeRecipient = when (type) {
             else -> throw IllegalStateException("stored ssh-rsa recipient did not parse as RSA")
         }
     }
+    StoredRecipientType.YUBIKEY_P256 -> P256Recipient(b64d(publicKeyB64))
 }
 
 fun StoredRecipient.publicDisplayString(): String = when (type) {
@@ -152,6 +154,7 @@ fun StoredRecipient.publicDisplayString(): String = when (type) {
     StoredRecipientType.MLKEM768X25519 -> HybridRecipient(b64d(publicKeyB64)).toBech32()
     StoredRecipientType.SSH_ED25519 -> sshEd25519Line(b64d(publicKeyB64), sshComment)
     StoredRecipientType.SSH_RSA -> String(b64d(publicKeyB64), Charsets.UTF_8)
+    StoredRecipientType.YUBIKEY_P256 -> P256Recipient(b64d(publicKeyB64)).toBech32()
 }
 
 /**
@@ -164,4 +167,5 @@ fun RecipientCandidate.publicDisplayString(): String = when (type) {
     StoredRecipientType.MLKEM768X25519 -> HybridRecipient(b64d(publicKeyB64)).toBech32()
     StoredRecipientType.SSH_ED25519 -> sshEd25519Line(b64d(publicKeyB64), sshComment)
     StoredRecipientType.SSH_RSA -> String(b64d(publicKeyB64), Charsets.UTF_8)
+    StoredRecipientType.YUBIKEY_P256 -> P256Recipient(b64d(publicKeyB64)).toBech32()
 }

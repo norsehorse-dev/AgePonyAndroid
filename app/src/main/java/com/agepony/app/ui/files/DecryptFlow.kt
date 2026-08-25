@@ -14,11 +14,16 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import com.agepony.app.ui.util.rememberHaptics
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -77,6 +82,10 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
     var originalName by remember { mutableStateOf<String?>(null) }
     var verdict by remember { mutableStateOf<String?>(null) }
     var bytesDone by remember { mutableStateOf(0L) }
+    var isBundle by remember { mutableStateOf(false) }
+    var savedDest by remember { mutableStateOf<Uri?>(null) }
+    var extracting by remember { mutableStateOf(false) }
+    var extractResult by remember { mutableStateOf<String?>(null) }
 
     val sourceName = source?.name ?: "file.age"
 
@@ -112,6 +121,8 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 originalName = outcome.originalName
                 verdict = outcome.verdict
                 savedName = withContext(Dispatchers.IO) { SafIo.queryNameSize(context, dest).first }
+                savedDest = dest
+                isBundle = withContext(Dispatchers.IO) { peekIsBundle(context, dest) }
                 stage = DecryptStage.DONE
             } catch (e: WrongPassphraseException) {
                 error = e.message
@@ -159,12 +170,35 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         }
     }
 
+    val pickExtractTree = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { tree: Uri? ->
+        val src = savedDest
+        if (tree == null || src == null) return@rememberLauncherForActivityResult
+        extracting = true
+        extractResult = null
+        scope.launch {
+            try {
+                val msg = withContext(Dispatchers.IO) { extractBundleToTree(context, src, tree) }
+                extractResult = msg
+            } catch (e: Exception) {
+                extractResult = "Extract failed: ${e.message}"
+            } finally {
+                extracting = false
+            }
+        }
+    }
+
     fun reset() {
         source = null; passphrase = ""; usePassphrase = false
         error = null; savedName = null; originalName = null; verdict = null
         bytesDone = 0L
+        isBundle = false; savedDest = null; extracting = false; extractResult = null
         stage = DecryptStage.PICK
     }
+
+    val haptics = rememberHaptics()
+    LaunchedEffect(stage) { if (stage == DecryptStage.DONE) haptics.success() }
 
     Column(modifier.fillMaxSize()) {
         when (stage) {
@@ -224,6 +258,8 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                     onValueChange = { passphrase = it; error = null },
                     label = { Text("Passphrase") },
                     singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (error != null) ErrorLine(error!!)
@@ -325,6 +361,28 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
                 }
+                if (isBundle) {
+                    Text(
+                        "This is a bundle of files. You can extract them into a folder.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    OutlinedButton(
+                        onClick = { vault.autoLockSuppressed = true; pickExtractTree.launch(null) },
+                        enabled = !extracting,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    ) { Text(if (extracting) "Extracting\u2026" else "Extract files into a folder\u2026") }
+                    val msg = extractResult
+                    if (msg != null) {
+                        Text(
+                            msg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
+                }
                 Button(onClick = { reset() }, modifier = Modifier.fillMaxWidth()) { Text("Decrypt another") }
                 OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Done") }
             }
@@ -395,6 +453,47 @@ private fun decryptToDocument(
         FileVerifier.Trust.INVALID -> "⚠ Signature invalid: ${result.reason ?: "verification failed"}"
     }
     return DecryptOutcome(bundle.name, verdict)
+}
+
+private fun peekIsBundle(context: android.content.Context, uri: Uri): Boolean =
+    try {
+        SafIo.openInput(context, uri).use { input ->
+            val block = ByteArray(com.agepony.core.archive.TarArchive.BLOCK_SIZE)
+            var read = 0
+            while (read < block.size) {
+                val r = input.read(block, read, block.size - read)
+                if (r < 0) break
+                read += r
+            }
+            read >= block.size && com.agepony.core.archive.TarArchive.looksLikeTar(block)
+        }
+    } catch (_: Exception) {
+        false
+    }
+
+/**
+ * Extract a decrypted tar bundle into a folder the user granted. Entry names are
+ * sanitised to their final path component so a crafted bundle cannot write outside
+ * the chosen folder, and collisions are de-duplicated.
+ */
+private fun extractBundleToTree(context: android.content.Context, src: Uri, tree: Uri): String {
+    val used = mutableSetOf<String>()
+    var count = 0
+    java.io.BufferedInputStream(SafIo.openInput(context, src)).use { input ->
+        com.agepony.core.archive.TarArchive.forEachEntry(input) { name, _, data ->
+            val unique = SafIo.uniqueName(sanitizeEntryName(name), used)
+            val out = SafIo.createInTree(context, tree, unique)
+            SafIo.openOutput(context, out).use { o -> data.copyTo(o, 64 * 1024) }
+            count++
+        }
+    }
+    if (count == 0) throw IllegalStateException("No files found in the bundle.")
+    return "Extracted $count file${if (count == 1) "" else "s"} to the folder."
+}
+
+private fun sanitizeEntryName(name: String): String {
+    val base = name.substringAfterLast('/').substringAfterLast('\\').trim()
+    return if (base.isEmpty() || base == "." || base == "..") "file" else base
 }
 
 /**

@@ -8,6 +8,11 @@
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
+    <!-- See Orbot (Tor) for the proxy feature on Android 11+ (package visibility). -->
+    <queries>
+        <package android:name="org.torproject.android" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:largeHeap="true"
