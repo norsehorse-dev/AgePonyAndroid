@@ -95,3 +95,7 @@ AgePony is an independent app built on the open age format and is not affiliated
 ## Contact
 
 NorseHorse@norsehor.se
+
+## A note on how this is built
+
+This app is developed solo and with heavy use of AI assistance, which I don't hide. What matters for a tool like this is the crypto, and AgePony implements the open age format and checks its output against the reference age tool in both directions, so a broken encryption path fails a test instead of passing quietly. The full source is here to audit, and bug reports and code review are welcome.
