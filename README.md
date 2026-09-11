@@ -20,6 +20,27 @@ Website: https://agepony.com
 - QR scanning and display for exchanging recipient keys
 - ASCII armor support
 
+## Verifying your download
+
+AgePony is signed with the same certificate for every release, and that fingerprint does not change between versions. The APK on GitHub Releases and the F-Droid build both carry it, because the F-Droid build is reproducible and ships this signature. A Google Play copy is re-signed by Google, so its certificate differs there by design.
+
+To check the signer with [AppVerifier](https://github.com/soupslurpr/AppVerifier), paste this as the verification info:
+
+```
+AgePony
+com.agepony.app
+6D:02:B1:83:9D:3D:1A:11:9F:24:E9:2B:12:F9:72:86:69:4D:00:1F:F9:96:ED:20:74:B6:B8:39:CC:D0:83:BA
+```
+
+The same certificate from `apksigner verify --print-certs` or `keytool`:
+
+```
+SHA-256  6D:02:B1:83:9D:3D:1A:11:9F:24:E9:2B:12:F9:72:86:69:4D:00:1F:F9:96:ED:20:74:B6:B8:39:CC:D0:83:BA
+SHA-1    6A:A2:2B:04:B9:8F:0F:0E:1B:D6:16:D3:E0:06:D1:EA:2E:EB:2C:E1
+```
+
+Each GitHub release also lists the whole-file `sha256sum` of its APK, for checking the download itself. That value changes every release and only matches the exact file from GitHub Releases, so an F-Droid or Play copy shows a different file hash while carrying the same signing certificate above.
+
 ## Modules
 
 ```
