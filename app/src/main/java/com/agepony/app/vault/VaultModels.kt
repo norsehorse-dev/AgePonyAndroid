@@ -28,7 +28,15 @@ enum class StoredIdentityType {
     @SerialName("sshRSA") SSH_RSA,
     @SerialName("hardwareKey") HARDWARE_KEY,
     @SerialName("skEd25519") SK_ED25519,
-    @SerialName("skEcdsaP256") SK_ECDSA_P256
+    @SerialName("skEcdsaP256") SK_ECDSA_P256,
+    // 5.0.0: hardware-bound age decryption keys (age v1.3 tag recipients). The P-256 private key
+    // lives in the Android Keystore under keystoreAlias. HARDWARE_TAG_PQ also holds a 64-byte
+    // ML-KEM-768 seed in privateKeyB64.
+    @SerialName("hardwareTag") HARDWARE_TAG,
+    @SerialName("hardwareTagPQ") HARDWARE_TAG_PQ,
+    // 5.0.0: an age-plugin-yubikey key in a YubiKey PIV slot. publicKeyB64 = 33-byte compressed
+    // point, privateKeyB64 = the 9-byte AGE-PLUGIN-YUBIKEY stub (a pointer, not a secret).
+    @SerialName("yubikeyPiv") YUBIKEY_PIV
 }
 
 /**
@@ -46,11 +54,20 @@ val StoredIdentityType.isSigningOnly: Boolean
         StoredIdentityType.HARDWARE_KEY -> true
         StoredIdentityType.SK_ED25519 -> true
         StoredIdentityType.SK_ECDSA_P256 -> true
+        StoredIdentityType.HARDWARE_TAG -> false
+        StoredIdentityType.HARDWARE_TAG_PQ -> false
+        StoredIdentityType.YUBIKEY_PIV -> false
     }
 
-/** True for post-quantum (MLKEM768-X25519 hybrid) identity types. */
+/** True for identities whose private key is bound to this device's Keystore (cannot be moved or backed up). */
+val StoredIdentityType.isDeviceBound: Boolean
+    get() = this == StoredIdentityType.HARDWARE_KEY ||
+        this == StoredIdentityType.HARDWARE_TAG ||
+        this == StoredIdentityType.HARDWARE_TAG_PQ
+
+/** True for post-quantum (hybrid ML-KEM-768) identity types. */
 val StoredIdentityType.isPostQuantum: Boolean
-    get() = this == StoredIdentityType.MLKEM768X25519
+    get() = this == StoredIdentityType.MLKEM768X25519 || this == StoredIdentityType.HARDWARE_TAG_PQ
 
 @Serializable
 enum class StoredRecipientType {
@@ -58,12 +75,15 @@ enum class StoredRecipientType {
     @SerialName("mlkem768x25519") MLKEM768X25519,
     @SerialName("sshEd25519") SSH_ED25519,
     @SerialName("sshRSA") SSH_RSA,
-    @SerialName("yubikeyP256") YUBIKEY_P256
+    @SerialName("yubikeyP256") YUBIKEY_P256,
+    // 5.0.0: age v1.3 tag recipients (age1tag1 / age1tagpq1), usually hardware keys elsewhere.
+    @SerialName("tag") TAG,
+    @SerialName("tagPQ") TAG_PQ
 }
 
-/** True for post-quantum (MLKEM768-X25519 hybrid) recipient types. */
+/** True for post-quantum (hybrid ML-KEM-768) recipient types. */
 val StoredRecipientType.isPostQuantum: Boolean
-    get() = this == StoredRecipientType.MLKEM768X25519
+    get() = this == StoredRecipientType.MLKEM768X25519 || this == StoredRecipientType.TAG_PQ
 
 @Serializable
 enum class StoredRecipientSource {

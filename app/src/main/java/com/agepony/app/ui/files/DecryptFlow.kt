@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import com.agepony.app.ui.util.rememberHaptics
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -69,7 +70,12 @@ import java.io.InputStream
 private enum class DecryptStage { PICK, PROBING, NEED_PASSPHRASE, WORKING, DONE }
 
 @Composable
-fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit) {
+fun DecryptFlow(
+    vault: Vault,
+    modifier: Modifier = Modifier,
+    initialUri: Uri? = null,
+    onClose: () -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -137,10 +143,8 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         }
     }
 
-    val openInput = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
+    // Shared in from another app, or picked here: probe the header, then save or ask for a passphrase.
+    fun beginDecrypt(uri: Uri) {
         error = null
         passphrase = ""
         usePassphrase = false
@@ -168,6 +172,18 @@ fun DecryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 stage = DecryptStage.PICK
             }
         }
+    }
+
+    val openInput = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) beginDecrypt(uri)
+    }
+
+    // Once only: survives rotation, so a recreated screen doesn't reopen the save picker.
+    var initialConsumed by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(initialUri) {
+        if (!initialConsumed && initialUri != null) { initialConsumed = true; beginDecrypt(initialUri) }
     }
 
     val pickExtractTree = rememberLauncherForActivityResult(
@@ -406,8 +422,27 @@ private fun headerOpensWith(
     val (armored, input) = FileEncryptor.sniffArmored(SafIo.openInput(context, source.uri))
     return input.use { stream ->
         val binary: InputStream = if (armored) com.agepony.core.Armor.decodingSource(stream) else stream
-        Age.canDecryptStream(binary, identities)
+        Age.canDecryptStream(FileEncryptor.guardedPassphraseSource(binary), identities)
     }
+}
+
+/** Does this file carry an agepony.com/sig stanza in its header? Reads the header only. */
+private fun headerHasSignatureStanza(context: android.content.Context, source: SourceRef): Boolean =
+    try {
+        val (armored, input) = FileEncryptor.sniffArmored(SafIo.openInput(context, source.uri))
+        input.use { stream ->
+            val binary: InputStream =
+                if (armored) com.agepony.core.Armor.decodingSource(stream) else stream
+            FileEncryptor.headerHasSignatureStanza(binary)
+        }
+    } catch (_: Exception) {
+        false
+    }
+
+private fun verdictFor(result: FileVerifier.Result): String = when (result.trust) {
+    FileVerifier.Trust.TRUSTED -> "Signed by ${result.signerName ?: "a known key"} ✓"
+    FileVerifier.Trust.VALID_UNKNOWN -> "Valid signature (signer not in your vault)"
+    FileVerifier.Trust.INVALID -> "⚠ Signature invalid: ${result.reason ?: "verification failed"}"
 }
 
 /**
@@ -424,6 +459,22 @@ private fun decryptToDocument(
     signers: List<StoredSigner>,
     onBytes: (Long) -> Unit,
 ): DecryptOutcome {
+    // New-format signed files (agepony.com/sig) hold the signature in the header over a bare
+    // payload, so plain age reads them. Decrypt buffered and verify against the recovered
+    // plaintext; old SignedBundle files and unsigned files take the streaming path below.
+    if (passphrase == null && headerHasSignatureStanza(context, source)) {
+        val rawBytes = CountingInputStream(SafIo.openInput(context, source.uri), onBytes)
+            .use { it.readBytes() }
+        val recovered = FileEncryptor.decryptSignedBytes(FileEncryptor.toBinary(rawBytes), identities)
+        BufferedOutputStream(SafIo.openOutput(context, dest)).use { out ->
+            out.write(recovered.plaintext)
+            out.flush()
+        }
+        val sig = recovered.signatureArmored ?: return DecryptOutcome(null, null)
+        val result = FileVerifier().verify(sig.toByteArray(Charsets.UTF_8), recovered.plaintext, known, signers)
+        return DecryptOutcome(null, verdictFor(result))
+    }
+
     val (armored, rawInput) = FileEncryptor.sniffArmored(SafIo.openInput(context, source.uri))
     var parsed: SignedBundle.StreamParsed? = null
 
@@ -447,12 +498,7 @@ private fun decryptToDocument(
         known,
         signers,
     ) { alg -> bundle.hash(alg) }
-    val verdict = when (result.trust) {
-        FileVerifier.Trust.TRUSTED -> "Signed by ${result.signerName ?: "a known key"} ✓"
-        FileVerifier.Trust.VALID_UNKNOWN -> "Valid signature — signer not in your vault"
-        FileVerifier.Trust.INVALID -> "⚠ Signature invalid: ${result.reason ?: "verification failed"}"
-    }
-    return DecryptOutcome(bundle.name, verdict)
+    return DecryptOutcome(bundle.name, verdictFor(result))
 }
 
 private fun peekIsBundle(context: android.content.Context, uri: Uri): Boolean =

@@ -26,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.agepony.app.security.BiometricGate
+import com.agepony.app.ui.passphrase.PassphraseOnlyScreen
 import com.agepony.app.vault.LockMode
 import com.agepony.app.vault.VaultViewModel
 
@@ -71,7 +73,16 @@ import com.agepony.app.vault.VaultViewModel
 //     exists — the deliberate "no lock at all" mode.
 //
 @Composable
-fun VaultGate(vm: VaultViewModel) {
+fun VaultGate(
+    vm: VaultViewModel,
+    passphraseOnlyContent: @Composable (onClose: () -> Unit) -> Unit = { close ->
+        PassphraseOnlyScreen(vault = vm.vault, onClose = close)
+    },
+    unlockedContent: @Composable () -> Unit = { AgePonyApp(vm) },
+) {
+    // Issue #13: passphrase work is available from the lock screen without unlocking the vault.
+    var passphraseOnly by rememberSaveable { mutableStateOf(false) }
+
     val activity = LocalContext.current as FragmentActivity
 
     // Lock when backgrounding, but skip the lock for an in-app SAF round trip.
@@ -99,8 +110,9 @@ fun VaultGate(vm: VaultViewModel) {
 
     when {
         !vm.provisioned -> WelcomeScreen(vm, activity)
-        !vm.vault.isUnlocked -> LockedScreen(vm, activity)
-        else -> AgePonyApp(vm)
+        !vm.vault.isUnlocked && passphraseOnly -> passphraseOnlyContent { passphraseOnly = false }
+        !vm.vault.isUnlocked -> LockedScreen(vm, activity, onPassphraseOnly = { passphraseOnly = true })
+        else -> unlockedContent()
     }
 }
 
@@ -192,7 +204,7 @@ private fun WelcomeScreen(vm: VaultViewModel, activity: FragmentActivity) {
 }
 
 @Composable
-private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity) {
+private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassphraseOnly: () -> Unit) {
     val isPin = vm.unlockSecretKind == "pin"
     val secretNoun = if (isPin) "PIN" else "password"
     // With an OS gate, that gate leads and the password field is opt-in; a no-lock
@@ -305,6 +317,12 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity) {
                             modifier = Modifier.padding(top = 16.dp),
                         ) { Text("Use your $secretNoun instead") }
                     }
+                }
+            }
+
+            if (!vm.isBusy) {
+                TextButton(onClick = onPassphraseOnly, modifier = Modifier.padding(top = 24.dp)) {
+                    Text("Just need a passphrase? Continue without unlocking")
                 }
             }
 

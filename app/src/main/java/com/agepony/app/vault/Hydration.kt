@@ -9,6 +9,11 @@ import com.agepony.core.recipients.SSHEd25519Identity
 import com.agepony.core.recipients.SSHEd25519Recipient
 import com.agepony.core.recipients.SSHRSAIdentity
 import com.agepony.core.recipients.SSHRSARecipient
+import com.agepony.core.recipients.TagRecipient
+import com.agepony.app.security.keystore.HardwareTagKeyService
+import com.agepony.app.security.piv.YubiKeyBroker
+import com.agepony.core.recipients.YubiKeyIdentity
+import com.agepony.core.recipients.YubiKeyStub
 import com.agepony.core.recipients.X25519Identity
 import com.agepony.core.recipients.X25519Recipient
 import com.agepony.core.ssh.OpenSSHPublicKey
@@ -72,6 +77,12 @@ fun StoredIdentity.toAgeIdentity(): AgeIdentity = when (type) {
     StoredIdentityType.HARDWARE_KEY -> throw IllegalStateException(HARDWARE_SIGNING_ONLY)
     StoredIdentityType.SK_ED25519 -> throw IllegalStateException(SK_SIGNING_ONLY)
     StoredIdentityType.SK_ECDSA_P256 -> throw IllegalStateException(SK_SIGNING_ONLY)
+    StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ ->
+        HardwareTagKeyService.toTagIdentity(this)
+    StoredIdentityType.YUBIKEY_PIV -> {
+        val stub = YubiKeyStub.fromBytes(b64d(privateKeyB64))
+        YubiKeyIdentity(stub, b64d(publicKeyB64), YubiKeyBroker.keyAgreement(stub))
+    }
 }
 
 fun StoredIdentity.toAgeRecipient(): AgeRecipient = when (type) {
@@ -88,6 +99,9 @@ fun StoredIdentity.toAgeRecipient(): AgeRecipient = when (type) {
     StoredIdentityType.HARDWARE_KEY -> throw IllegalStateException(HARDWARE_SIGNING_ONLY)
     StoredIdentityType.SK_ED25519 -> throw IllegalStateException(SK_SIGNING_ONLY)
     StoredIdentityType.SK_ECDSA_P256 -> throw IllegalStateException(SK_SIGNING_ONLY)
+    StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ -> TagRecipient(b64d(publicKeyB64))
+    // piv-p256, which every age-plugin-yubikey version can decrypt.
+    StoredIdentityType.YUBIKEY_PIV -> P256Recipient(b64d(publicKeyB64))
 }
 
 fun StoredIdentity.publicDisplayString(): String = when (type) {
@@ -102,6 +116,9 @@ fun StoredIdentity.publicDisplayString(): String = when (type) {
     }
     StoredIdentityType.SK_ED25519 -> skLine("sk-ssh-ed25519@openssh.com")
     StoredIdentityType.SK_ECDSA_P256 -> skLine("sk-ecdsa-sha2-nistp256@openssh.com")
+    StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ ->
+        TagRecipient(b64d(publicKeyB64)).toBech32()
+    StoredIdentityType.YUBIKEY_PIV -> P256Recipient(b64d(publicKeyB64)).toBech32()
 }
 
 fun StoredIdentity.privateDisplayString(): String = when (type) {
@@ -115,6 +132,10 @@ fun StoredIdentity.privateDisplayString(): String = when (type) {
         "(hardware key — private key stays in the device keystore; not exportable)"
     StoredIdentityType.SK_ED25519, StoredIdentityType.SK_ECDSA_P256 ->
         "(security key — signing happens on the FIDO device over NFC; no exportable private key)"
+    StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ ->
+        "(hardware key: decryption happens inside this device's secure hardware; not exportable)"
+    // The age-plugin-yubikey identity line: a pointer to the slot, safe to copy to a computer.
+    StoredIdentityType.YUBIKEY_PIV -> YubiKeyStub.fromBytes(b64d(privateKeyB64)).encode()
 }
 
 /**
@@ -126,7 +147,8 @@ fun StoredIdentity.privateDisplayString(): String = when (type) {
 fun StoredIdentity.isPrivateKeyExportable(): Boolean = when (type) {
     StoredIdentityType.X25519,
     StoredIdentityType.MLKEM768X25519,
-    StoredIdentityType.SSH_RSA -> true
+    StoredIdentityType.SSH_RSA,
+    StoredIdentityType.YUBIKEY_PIV -> true
     else -> false
 }
 
@@ -147,6 +169,7 @@ fun StoredRecipient.toAgeRecipient(): AgeRecipient = when (type) {
         }
     }
     StoredRecipientType.YUBIKEY_P256 -> P256Recipient(b64d(publicKeyB64))
+    StoredRecipientType.TAG, StoredRecipientType.TAG_PQ -> TagRecipient(b64d(publicKeyB64))
 }
 
 fun StoredRecipient.publicDisplayString(): String = when (type) {
@@ -155,6 +178,7 @@ fun StoredRecipient.publicDisplayString(): String = when (type) {
     StoredRecipientType.SSH_ED25519 -> sshEd25519Line(b64d(publicKeyB64), sshComment)
     StoredRecipientType.SSH_RSA -> String(b64d(publicKeyB64), Charsets.UTF_8)
     StoredRecipientType.YUBIKEY_P256 -> P256Recipient(b64d(publicKeyB64)).toBech32()
+    StoredRecipientType.TAG, StoredRecipientType.TAG_PQ -> TagRecipient(b64d(publicKeyB64)).toBech32()
 }
 
 /**
@@ -168,4 +192,5 @@ fun RecipientCandidate.publicDisplayString(): String = when (type) {
     StoredRecipientType.SSH_ED25519 -> sshEd25519Line(b64d(publicKeyB64), sshComment)
     StoredRecipientType.SSH_RSA -> String(b64d(publicKeyB64), Charsets.UTF_8)
     StoredRecipientType.YUBIKEY_P256 -> P256Recipient(b64d(publicKeyB64)).toBech32()
+    StoredRecipientType.TAG, StoredRecipientType.TAG_PQ -> TagRecipient(b64d(publicKeyB64)).toBech32()
 }

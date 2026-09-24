@@ -44,6 +44,9 @@ import com.agepony.app.vault.LockMode
 import com.agepony.app.vault.ProxyConfig
 import com.agepony.app.vault.ProxyType
 import com.agepony.app.vault.VaultViewModel
+import com.agepony.app.ui.portability.PaperRestoreScreen
+import com.agepony.app.ui.portability.ReceiveKeysScreen
+import com.agepony.app.ui.portability.SendKeysScreen
 
 //
 // Settings tab (expanded in Phase 2d-3a). Android counterpart of iOS's
@@ -51,7 +54,7 @@ import com.agepony.app.vault.VaultViewModel
 // about, and a guarded reset. The lock-mode selector picks the Keystore/OS gate
 // (Off / device credential / biometric) via VaultViewModel.applyLockMode.
 //
-private enum class SettingsSub { HELP, SECURITY, LICENSES, TRASH }
+private enum class SettingsSub { HELP, SECURITY, LICENSES, TRASH, SEND_KEYS, RECEIVE_KEYS, PAPER_RESTORE }
 private enum class ProxyMode { OFF, ORBOT, CUSTOM }
 
 @Composable
@@ -103,6 +106,9 @@ fun SettingsScreen(
         SettingsSub.SECURITY -> { SecurityInfoScreen(onBack = { subScreen = null }, modifier = modifier); return }
         SettingsSub.LICENSES -> { LicensesScreen(onBack = { subScreen = null }, modifier = modifier); return }
         SettingsSub.TRASH -> { RecentlyDeletedScreen(vault = vault, onBack = { subScreen = null }, modifier = modifier); return }
+        SettingsSub.SEND_KEYS -> { SendKeysScreen(vault = vault, onBack = { subScreen = null }, modifier = modifier); return }
+        SettingsSub.RECEIVE_KEYS -> { ReceiveKeysScreen(vault = vault, onBack = { subScreen = null }, modifier = modifier); return }
+        SettingsSub.PAPER_RESTORE -> { PaperRestoreScreen(vault = vault, onBack = { subScreen = null }, modifier = modifier); return }
         null -> {}
     }
 
@@ -520,6 +526,26 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
+        HorizontalDivider()
+
+        // Keys on other devices (5.0.0)
+        SectionLabel("Move and back up keys")
+        OutlinedButton(onClick = { subScreen = SettingsSub.SEND_KEYS }, modifier = Modifier.fillMaxWidth()) {
+            Text("Send keys to another device")
+        }
+        OutlinedButton(onClick = { subScreen = SettingsSub.RECEIVE_KEYS }, modifier = Modifier.fillMaxWidth()) {
+            Text("Receive keys from another device")
+        }
+        OutlinedButton(onClick = { subScreen = SettingsSub.PAPER_RESTORE }, modifier = Modifier.fillMaxWidth()) {
+            Text("Restore from a paper backup")
+        }
+        Text(
+            "To make a paper backup, open an identity on the Identities tab. Hardware keys stay on this " +
+                "device and can't be moved or backed up.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         HorizontalDivider()
 

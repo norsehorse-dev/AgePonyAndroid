@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import com.agepony.app.ui.util.rememberHaptics
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.signing.FileSigner
+import com.agepony.app.share.ShareOut
 import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.ScryptMemoryException
 import com.agepony.app.vault.StoredIdentity
@@ -91,7 +93,12 @@ private class EncryptResult(val name: String, val ok: Boolean, val detail: Strin
 private class SignChoice(val identity: StoredIdentity, val fileSigner: FileSigner)
 
 @Composable
-fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit) {
+fun EncryptFlow(
+    vault: Vault,
+    modifier: Modifier = Modifier,
+    initialUris: List<Uri>? = null,
+    onClose: () -> Unit,
+) {
     val context = LocalContext.current
     val activity = context as FragmentActivity
     val scope = rememberCoroutineScope()
@@ -118,6 +125,7 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
     var fileIndex by remember { mutableStateOf(0) }
     var results by remember { mutableStateOf<List<EncryptResult>>(emptyList()) }
     var savedName by remember { mutableStateOf<String?>(null) }
+    var savedUri by remember { mutableStateOf<Uri?>(null) }
 
     val totalSize = sources.sumOf { it.size }
     val separate = sources.size > 1 && mode == OutputMode.SEPARATE
@@ -129,10 +137,8 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         return SignChoice(identity, FileSigner(activity))
     }
 
-    val openInput = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris: List<Uri> ->
-        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+    fun beginEncrypt(uris: List<Uri>) {
+        if (uris.isEmpty()) return
         error = null
         scope.launch {
             try {
@@ -143,6 +149,15 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 error = e.message ?: "Couldn't read the files."
             }
         }
+    }
+
+    val openInput = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> -> beginEncrypt(uris) }
+
+    var initialConsumed by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(initialUris) {
+        if (!initialConsumed && initialUris != null) { initialConsumed = true; beginEncrypt(initialUris) }
     }
 
     // Single output: one file in, or several bundled into one archive.
@@ -184,6 +199,7 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                     )
                 }
                 savedName = withContext(Dispatchers.IO) { SafIo.queryNameSize(context, uri).first }
+                savedUri = uri
                 stage = EncryptStage.DONE
             } catch (e: ScryptMemoryException) {
                 error = e.message
@@ -261,6 +277,7 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         mode = OutputMode.BUNDLE
         results = emptyList()
         savedName = null
+        savedUri = null
         bytesDone = 0L
         bytesTotal = 0L
         fileIndex = 0
@@ -552,6 +569,13 @@ fun EncryptFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    // The output is ciphertext, so it can go straight out to another app.
+                    savedUri?.let { out ->
+                        OutlinedButton(
+                            onClick = { ShareOut.file(context, out, savedName ?: "encrypted.age") },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Share encrypted file…") }
+                    }
                 } else {
                     val okCount = results.count { it.ok }
                     Text("Encrypted ✓", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
@@ -639,20 +663,37 @@ private suspend fun encryptToDocument(
             else -> prepared.first().open()
         }
 
-        val plaintext: InputStream = if (signer == null) {
-            openPayload(counting = true)
-        } else {
+        if (signer != null && passphrase.isNullOrEmpty()) {
+            // Signed to public-key recipients: the signature rides in an encrypted header stanza
+            // (agepony.com/sig), so the output stays a real age file that plain age still reads.
+            // The payload is buffered because the signature must sit in the header, ahead of the
+            // payload bytes.
             onPhase("Signing")
-            val hash = openPayload(counting = true).use { SSHSig.hashStream(it) }
+            val payloadBytes = openPayload(counting = true).use { it.readBytes() }
+            val hash = SSHSig.hashMessage(payloadBytes)
             val signature = signer.fileSigner.signHashed(signer.identity, hash)
-            SignedBundle.bundleSource(payloadName, payloadSize, openPayload(counting = true), signature)
-        }
-
-        onPhase("Encrypting")
-        plaintext.use { input ->
+            onPhase("Encrypting")
+            val ciphertext = FileEncryptor.encryptSigned(payloadBytes, recipients, signature, armor)
             BufferedOutputStream(SafIo.openOutput(context, dest)).use { out ->
-                FileEncryptor.encryptStream(input, recipients, passphrase, armor, out, workFactor)
+                out.write(ciphertext)
                 out.flush()
+            }
+        } else {
+            val plaintext: InputStream = if (signer == null) {
+                openPayload(counting = true)
+            } else {
+                onPhase("Signing")
+                val hash = openPayload(counting = true).use { SSHSig.hashStream(it) }
+                val signature = signer.fileSigner.signHashed(signer.identity, hash)
+                SignedBundle.bundleSource(payloadName, payloadSize, openPayload(counting = true), signature)
+            }
+
+            onPhase("Encrypting")
+            plaintext.use { input ->
+                BufferedOutputStream(SafIo.openOutput(context, dest)).use { out ->
+                    FileEncryptor.encryptStream(input, recipients, passphrase, armor, out, workFactor)
+                    out.flush()
+                }
             }
         }
     } finally {

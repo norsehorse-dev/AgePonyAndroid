@@ -2,6 +2,7 @@ package com.agepony.app.vault
 
 import com.agepony.core.recipients.HybridRecipient
 import com.agepony.core.recipients.P256Recipient
+import com.agepony.core.recipients.TagRecipient
 import com.agepony.core.recipients.X25519Recipient
 import com.agepony.core.ssh.OpenSSHPublicKey
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +53,23 @@ object RecipientImport {
             )
         }
 
+        // age v1.3 tag recipients (hardware keys: age1tag1 / age1tagpq1). Before "age1".
+        if (TagRecipient.isTagRecipient(t)) {
+            val recipient = try {
+                TagRecipient(t)
+            } catch (e: Exception) {
+                throw RecipientImportException("Not a valid age hardware-key recipient (${e.message}).")
+            }
+            return RecipientCandidate(
+                type = if (recipient.hybrid) StoredRecipientType.TAG_PQ else StoredRecipientType.TAG,
+                publicKeyB64 = b64e(recipient.publicKey),
+                sshComment = null,
+                defaultName = shortAgeName(t),
+                source = StoredRecipientSource.PASTE_AGE,
+                sourceMetadata = null,
+            )
+        }
+
         // age-plugin-yubikey recipients: age1yubikey1... Must be checked before the
         // generic "age1" branch, since they also start with "age1".
         if (t.startsWith("age1yubikey")) {
@@ -91,7 +109,7 @@ object RecipientImport {
         }
 
         throw RecipientImportException(
-            "Expected an age1… / age1pq… / age1yubikey1… recipient or an ssh-ed25519 / ssh-rsa line."
+            "Expected an age1… / age1pq… / age1tag1… / age1yubikey1… recipient or an ssh-ed25519 / ssh-rsa line."
         )
     }
 

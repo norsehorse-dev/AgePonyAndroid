@@ -30,7 +30,9 @@ import kotlinx.coroutines.withContext
 //
 class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
-    val vault = Vault(app)
+    // One Vault per process: the share-sheet activity and the main one must never hold two
+    // copies of the vault in memory, or a save from one could overwrite the other's changes.
+    val vault = SharedVault.get(app)
 
     var provisioned by mutableStateOf(vault.isProvisioned())
         private set

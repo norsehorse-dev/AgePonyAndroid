@@ -27,22 +27,26 @@ fun QrImage(
     content: String,
     modifier: Modifier = Modifier,
     size: Dp = 220.dp,
+    lowErrorCorrection: Boolean = false,
+    contentDescription: String = "QR code for this recipient",
 ) {
-    val bitmap = remember(content) { qrBitmap(content, 640) }
+    val bitmap = remember(content, lowErrorCorrection) {
+        qrBitmap(content, 900, if (lowErrorCorrection) ErrorCorrectionLevel.L else ErrorCorrectionLevel.M)
+    }
     if (bitmap != null) {
         Image(
             bitmap = bitmap.asImageBitmap(),
-            contentDescription = "QR code for this recipient",
+            contentDescription = contentDescription,
             contentScale = ContentScale.Fit,
             modifier = modifier.size(size),
         )
     }
 }
 
-private fun qrBitmap(content: String, px: Int): Bitmap? = try {
+internal fun qrBitmap(content: String, px: Int, ecc: ErrorCorrectionLevel = ErrorCorrectionLevel.M): Bitmap? = try {
     val hints = mapOf(
         EncodeHintType.MARGIN to 1,
-        EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
+        EncodeHintType.ERROR_CORRECTION to ecc,
     )
     val matrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, px, px, hints)
     val w = matrix.width

@@ -3,6 +3,8 @@ package com.agepony.core
 import com.agepony.core.recipients.AgeIdentity
 import com.agepony.core.recipients.AgeRecipient
 import com.agepony.core.recipients.LabeledAgeRecipient
+import com.agepony.core.recipients.HardwareIdentity
+import com.agepony.core.signing.SignatureStanza
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
@@ -34,11 +36,15 @@ object Age {
      * Note: per the age spec, a scrypt recipient must be the only recipient in the file.
      * This method enforces that constraint by checking the stanza types after wrapping.
      */
-    fun encrypt(plaintext: ByteArray, to: List<AgeRecipient>): ByteArray {
+    fun encrypt(
+        plaintext: ByteArray,
+        to: List<AgeRecipient>,
+        extraStanzas: (fileKey: ByteArray) -> List<Stanza> = { emptyList() },
+    ): ByteArray {
         require(to.isNotEmpty()) { "must have at least one recipient" }
         enforceRecipientLabels(to)
         val fileKey = ByteArray(FILE_KEY_SIZE).also { SecureRandom().nextBytes(it) }
-        val stanzas = to.map { it.wrap(fileKey) }
+        val stanzas = to.map { it.wrap(fileKey) } + extraStanzas(fileKey)
 
         val scryptCount = stanzas.count { it.type == "scrypt" }
         if (scryptCount > 0 && stanzas.size > 1) {
@@ -57,22 +63,35 @@ object Age {
      * stanza in turn; the first successful unwrap unlocks the file. Throws
      * `NoMatchingIdentityException` if no identity matched any stanza.
      */
-    fun decrypt(ciphertext: ByteArray, identities: List<AgeIdentity>): ByteArray {
+    /**
+     * Plaintext plus the armored SSHSIG recovered from an `agepony.com/sig` stanza, when the file
+     * carried one and it opened under the file key. [signatureArmored] is null for a file with no
+     * signature stanza.
+     */
+    class DecryptedWithSignature(val plaintext: ByteArray, val signatureArmored: String?)
+
+    fun decrypt(ciphertext: ByteArray, identities: List<AgeIdentity>): ByteArray =
+        decryptAndRecoverSignature(ciphertext, identities).plaintext
+
+    /**
+     * Like [decrypt], but also recovers the AgePony signature stanza if one is present. An
+     * unrecognized stanza is otherwise ignored, exactly as plain age ignores it, so this returns
+     * the same bare plaintext either way.
+     */
+    fun decryptAndRecoverSignature(
+        ciphertext: ByteArray,
+        identities: List<AgeIdentity>,
+    ): DecryptedWithSignature {
         require(identities.isNotEmpty()) { "must have at least one identity" }
         val parsed = AgeHeader.parse(ciphertext)
 
-        var fileKey: ByteArray? = null
-        outer@ for (stanza in parsed.stanzas) {
-            for (id in identities) {
-                val k = id.unwrap(stanza)
-                if (k != null) { fileKey = k; break@outer }
-            }
-        }
-        if (fileKey == null) throw NoMatchingIdentityException()
+        val fileKey = unwrapFileKey(parsed.stanzas, identities)
 
         AgeHeader.verifyMAC(parsed.macInputBytes, parsed.mac, fileKey)
         val payloadBytes = ciphertext.copyOfRange(parsed.payloadStart, ciphertext.size)
-        return AgePayload.decrypt(fileKey, payloadBytes)
+        val plaintext = AgePayload.decrypt(fileKey, payloadBytes)
+        val signature = SignatureStanza.find(parsed.stanzas)?.let { SignatureStanza.open(fileKey, it) }
+        return DecryptedWithSignature(plaintext, signature)
     }
 
     /**
@@ -109,14 +128,7 @@ object Age {
         val headerBytes = readHeaderBytes(ciphertext)
         val parsed = AgeHeader.parse(headerBytes)
 
-        var fileKey: ByteArray? = null
-        outer@ for (stanza in parsed.stanzas) {
-            for (id in identities) {
-                val k = id.unwrap(stanza)
-                if (k != null) { fileKey = k; break@outer }
-            }
-        }
-        if (fileKey == null) throw NoMatchingIdentityException()
+        val fileKey = unwrapFileKey(parsed.stanzas, identities)
 
         AgeHeader.verifyMAC(parsed.macInputBytes, parsed.mac, fileKey)
         // `ciphertext` is now positioned exactly at the first payload byte.
@@ -142,13 +154,40 @@ object Age {
         val parsed = AgeHeader.parse(readHeaderBytes(ciphertext))
         for (stanza in parsed.stanzas) {
             for (id in identities) {
-                if (id.unwrap(stanza) != null) return true
+                // A hardware identity answers from its key tag, so probing a file never makes a
+                // hardware key (or its user prompt) do an ECDH just to find out.
+                val opens = if (id is HardwareIdentity) id.matches(stanza) else id.unwrap(stanza) != null
+                if (opens) return true
             }
         }
         return false
     }
 
     // --- Internals ---
+
+    /**
+     * Find the file key. Software identities go first across every stanza, so a file that also
+     * has a software recipient never waits on (or fails because of) a hardware key. Tag
+     * identities go last, and an error from one (a cancelled prompt, a key the OS invalidated) is
+     * held back while the rest are tried; it only surfaces if nothing else opened the file.
+     */
+    private fun unwrapFileKey(stanzas: List<Stanza>, identities: List<AgeIdentity>): ByteArray {
+        val (hardware, software) = identities.partition { it is HardwareIdentity }
+        for (stanza in stanzas) {
+            for (id in software) id.unwrap(stanza)?.let { return it }
+        }
+        var firstError: Exception? = null
+        for (stanza in stanzas) {
+            for (id in hardware) {
+                try {
+                    id.unwrap(stanza)?.let { return it }
+                } catch (e: Exception) {
+                    if (firstError == null) firstError = e
+                }
+            }
+        }
+        throw firstError ?: NoMatchingIdentityException()
+    }
 
     /**
      * Enforce age's recipient-labels rule: every recipient must agree on the exact same set

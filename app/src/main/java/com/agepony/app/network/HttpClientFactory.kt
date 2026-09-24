@@ -10,8 +10,9 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 //
-// The single OkHttp client for AgePony's one and only network path: the GitHub
-// .keys fetch in RecipientImport. Building it here (not per call) means the
+// The single OkHttp client for AgePony's one and only HTTP path: the GitHub
+// .keys fetch in RecipientImport. (Key transfer between phones is a raw LAN
+// socket, see LanTransfer, and never goes through here.) Building it here (not per call) means the
 // proxy setting is applied in exactly one place, and a dead proxy makes the
 // fetch FAIL -- there is no direct fallback anywhere.
 //

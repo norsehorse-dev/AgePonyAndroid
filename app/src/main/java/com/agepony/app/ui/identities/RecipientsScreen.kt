@@ -24,7 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -347,7 +347,7 @@ internal fun AddRecipientFlow(
             color = MaterialTheme.colorScheme.primary,
         )
 
-        TabRow(selectedTabIndex = source.ordinal) {
+        PrimaryTabRow(selectedTabIndex = source.ordinal) {
             AddRecipientSource.entries.forEach { s ->
                 Tab(
                     selected = source == s,
@@ -521,7 +521,8 @@ private fun candidateKeySummary(candidate: RecipientCandidate): String {
     val full = runCatching { candidate.publicDisplayString() }.getOrNull()
         ?: return candidate.defaultName
     return when (candidate.type) {
-        StoredRecipientType.X25519, StoredRecipientType.MLKEM768X25519, StoredRecipientType.YUBIKEY_P256 ->
+        StoredRecipientType.X25519, StoredRecipientType.MLKEM768X25519, StoredRecipientType.YUBIKEY_P256,
+        StoredRecipientType.TAG, StoredRecipientType.TAG_PQ ->
             if (full.length <= 24) full else "${full.take(14)}…${full.takeLast(5)}"
 
         StoredRecipientType.SSH_ED25519, StoredRecipientType.SSH_RSA -> {
@@ -544,6 +545,8 @@ private fun typeLabel(t: StoredRecipientType): String = when (t) {
     StoredRecipientType.SSH_ED25519 -> "SSH Ed25519"
     StoredRecipientType.SSH_RSA -> "SSH RSA"
     StoredRecipientType.YUBIKEY_P256 -> "YubiKey (P-256)"
+    StoredRecipientType.TAG -> "Hardware key (age1tag)"
+    StoredRecipientType.TAG_PQ -> "Hardware key, quantum-safe (age1tagpq)"
 }
 
 private fun sourceLabel(s: StoredRecipientSource): String = when (s) {

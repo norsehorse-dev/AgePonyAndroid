@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.agepony.app.security.keystore.HardwareKeyService
+import com.agepony.app.security.keystore.HardwareTagKeyService
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -22,6 +24,16 @@ import java.io.File
 //
 // The VK is held only while unlocked and is dropped by lock().
 //
+/** The process-wide [Vault]. Every activity's view model uses this one instance. */
+object SharedVault {
+    @Volatile private var instance: Vault? = null
+
+    fun get(context: Context): Vault =
+        instance ?: synchronized(this) {
+            instance ?: Vault(context.applicationContext).also { instance = it }
+        }
+}
+
 class Vault(context: Context) {
 
     // Compose-observable state (mirrors the iOS @Observable arrays + isUnlocked).
@@ -448,7 +460,30 @@ class Vault(context: Context) {
 
     /** Permanently remove one identity from the recycle bin. */
     fun purgeIdentity(id: String) {
-        if (trashedIdentities.removeAll { it.identity.id == id }) persist()
+        val gone = trashedIdentities.filter { it.identity.id == id }.map { it.identity }
+        if (trashedIdentities.removeAll { it.identity.id == id }) {
+            persist()
+            releaseDeviceKeys(gone)
+        }
+    }
+
+    /**
+     * Delete the Keystore entries behind identities that are gone for good. Only called after
+     * the vault without them has been persisted, so a failed write never strands a vault entry
+     * whose key was already destroyed.
+     */
+    private fun releaseDeviceKeys(gone: List<StoredIdentity>) {
+        for (identity in gone) {
+            val alias = identity.keystoreAlias ?: continue
+            runCatching {
+                when (identity.type) {
+                    StoredIdentityType.HARDWARE_KEY -> HardwareKeyService.delete(alias)
+                    StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ ->
+                        HardwareTagKeyService.delete(alias)
+                    else -> Unit
+                }
+            }
+        }
     }
 
     /** Move a soft-deleted recipient back into the active list. */
@@ -467,17 +502,21 @@ class Vault(context: Context) {
     /** Empty the whole recycle bin now. */
     fun emptyTrash() {
         if (trashedIdentities.isEmpty() && trashedRecipients.isEmpty()) return
+        val gone = trashedIdentities.map { it.identity }
         trashedIdentities.clear()
         trashedRecipients.clear()
         persist()
+        releaseDeviceKeys(gone)
     }
 
     /** Drop bin entries older than TRASH_RETENTION_DAYS. Persists only if something changed. */
     fun purgeExpiredTrash() {
         val cutoff = System.currentTimeMillis() - TRASH_RETENTION_DAYS * 24L * 60L * 60L * 1000L
+        val gone = trashedIdentities.filter { it.deletedAt < cutoff }.map { it.identity }
         val a = trashedIdentities.removeAll { it.deletedAt < cutoff }
         val b = trashedRecipients.removeAll { it.deletedAt < cutoff }
         if (a || b) persist()
+        if (a) releaseDeviceKeys(gone)
     }
 
     // MARK: - Note CRUD
@@ -531,12 +570,25 @@ class Vault(context: Context) {
         passwordKeyFile.delete()
         duressKeyFile.delete()
         dataFile.delete()
+        // Hardware keys outlive the vault file otherwise. A decryption key left in the Keystore
+        // after a wipe (duress included) would still open files encrypted to it.
+        deleteAllDeviceKeys()
         prefs.edit()
             .remove(KEY_ACTIVE_IDENTITY)
             .remove(KEY_ONBOARDED)
             .remove(KEY_LAST_TAB)
             .remove(KEY_UNLOCK_SECRET_KIND)
             .apply()
+    }
+
+    private fun deleteAllDeviceKeys() {
+        runCatching {
+            val ks = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            val prefixes = listOf(HardwareKeyService.ALIAS_PREFIX, HardwareTagKeyService.ALIAS_PREFIX)
+            ks.aliases().toList()
+                .filter { alias -> prefixes.any { alias.startsWith(it) } }
+                .forEach { alias -> runCatching { ks.deleteEntry(alias) } }
+        }
     }
 
     // MARK: - Persistence
