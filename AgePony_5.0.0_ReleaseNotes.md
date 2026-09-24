@@ -121,8 +121,8 @@ This release is reproducible. Two independent builds from clean clones of the `v
 are byte-identical, and the published APK matches them; the same check runs in F-Droid's
 clean room.
 
-- Content hash (signatures ignored, for reproducible-build verification): `TODO`
-- Whole-file SHA-256 of the download: `TODO` (also in `AgePony-5.0.0-foss.apk.sha256`)
+- Content hash (signatures ignored, for reproducible-build verification): `5e508ed75e2a7d3187060d4fc36bc9ee60d0553ac4ff462116327e3e9cb9c062`
+- Whole-file SHA-256 of the download: `ebfb258e58fa17e182cd634f290f197f11871f690e5a11552bfe19ebed3403c0` (also in `AgePony-5.0.0-foss.apk.sha256`)
 - Signature: `AgePony-5.0.0-foss.apk.asc`, made with the NorseHorse release key, the same key
   F-Droid distributes.
 
