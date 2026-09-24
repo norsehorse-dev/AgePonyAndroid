@@ -1,0 +1,8 @@
+AgePony 4.2.0
+
+- Proxy for the GitHub key fetch: Off, Orbot (Tor), or a custom SOCKS5/HTTP proxy, in Settings > Network. Optional credentials give Tor stream isolation. Off by default.
+- Encrypt to YubiKey (age-plugin-yubikey) recipients.
+- Configurable auto-lock delay after leaving the app.
+- Recently deleted: restore an accidental identity or recipient delete.
+- Key avatars, and in-app Help, Security, and Licenses.
+- Passphrase fields on Decrypt, Text, and Migrate are now hidden.

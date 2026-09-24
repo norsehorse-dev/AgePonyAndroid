@@ -90,6 +90,7 @@ class FileVerifier {
         StoredIdentityType.X25519 -> null
         // Encryption-only; never a signer.
         StoredIdentityType.MLKEM768X25519 -> null
+        StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ, StoredIdentityType.YUBIKEY_PIV -> null
     }
 
     private fun b64dOrNull(s: String): ByteArray? = try {

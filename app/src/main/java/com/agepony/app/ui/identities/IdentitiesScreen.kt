@@ -23,7 +23,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import com.agepony.app.ui.settings.RecentlyDeletedScreen
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +43,10 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.security.SecurityKeyService
 import com.agepony.app.security.keystore.HardwareKeyService
+import com.agepony.app.security.keystore.HardwareTagKeyService
+import com.agepony.app.security.piv.YubiKeyBroker
+import com.agepony.core.recipients.YubiKeyStub
+import com.agepony.app.ui.components.KeyAvatar
 import com.agepony.app.ui.components.PostQuantumBadge
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
@@ -58,6 +63,7 @@ import com.agepony.core.recipients.HybridIdentity
 import com.agepony.core.recipients.SSHEd25519Identity
 import com.agepony.core.recipients.X25519Identity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -81,6 +87,7 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
     var segment by rememberSaveable { mutableStateOf(IdSegment.IDENTITIES) }
     var mode by rememberSaveable { mutableStateOf(PaneMode.LIST) }
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showTrash by rememberSaveable { mutableStateOf(false) }
 
     fun toList() {
         mode = PaneMode.LIST
@@ -88,8 +95,12 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
     }
 
     Column(modifier) {
+        if (showTrash) {
+            RecentlyDeletedScreen(vault = vault, onBack = { showTrash = false })
+            return@Column
+        }
         if (mode == PaneMode.LIST) {
-            TabRow(selectedTabIndex = segment.ordinal) {
+            PrimaryTabRow(selectedTabIndex = segment.ordinal) {
                 IdSegment.entries.forEach { s ->
                     Tab(
                         selected = segment == s,
@@ -106,6 +117,7 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
                     vault = vault,
                     onAdd = { mode = PaneMode.ADD },
                     onOpen = { detailId = it; mode = PaneMode.DETAIL },
+                    onRecentlyDeleted = { showTrash = true },
                 )
 
                 PaneMode.ADD -> AddIdentityFlow(
@@ -126,6 +138,7 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
                     vault = vault,
                     onAdd = { mode = PaneMode.ADD },
                     onOpen = { detailId = it; mode = PaneMode.DETAIL },
+                    onRecentlyDeleted = { showTrash = true },
                 )
 
                 PaneMode.ADD -> AddRecipientFlow(
@@ -151,6 +164,7 @@ private fun IdentityList(
     vault: Vault,
     onAdd: () -> Unit,
     onOpen: (String) -> Unit,
+    onRecentlyDeleted: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -160,6 +174,7 @@ private fun IdentityList(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Spacer(Modifier.weight(1f))
+            TextButton(onClick = onRecentlyDeleted) { Text("Recently deleted") }
             TextButton(onClick = onAdd) { Text("Add") }
         }
 
@@ -191,7 +206,9 @@ private fun IdentityRow(identity: StoredIdentity, isActive: Boolean, onClick: ()
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        KeyAvatar(seed = identity.publicKeyB64, name = identity.name)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(identity.name, style = MaterialTheme.typography.bodyLarge)
@@ -270,7 +287,7 @@ private fun AddIdentityFlow(
     }
 }
 
-private enum class GenKeyType { X25519, QUANTUM_SAFE, SSH_ED25519, HARDWARE, SECURITY }
+private enum class GenKeyType { X25519, QUANTUM_SAFE, HARDWARE_DECRYPT, SSH_ED25519, HARDWARE, SECURITY }
 
 @Composable
 private fun GenerateIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
@@ -279,6 +296,7 @@ private fun GenerateIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> U
         null -> GenerateTypeChooser(onPick = { keyType = it }, onCancel = onCancel)
         GenKeyType.X25519 -> GenerateX25519(vault, onDone) { keyType = null }
         GenKeyType.QUANTUM_SAFE -> GenerateHybrid(vault, onDone) { keyType = null }
+        GenKeyType.HARDWARE_DECRYPT -> GenerateHardwareDecryptKey(vault, onDone) { keyType = null }
         GenKeyType.SSH_ED25519 -> GenerateEd25519(vault, onDone) { keyType = null }
         GenKeyType.HARDWARE -> GenerateHardwareKey(vault, onDone) { keyType = null }
         GenKeyType.SECURITY -> GenerateSecurityKey(vault, onDone) { keyType = null }
@@ -293,8 +311,9 @@ private fun GenerateTypeChooser(onPick: (GenKeyType) -> Unit, onCancel: () -> Un
     ) {
         Text("Generate identity", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Text(
-            "Pick the kind of key to create. age and quantum-safe keys encrypt/decrypt; the SSH key " +
-                "signs (and can also receive files). Hardware and security keys sign only; they can't decrypt.",
+            "Pick the kind of key to create. age, quantum-safe and hardware decryption keys " +
+                "encrypt/decrypt; the SSH key signs (and can also receive files). Hardware signing and " +
+                "security keys sign only; they can't decrypt.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -304,11 +323,16 @@ private fun GenerateTypeChooser(onPick: (GenKeyType) -> Unit, onCancel: () -> Un
         OutlinedButton(onClick = { onPick(GenKeyType.QUANTUM_SAFE) }, modifier = Modifier.fillMaxWidth()) {
             Text("Quantum-safe (ML-KEM-768)")
         }
+        if (HardwareTagKeyService.isSupported) {
+            OutlinedButton(onClick = { onPick(GenKeyType.HARDWARE_DECRYPT) }, modifier = Modifier.fillMaxWidth()) {
+                Text("Hardware decryption key (this device)")
+            }
+        }
         OutlinedButton(onClick = { onPick(GenKeyType.SSH_ED25519) }, modifier = Modifier.fillMaxWidth()) {
             Text("SSH signing key (Ed25519)")
         }
         OutlinedButton(onClick = { onPick(GenKeyType.HARDWARE) }, modifier = Modifier.fillMaxWidth()) {
-            Text("Hardware key (this device)")
+            Text("Hardware signing key (this device)")
         }
         OutlinedButton(onClick = { onPick(GenKeyType.SECURITY) }, modifier = Modifier.fillMaxWidth()) {
             Text("Security key (FIDO over NFC)")
@@ -537,6 +561,118 @@ private fun GenerateHardwareKey(vault: Vault, onDone: () -> Unit, onCancel: () -
     }
 }
 
+/**
+ * A decryption key whose private half never leaves this device's secure hardware, published as
+ * an age v1.3 tag recipient (age1tag1 / age1tagpq1) that stock age can encrypt to. It cannot be
+ * exported, moved or backed up, so the screen says so plainly before creating one.
+ */
+@Composable
+private fun GenerateHardwareDecryptKey(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var postQuantum by rememberSaveable { mutableStateOf(true) }
+    var requireAuth by rememberSaveable { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Hardware decryption key", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+        Text(
+            "Creates a P-256 key inside this device's secure hardware (StrongBox or TEE). Files are " +
+                "encrypted to it as usual, including from the age command line (1.3 or later), and " +
+                "only this phone can open them.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Surface(
+            color = MaterialTheme.colorScheme.errorContainer,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                "This key can't be exported, moved to another device, or backed up. If this phone is " +
+                    "lost, reset, or broken, anything encrypted only to this key is gone. Encrypt " +
+                    "important files to a second recipient as well.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.padding(12.dp),
+            )
+        }
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(checked = postQuantum, onCheckedChange = { postQuantum = it })
+            Text("Quantum-safe (adds ML-KEM-768)", modifier = Modifier.padding(start = 12.dp))
+        }
+        Text(
+            if (postQuantum) "age1tagpq1… recipient. The ML-KEM half is held in your vault, the P-256 half in " +
+                "hardware; both are needed to decrypt. Can only share a file with other quantum-safe recipients."
+            else "age1tag1… recipient. Works alongside any other recipient type.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(checked = requireAuth, onCheckedChange = { requireAuth = it })
+            Text("Require biometric or device unlock to decrypt", modifier = Modifier.padding(start = 12.dp))
+        }
+        if (requireAuth) {
+            Text(
+                "Android deletes keys like this if you ever remove the device's screen lock. Only turn " +
+                    "this on if you'll keep a screen lock set.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        if (error != null) {
+            Text(error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = {
+                    if (busy) return@Button
+                    busy = true; error = null
+                    scope.launch {
+                        try {
+                            val label = name.trim().ifBlank { "hardware decryption key" }
+                            // Not cancellable: leaving the screen mid-way must not strand a
+                            // Keystore key with no vault record pointing at it.
+                            withContext(NonCancellable) {
+                                val alias = HardwareTagKeyService.newAlias()
+                                val stored = try {
+                                    withContext(Dispatchers.IO) {
+                                        val generated = HardwareTagKeyService.generate(alias, requireAuth)
+                                        if (postQuantum) HardwareTagKeyService.toStoredHybrid(label, generated)
+                                        else HardwareTagKeyService.toStoredClassic(label, generated)
+                                    }
+                                } catch (e: Exception) {
+                                    runCatching { HardwareTagKeyService.delete(alias) }
+                                    throw e
+                                }
+                                vault.addIdentity(stored)
+                            }
+                            busy = false
+                            onDone()
+                        } catch (e: Exception) {
+                            error = e.message ?: "Couldn't create the hardware key."
+                            busy = false
+                        }
+                    }
+                },
+                modifier = Modifier.weight(1f),
+            ) { Text(if (busy) "Creating…" else "Create") }
+            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Back") }
+        }
+    }
+}
+
 @Composable
 private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
     val activity = LocalContext.current as? FragmentActivity
@@ -650,8 +786,9 @@ private fun ImportIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
-            "Paste an AGE-SECRET-KEY-1… string, a quantum-safe AGE-SECRET-KEY-PQ-1… string, or a full " +
-                "OpenSSH private key (-----BEGIN OPENSSH PRIVATE KEY-----). Ed25519 and age keys are supported.",
+            "Paste an AGE-SECRET-KEY-1… string, a quantum-safe AGE-SECRET-KEY-PQ-1… string, a full " +
+                "OpenSSH private key (-----BEGIN OPENSSH PRIVATE KEY-----), or a YubiKey identity from " +
+                "age-plugin-yubikey (AGE-PLUGIN-YUBIKEY-1…). A YubiKey identity asks for one tap to read its key.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -689,10 +826,21 @@ private fun ImportIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
                     error = null
                     scope.launch {
                         try {
-                            val stored = withContext(Dispatchers.Default) {
+                            val stored = withContext(Dispatchers.IO) {
                                 // Covers both AGE-SECRET-KEY-1… and AGE-SECRET-KEY-PQ-1…;
                                 // fromAgeSecretKey routes on the -PQ- marker.
-                                if (txt.startsWith("AGE-SECRET-KEY-", ignoreCase = true)) {
+                                if (YubiKeyStub.isStub(txt)) {
+                                    val stub = YubiKeyStub.parse(txt)
+                                    val pub = YubiKeyBroker.readPublicKey(stub)
+                                    StoredIdentity(
+                                        id = java.util.UUID.randomUUID().toString(),
+                                        name = name.trim().ifBlank { "YubiKey ${stub.serial}" },
+                                        type = StoredIdentityType.YUBIKEY_PIV,
+                                        publicKeyB64 = b64e(pub),
+                                        privateKeyB64 = b64e(stub.toBytes()),
+                                        createdAt = System.currentTimeMillis(),
+                                    )
+                                } else if (txt.startsWith("AGE-SECRET-KEY-", ignoreCase = true)) {
                                     IdentityImport.fromAgeSecretKey(txt, name)
                                 } else {
                                     IdentityImport.fromOpenSSHPem(txt, passphrase, name)

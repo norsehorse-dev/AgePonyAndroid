@@ -41,6 +41,8 @@ import com.agepony.app.vault.toAgeRecipient
 import com.agepony.core.crypto.Diceware
 import com.agepony.core.recipients.AgeRecipient
 import com.agepony.core.recipients.HybridRecipient
+import com.agepony.core.recipients.P256Recipient
+import com.agepony.core.recipients.TagRecipient
 import com.agepony.core.recipients.SSHEd25519Recipient
 import com.agepony.core.recipients.SSHRSARecipient
 import com.agepony.core.recipients.X25519Recipient
@@ -521,6 +523,15 @@ private fun toggle(set: MutableList<String>, id: String) {
 private fun parseAdHoc(raw: String): AdHocRecipient {
     val t = raw.trim()
     if (t.isEmpty()) throw IllegalArgumentException("Nothing to add.")
+    // Longer age1 prefixes first: they all share "age1".
+    if (TagRecipient.isTagRecipient(t)) {
+        val r = TagRecipient(t)
+        return AdHocRecipient(shorten(t), r, t)
+    }
+    if (t.startsWith("age1yubikey")) {
+        val r = P256Recipient(t)
+        return AdHocRecipient(shorten(t), r, t)
+    }
     // "age1pq" before "age1": post-quantum recipients share the "age1" prefix.
     if (t.startsWith("age1pq")) {
         val r = HybridRecipient(t)
@@ -539,7 +550,7 @@ private fun parseAdHoc(raw: String): AdHocRecipient {
                 AdHocRecipient("SSH RSA (one-time)", SSHRSARecipient(parsed), t)
         }
     }
-    throw IllegalArgumentException("Expected an age1… / age1pq… recipient or an ssh-ed25519 / ssh-rsa line.")
+    throw IllegalArgumentException("Expected an age1… / age1pq… / age1tag1… / age1yubikey1… recipient or an ssh-ed25519 / ssh-rsa line.")
 }
 
 private fun shorten(s: String): String =
@@ -553,6 +564,9 @@ private fun identityTypeLabel(t: StoredIdentityType): String = when (t) {
     StoredIdentityType.HARDWARE_KEY -> "Hardware Key (P-256)"
     StoredIdentityType.SK_ED25519 -> "Security Key (Ed25519)"
     StoredIdentityType.SK_ECDSA_P256 -> "Security Key (P-256)"
+    StoredIdentityType.HARDWARE_TAG -> "Hardware decryption key (P-256)"
+    StoredIdentityType.HARDWARE_TAG_PQ -> "Hardware decryption key, quantum-safe"
+    StoredIdentityType.YUBIKEY_PIV -> "YubiKey (PIV P-256)"
 }
 
 private fun recipientTypeLabel(t: StoredRecipientType): String = when (t) {
@@ -560,4 +574,7 @@ private fun recipientTypeLabel(t: StoredRecipientType): String = when (t) {
     StoredRecipientType.MLKEM768X25519 -> "Quantum-safe (ML-KEM-768 + X25519)"
     StoredRecipientType.SSH_ED25519 -> "SSH Ed25519"
     StoredRecipientType.SSH_RSA -> "SSH RSA"
+    StoredRecipientType.YUBIKEY_P256 -> "YubiKey (P-256)"
+    StoredRecipientType.TAG -> "Hardware key (age1tag)"
+    StoredRecipientType.TAG_PQ -> "Hardware key, quantum-safe (age1tagpq)"
 }

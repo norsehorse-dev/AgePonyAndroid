@@ -1,12 +1,14 @@
 package com.agepony.app.vault
 
 import com.agepony.core.recipients.HybridRecipient
+import com.agepony.core.recipients.P256Recipient
+import com.agepony.core.recipients.TagRecipient
 import com.agepony.core.recipients.X25519Recipient
 import com.agepony.core.ssh.OpenSSHPublicKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
+import com.agepony.app.network.HttpClientFactory
+import okhttp3.Request
 
 //
 // Android counterpart of iOS's RecipientImportService. Import paths funnel into
@@ -51,6 +53,41 @@ object RecipientImport {
             )
         }
 
+        // age v1.3 tag recipients (hardware keys: age1tag1 / age1tagpq1). Before "age1".
+        if (TagRecipient.isTagRecipient(t)) {
+            val recipient = try {
+                TagRecipient(t)
+            } catch (e: Exception) {
+                throw RecipientImportException("Not a valid age hardware-key recipient (${e.message}).")
+            }
+            return RecipientCandidate(
+                type = if (recipient.hybrid) StoredRecipientType.TAG_PQ else StoredRecipientType.TAG,
+                publicKeyB64 = b64e(recipient.publicKey),
+                sshComment = null,
+                defaultName = shortAgeName(t),
+                source = StoredRecipientSource.PASTE_AGE,
+                sourceMetadata = null,
+            )
+        }
+
+        // age-plugin-yubikey recipients: age1yubikey1... Must be checked before the
+        // generic "age1" branch, since they also start with "age1".
+        if (t.startsWith("age1yubikey")) {
+            val recipient = try {
+                P256Recipient(t)
+            } catch (e: Exception) {
+                throw RecipientImportException("Not a valid YubiKey recipient (${e.message}).")
+            }
+            return RecipientCandidate(
+                type = StoredRecipientType.YUBIKEY_P256,
+                publicKeyB64 = b64e(recipient.compressedPublicKey),
+                sshComment = null,
+                defaultName = shortAgeName(t),
+                source = StoredRecipientSource.PASTE_AGE,
+                sourceMetadata = null,
+            )
+        }
+
         if (t.startsWith("age1")) {
             val recipient = try {
                 X25519Recipient(t)
@@ -72,12 +109,15 @@ object RecipientImport {
         }
 
         throw RecipientImportException(
-            "Expected an age1… / age1pq… recipient or an ssh-ed25519 / ssh-rsa line."
+            "Expected an age1… / age1pq… / age1tag1… / age1yubikey1… recipient or an ssh-ed25519 / ssh-rsa line."
         )
     }
 
     /** Fetch https://github.com/<username>.keys and return every parsable recipient. */
-    suspend fun fetchFromGitHub(username: String): List<RecipientCandidate> =
+    suspend fun fetchFromGitHub(
+        username: String,
+        proxyConfig: ProxyConfig = ProxyConfig.DIRECT,
+    ): List<RecipientCandidate> =
         withContext(Dispatchers.IO) {
             val user = username.trim()
             if (user.isEmpty() || !user.all { it.isLetterOrDigit() || it == '-' || it == '_' }) {
@@ -86,7 +126,7 @@ object RecipientImport {
                 )
             }
 
-            val text = httpGet("https://github.com/$user.keys")
+            val text = httpGet("https://github.com/$user.keys", proxyConfig)
             val metadata = "github.com/$user"
             val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
 
@@ -155,25 +195,27 @@ object RecipientImport {
         return "${s.take(10)}…${s.takeLast(4)}"
     }
 
-    private fun httpGet(urlString: String): String {
-        val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15000
-            readTimeout = 15000
-            requestMethod = "GET"
-            instanceFollowRedirects = true
-        }
+    private fun httpGet(urlString: String, proxyConfig: ProxyConfig): String {
         try {
-            val code = conn.responseCode
-            if (code != HttpURLConnection.HTTP_OK) {
-                throw RecipientImportException("GitHub returned HTTP $code.")
+            // Building the client applies the proxy; a dead or incomplete proxy
+            // throws here, so the fetch fails rather than silently going direct.
+            val client = HttpClientFactory.client(proxyConfig)
+            val request = Request.Builder()
+                .url(urlString)
+                .header("Accept", "text/plain")
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw RecipientImportException("GitHub returned HTTP ${response.code}.")
+                }
+                return response.body?.string()
+                    ?: throw RecipientImportException("GitHub returned an empty response.")
             }
-            return conn.inputStream.bufferedReader().use { it.readText() }
         } catch (e: RecipientImportException) {
             throw e
         } catch (e: Exception) {
             throw RecipientImportException("Network error: ${e.message}")
-        } finally {
-            conn.disconnect()
         }
     }
 }

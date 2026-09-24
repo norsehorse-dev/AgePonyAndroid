@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">AgePony</string>
+    <string name="share_label">AgePony</string>
 </resources>

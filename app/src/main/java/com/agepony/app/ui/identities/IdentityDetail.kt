@@ -35,6 +35,9 @@ import androidx.fragment.app.FragmentActivity
 import com.agepony.app.security.BiometricGate
 import com.agepony.app.security.BiometricGateException
 import com.agepony.app.security.PasswordVault
+import com.agepony.app.ui.portability.PaperBackupScreen
+import com.agepony.app.vault.KeyPortability
+import com.agepony.app.vault.isDeviceBound
 import com.agepony.app.ui.components.KeyBlock
 import com.agepony.app.ui.components.QrImage
 import com.agepony.app.ui.components.PostQuantumBadge
@@ -64,6 +67,11 @@ fun IdentityDetail(
     onBack: () -> Unit,
 ) {
     val identity = vault.identities.firstOrNull { it.id == identityId }
+    var paperBackup by remember(identityId) { mutableStateOf(false) }
+    if (paperBackup && identity != null) {
+        PaperBackupScreen(vault = vault, identity = identity, onBack = { paperBackup = false }, modifier = modifier)
+        return
+    }
 
     val activity = LocalContext.current as FragmentActivity
     val scope = rememberCoroutineScope()
@@ -207,6 +215,20 @@ fun IdentityDetail(
                 )
             }
 
+            if (KeyPortability.isPaperBackable(identity)) {
+                OutlinedButton(onClick = { paperBackup = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Text("Paper backup…")
+                }
+            }
+            if (identity.type.isDeviceBound) {
+                Text(
+                    "This key lives in this device's secure hardware. It can't be exported, moved, or backed up.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             if (activeId != identity.id) {
@@ -319,6 +341,9 @@ private fun typeLabel(t: StoredIdentityType): String = when (t) {
     StoredIdentityType.HARDWARE_KEY -> "Hardware Key (P-256)"
     StoredIdentityType.SK_ED25519 -> "Security Key (Ed25519)"
     StoredIdentityType.SK_ECDSA_P256 -> "Security Key (P-256)"
+    StoredIdentityType.HARDWARE_TAG -> "Hardware decryption key (P-256)"
+    StoredIdentityType.HARDWARE_TAG_PQ -> "Hardware decryption key, quantum-safe"
+    StoredIdentityType.YUBIKEY_PIV -> "YubiKey (PIV P-256)"
 }
 
 /**

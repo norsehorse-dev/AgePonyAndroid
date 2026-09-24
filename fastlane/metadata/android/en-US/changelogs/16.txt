@@ -1,0 +1,9 @@
+AgePony 5.0.0
+
+- Share sheet and text-selection support
+- Hardware decryption keys (age1tag / age1tagpq) in secure hardware
+- Decrypt with a YubiKey over NFC
+- Move keys to another phone, or back them up on paper
+- Passphrase work from the lock screen without unlocking
+- Signed files decrypt with plain age
+- Fix: crash on high work factor passphrase files

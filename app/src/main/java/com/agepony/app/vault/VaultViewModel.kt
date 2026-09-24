@@ -30,7 +30,9 @@ import kotlinx.coroutines.withContext
 //
 class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
-    val vault = Vault(app)
+    // One Vault per process: the share-sheet activity and the main one must never hold two
+    // copies of the vault in memory, or a save from one could overwrite the other's changes.
+    val vault = SharedVault.get(app)
 
     var provisioned by mutableStateOf(vault.isProvisioned())
         private set
@@ -606,7 +608,6 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     // for a short window after backgrounding and locks only if the app stays away
     // past it, so a quick switch (copy a recipient, paste it elsewhere) keeps state.
     private var pendingLockJob: Job? = null
-    private val autoLockGraceMillis = 30_000L
 
     /**
      * App went to the background. Schedule a lock after the grace period, unless an
@@ -616,8 +617,9 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     fun onEnterBackground() {
         if (vault.autoLockSuppressed) return
         pendingLockJob?.cancel()
+        val graceMillis = vault.autoLockGraceSeconds.toLong() * 1000L
         pendingLockJob = viewModelScope.launch {
-            delay(autoLockGraceMillis)
+            delay(graceMillis)
             vault.lock()
             pendingLockJob = null
         }

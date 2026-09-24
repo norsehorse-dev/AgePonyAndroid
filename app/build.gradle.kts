@@ -26,8 +26,8 @@ android {
         applicationId = "com.agepony.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 14
-        versionName = "4.1.1"
+        versionCode = 16
+        versionName = "5.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -126,6 +126,7 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.zxing.core)
+    implementation(libs.okhttp)
     // Google Play In-App Review — proprietary, so it's scoped to the `play` flavor only
     // and never enters the `foss` (F-Droid) build.
     "playImplementation"(libs.play.review)

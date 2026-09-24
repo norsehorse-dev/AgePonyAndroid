@@ -38,6 +38,8 @@ import com.agepony.core.Age
 import com.agepony.core.Armor
 import com.agepony.core.Stanza
 import com.agepony.core.recipients.AgeIdentity
+import com.agepony.core.recipients.TagIdentity
+import com.agepony.core.signing.SignatureStanza
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -242,7 +244,14 @@ private fun inspect(context: Context, uri: Uri, identities: List<AgeIdentity>): 
     val stanzas = parsed.stanzas.map { describe(it) }
     // An identity that can unwrap any stanza can open the file. scrypt is excluded because it
     // needs the passphrase, which we are deliberately not asking for here.
-    val opens = identities.any { id -> parsed.stanzas.any { runCatching { id.unwrap(it) }.getOrNull() != null } }
+    // Hardware tag identities are matched on their tag alone, so inspecting never asks the
+    // secure hardware (or the user) for anything.
+    val opens = identities.any { id ->
+        parsed.stanzas.any { stanza ->
+            if (id is TagIdentity) id.matches(stanza)
+            else runCatching { id.unwrap(stanza) }.getOrNull() != null
+        }
+    }
     val passphraseOnly = parsed.stanzas.size == 1 && parsed.stanzas.first().type == "scrypt"
 
     return InspectResult(
@@ -288,6 +297,26 @@ private fun describe(stanza: Stanza): StanzaInfo = when (stanza.type) {
     )
     "ssh-rsa" -> StanzaInfo(
         title = "SSH RSA recipient",
+        detail = "key tag " + shortArg(stanza.args.getOrNull(0)),
+        postQuantum = false,
+    )
+    "p256tag" -> StanzaInfo(
+        title = "Hardware-key recipient (age1tag, P-256)",
+        detail = "key tag " + shortArg(stanza.args.getOrNull(0)),
+        postQuantum = false,
+    )
+    "mlkem768p256tag" -> StanzaInfo(
+        title = "Post-quantum hardware-key recipient (age1tagpq, ML-KEM-768 with P-256)",
+        detail = "key tag " + shortArg(stanza.args.getOrNull(0)),
+        postQuantum = true,
+    )
+    SignatureStanza.TYPE -> StanzaInfo(
+        title = "AgePony signature (encrypted)",
+        detail = "Only a recipient can read who signed. Plain age ignores this stanza.",
+        postQuantum = false,
+    )
+    "piv-p256" -> StanzaInfo(
+        title = "YubiKey recipient (PIV P-256)",
         detail = "key tag " + shortArg(stanza.args.getOrNull(0)),
         postQuantum = false,
     )

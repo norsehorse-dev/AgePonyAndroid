@@ -41,7 +41,12 @@ import com.agepony.app.review.ReviewPrompt
 import com.agepony.app.security.BiometricGate
 import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.LockMode
+import com.agepony.app.vault.ProxyConfig
+import com.agepony.app.vault.ProxyType
 import com.agepony.app.vault.VaultViewModel
+import com.agepony.app.ui.portability.PaperRestoreScreen
+import com.agepony.app.ui.portability.ReceiveKeysScreen
+import com.agepony.app.ui.portability.SendKeysScreen
 
 //
 // Settings tab (expanded in Phase 2d-3a). Android counterpart of iOS's
@@ -49,6 +54,9 @@ import com.agepony.app.vault.VaultViewModel
 // about, and a guarded reset. The lock-mode selector picks the Keystore/OS gate
 // (Off / device credential / biometric) via VaultViewModel.applyLockMode.
 //
+private enum class SettingsSub { HELP, SECURITY, LICENSES, TRASH, SEND_KEYS, RECEIVE_KEYS, PAPER_RESTORE }
+private enum class ProxyMode { OFF, ORBOT, CUSTOM }
+
 @Composable
 fun SettingsScreen(
     vm: VaultViewModel,
@@ -90,6 +98,18 @@ fun SettingsScreen(
             putExtra(Intent.EXTRA_TEXT, body)
         }
         runCatching { context.startActivity(intent) }
+    }
+
+    var subScreen by remember { mutableStateOf<SettingsSub?>(null) }
+    when (subScreen) {
+        SettingsSub.HELP -> { HelpScreen(onBack = { subScreen = null }, modifier = modifier); return }
+        SettingsSub.SECURITY -> { SecurityInfoScreen(onBack = { subScreen = null }, modifier = modifier); return }
+        SettingsSub.LICENSES -> { LicensesScreen(onBack = { subScreen = null }, modifier = modifier); return }
+        SettingsSub.TRASH -> { RecentlyDeletedScreen(vault = vault, onBack = { subScreen = null }, modifier = modifier); return }
+        SettingsSub.SEND_KEYS -> { SendKeysScreen(vault = vault, onBack = { subScreen = null }, modifier = modifier); return }
+        SettingsSub.RECEIVE_KEYS -> { ReceiveKeysScreen(vault = vault, onBack = { subScreen = null }, modifier = modifier); return }
+        SettingsSub.PAPER_RESTORE -> { PaperRestoreScreen(vault = vault, onBack = { subScreen = null }, modifier = modifier); return }
+        null -> {}
     }
 
     Column(
@@ -290,6 +310,181 @@ fun SettingsScreen(
 
         HorizontalDivider()
 
+        // Auto-lock
+        SectionLabel("Auto-lock")
+        var graceMenuOpen by remember { mutableStateOf(false) }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text("Lock after leaving the app", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "How long AgePony waits after you switch away before locking the vault. Shorter is safer; longer keeps your place during a quick app switch.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Box {
+                TextButton(onClick = { graceMenuOpen = true }) {
+                    Text(autoLockLabel(vault.autoLockGraceSeconds))
+                }
+                DropdownMenu(expanded = graceMenuOpen, onDismissRequest = { graceMenuOpen = false }) {
+                    listOf(0, 15, 30, 60, 300).forEach { seconds ->
+                        DropdownMenuItem(
+                            text = { Text(autoLockLabel(seconds)) },
+                            onClick = {
+                                vault.autoLockGraceSeconds = seconds
+                                graceMenuOpen = false
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        HorizontalDivider()
+
+        // Network
+        SectionLabel("Network")
+        val proxyCtx = LocalContext.current
+        val orbotInstalled = remember { ProxyConfig.isOrbotInstalled(proxyCtx) }
+
+        var proxyMode by remember {
+            mutableStateOf(
+                when {
+                    vault.proxyType == ProxyType.NONE -> ProxyMode.OFF
+                    vault.proxyType == ProxyType.SOCKS &&
+                        vault.proxyHost.trim() == ProxyConfig.ORBOT_HOST &&
+                        vault.proxyPort == ProxyConfig.ORBOT_PORT -> ProxyMode.ORBOT
+                    else -> ProxyMode.CUSTOM
+                }
+            )
+        }
+        var customIsSocks by remember { mutableStateOf(vault.proxyType != ProxyType.HTTP) }
+        var proxyHostField by remember { mutableStateOf(vault.proxyHost) }
+        var proxyPortField by remember {
+            mutableStateOf(if (vault.proxyPort > 0) vault.proxyPort.toString() else "")
+        }
+        var proxyUserField by remember { mutableStateOf(vault.proxyUsername) }
+        var proxyPassField by remember { mutableStateOf(vault.proxyPassword) }
+
+        Text(
+            "Route the one network call, the GitHub key fetch, through a proxy. Everything else in AgePony is already offline.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        LockModeRow(
+            selected = proxyMode == ProxyMode.OFF,
+            title = "Off",
+            subtitle = "Direct connection (default).",
+            enabled = true,
+        ) {
+            proxyMode = ProxyMode.OFF
+            vault.proxyType = ProxyType.NONE
+        }
+        LockModeRow(
+            selected = proxyMode == ProxyMode.ORBOT,
+            title = "Orbot (Tor)",
+            subtitle = "SOCKS5 to 127.0.0.1:9050.",
+            enabled = true,
+        ) {
+            proxyMode = ProxyMode.ORBOT
+            proxyHostField = ProxyConfig.ORBOT_HOST
+            proxyPortField = ProxyConfig.ORBOT_PORT.toString()
+            vault.proxyType = ProxyType.SOCKS
+            vault.proxyHost = ProxyConfig.ORBOT_HOST
+            vault.proxyPort = ProxyConfig.ORBOT_PORT
+        }
+        LockModeRow(
+            selected = proxyMode == ProxyMode.CUSTOM,
+            title = "Custom",
+            subtitle = "Your own SOCKS5 or HTTP proxy.",
+            enabled = true,
+        ) {
+            proxyMode = ProxyMode.CUSTOM
+            vault.proxyType = if (customIsSocks) ProxyType.SOCKS else ProxyType.HTTP
+            vault.proxyHost = proxyHostField
+            vault.proxyPort = proxyPortField.toIntOrNull() ?: 0
+        }
+
+        if (proxyMode == ProxyMode.ORBOT && !orbotInstalled) {
+            Text(
+                "Orbot does not appear to be installed. Install it from Google Play or F-Droid, or choose Custom to point at another Tor SOCKS port.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        if (proxyMode == ProxyMode.CUSTOM) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(
+                    selected = customIsSocks,
+                    onClick = { customIsSocks = true; vault.proxyType = ProxyType.SOCKS },
+                )
+                Text("SOCKS5 (Tor)")
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(
+                    selected = !customIsSocks,
+                    onClick = { customIsSocks = false; vault.proxyType = ProxyType.HTTP },
+                )
+                Text("HTTP")
+            }
+            OutlinedTextField(
+                value = proxyHostField,
+                onValueChange = { proxyHostField = it; vault.proxyHost = it },
+                label = { Text("Proxy host") },
+                placeholder = { Text("127.0.0.1") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = proxyPortField,
+                onValueChange = { v ->
+                    val f = v.filter { ch -> ch.isDigit() }.take(5)
+                    proxyPortField = f
+                    vault.proxyPort = f.toIntOrNull() ?: 0
+                },
+                label = { Text("Port") },
+                placeholder = { Text("9050") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        if (proxyMode != ProxyMode.OFF) {
+            OutlinedTextField(
+                value = proxyUserField,
+                onValueChange = { proxyUserField = it; vault.proxyUsername = it },
+                label = { Text("Proxy username (optional)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = proxyPassField,
+                onValueChange = { proxyPassField = it; vault.proxyPassword = it },
+                label = { Text("Proxy password (optional)") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "For Tor/Orbot, a username and password put AgePony's traffic on its own circuit (stream isolation). For a real proxy they are ordinary credentials. Leave blank for none.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "If the proxy is unreachable, the key fetch fails rather than falling back to a direct connection.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        HorizontalDivider()
+
         // Active identity
         SectionLabel("Active identity")
         if (vault.identities.isEmpty()) {
@@ -334,6 +529,26 @@ fun SettingsScreen(
 
         HorizontalDivider()
 
+        // Keys on other devices (5.0.0)
+        SectionLabel("Move and back up keys")
+        OutlinedButton(onClick = { subScreen = SettingsSub.SEND_KEYS }, modifier = Modifier.fillMaxWidth()) {
+            Text("Send keys to another device")
+        }
+        OutlinedButton(onClick = { subScreen = SettingsSub.RECEIVE_KEYS }, modifier = Modifier.fillMaxWidth()) {
+            Text("Receive keys from another device")
+        }
+        OutlinedButton(onClick = { subScreen = SettingsSub.PAPER_RESTORE }, modifier = Modifier.fillMaxWidth()) {
+            Text("Restore from a paper backup")
+        }
+        Text(
+            "To make a paper backup, open an identity on the Identities tab. Hardware keys stay on this " +
+                "device and can't be moved or backed up.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        HorizontalDivider()
+
         OutlinedButton(onClick = { vm.lock() }, modifier = Modifier.fillMaxWidth()) { Text("Lock vault now") }
 
         if (vm.error != null) {
@@ -348,7 +563,14 @@ fun SettingsScreen(
         LinkRow("Website") { openUrl("https://agepony.com") }
         LinkRow("Source code") { openUrl("https://github.com/norsehorse-dev/AgePonyAndroid") }
         LinkRow("age spec") { openUrl("https://age-encryption.org/v1") }
+        LinkRow("Open-source licenses") { subScreen = SettingsSub.LICENSES }
         AboutRow("Made by", "NorseHorse")
+
+        HorizontalDivider()
+
+        // AgePony for Desktop — the same product on the desktop, not a sibling
+        // app, so it sits above the More-from list. Mirrors PGPony's desktop promo.
+        MoreRow("AgePony for Desktop", "age encryption for macOS, Linux and Windows") { openUrl("https://agepony.com/desktop") }
 
         HorizontalDivider()
 
@@ -358,17 +580,21 @@ fun SettingsScreen(
         // in the foss and play flavors.
         SectionLabel("More from NorseHorse")
         MoreRow("All Pony apps", "The whole family at pony.norsehor.se") { openUrl("https://pony.norsehor.se") }
+        MoreRow("PGPony", "OpenPGP encryption for messages and files") { openUrl("https://pgpony.app") }
         MoreRow("QuorumPony", "Split a secret into cards. Any few rebuild it.") { openUrl("https://quorumpony.com") }
         MoreRow("CarrierPony", "Private messaging and file transfer, sealed end to end") { openUrl("https://carrierpony.com") }
         MoreRow("BurnPony", "Send a secret. Encrypted on your phone, burned after reading") { openUrl("https://burnpony.app") }
         MoreRow("VaultPony", "VeraCrypt-compatible encrypted vaults, entirely on your device") { openUrl("https://vaultpony.app") }
         MoreRow("PassPony", "Your pass and passage store, in your pocket") { openUrl("https://passpony.app") }
         MoreRow("RelayPony", "Encrypted file transfer, phone to phone") { openUrl("https://relaypony.app") }
+        MoreRow("ScrubPony", "Strip identifying metadata from images. No pixel moves.") { openUrl("https://scrubpony.app") }
 
         HorizontalDivider()
 
         // Help & feedback
         SectionLabel("Help & feedback")
+        ActionRow(label = "Help & FAQ", trailing = "Open ↗", onClick = { subScreen = SettingsSub.HELP })
+        ActionRow(label = "How AgePony protects your files", trailing = "Open ↗", onClick = { subScreen = SettingsSub.SECURITY })
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -403,6 +629,13 @@ fun SettingsScreen(
         ActionRow(label = "Send feedback", trailing = "Email ↗", onClick = { sendFeedback() })
         Text(
             "Found a bug or have an idea? This opens an email to NorseHorse with your app and device details filled in.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        ActionRow(label = "Recently deleted", trailing = "Open ↗", onClick = { subScreen = SettingsSub.TRASH })
+        Text(
+            "Restore an identity or recipient you deleted, for up to 30 days.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -538,6 +771,13 @@ private fun SetSecretDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+private fun autoLockLabel(seconds: Int): String = when (seconds) {
+    0 -> "Immediately"
+    60 -> "1 minute"
+    300 -> "5 minutes"
+    else -> "$seconds seconds"
 }
 
 @Composable

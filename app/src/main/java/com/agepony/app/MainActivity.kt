@@ -6,6 +6,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.security.ClipboardGuard
+import com.agepony.app.security.keystore.HardwareAuthBroker
+import com.agepony.app.security.piv.YubiKeyBroker
+import com.agepony.app.ui.security.YubiKeyPromptHost
 import com.agepony.app.ui.VaultGate
 import com.agepony.app.ui.theme.AgePonyTheme
 import com.agepony.app.vault.VaultViewModel
@@ -13,6 +16,18 @@ import com.agepony.app.vault.VaultViewModel
 class MainActivity : FragmentActivity() {
 
     private val vaultViewModel: VaultViewModel by viewModels()
+
+    override fun onResume() {
+        super.onResume()
+        HardwareAuthBroker.attach(this)
+        YubiKeyBroker.attach(this)
+    }
+
+    override fun onPause() {
+        HardwareAuthBroker.detach(this)
+        YubiKeyBroker.detach(this)
+        super.onPause()
+    }
 
     override fun onStart() {
         super.onStart()
@@ -32,6 +47,7 @@ class MainActivity : FragmentActivity() {
         setContent {
             AgePonyTheme {
                 VaultGate(vaultViewModel)
+                YubiKeyPromptHost()
             }
         }
     }

@@ -1,12 +1,14 @@
 package com.agepony.app.vault
 
 import com.agepony.core.Age
+import com.agepony.core.AgeHeader
 import com.agepony.core.Armor
 import com.agepony.core.crypto.Scrypt
 import com.agepony.core.recipients.AgeIdentity
 import com.agepony.core.recipients.AgeRecipient
 import com.agepony.core.recipients.ScryptIdentity
 import com.agepony.core.recipients.ScryptRecipient
+import com.agepony.core.signing.SignatureStanza
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PushbackInputStream
@@ -38,11 +40,27 @@ class WrongPassphraseException : Exception("Wrong passphrase, or this file isn't
  * scrypt would need more memory than this device has free. Raised before any work starts, so the
  * user gets an accurate explanation instead of an OutOfMemoryError halfway through a file.
  */
-class ScryptMemoryException(val workFactor: Int, val needed: Long, val available: Long) : Exception(
-    "Deriving a key at work factor 2^" + workFactor + " needs about " + (needed shr 20) +
-        " MB, and only about " + (available shr 20) + " MB is free on this device. Lower the " +
-        "passphrase work factor in Settings, or encrypt to a recipient key instead."
-)
+class ScryptMemoryException(
+    val workFactor: Int,
+    val needed: Long,
+    val available: Long,
+    val whileDecrypting: Boolean = false,
+) : Exception(scryptMemoryMessage(needed, available, workFactor, whileDecrypting))
+
+private fun scryptMemoryMessage(needed: Long, available: Long, workFactor: Int, whileDecrypting: Boolean): String {
+    val needMb = needed shr 20
+    val freeMb = available shr 20
+    return if (whileDecrypting) {
+        "Opening this file needs about " + needMb + " MB to derive its passphrase key, and only " +
+            "about " + freeMb + " MB is free on this device. The work factor was set when the file " +
+            "was made (some tools raise it on fast machines), so if you control the original, " +
+            "re-encrypt it at a lower work factor."
+    } else {
+        "Deriving a key at work factor 2^" + workFactor + " needs about " + needMb +
+            " MB, and only about " + freeMb + " MB is free on this device. Lower the " +
+            "passphrase work factor in Settings, or encrypt to a recipient key instead."
+    }
+}
 
 object FileEncryptor {
 
@@ -69,7 +87,62 @@ object FileEncryptor {
 
     /** Whether scrypt at [workFactor] should fit in what is left, with headroom to spare. */
     fun scryptFitsInMemory(workFactor: Int): Boolean =
-        scryptMemoryBytes(workFactor) + SCRYPT_HEADROOM <= freeHeapBytes()
+        scryptFitsIn(workFactor, freeHeapBytes())
+
+    /** Pure form of [scryptFitsInMemory], taking the free-byte figure so it can be tested. */
+    fun scryptFitsIn(workFactor: Int, freeBytes: Long): Boolean =
+        scryptMemoryBytes(workFactor) + SCRYPT_HEADROOM <= freeBytes
+
+    /** Room to read a header while deciding whether a passphrase decrypt can fit. */
+    private const val HEADER_PEEK_LIMIT = 1024 * 1024
+
+    /**
+     * The scrypt work factor a passphrase-encrypted file will demand on decrypt, read from the
+     * header without deriving anything, or null if the header carries no scrypt stanza.
+     */
+    fun scryptWorkFactorOf(binaryHeader: ByteArray): Int? {
+        val header = try { AgeHeader.parse(binaryHeader) } catch (_: Exception) { return null }
+        return header.stanzas.firstOrNull { it.type == "scrypt" }?.args?.getOrNull(1)?.toIntOrNull()
+    }
+
+    /**
+     * Refuse a passphrase decrypt before any scrypt work starts when the file's work factor needs
+     * more memory than the device has free. The work factor is the encryptor's choice, baked into
+     * the file (rage auto-tunes it up on fast desktops), so a file made elsewhere can legitimately
+     * ask for more than a phone can give. Throwing here, rather than letting scrypt attempt the
+     * allocation and take the process down with it, is the whole point.
+     */
+    fun ensurePassphraseFileFits(binaryHeader: ByteArray) {
+        val factor = scryptWorkFactorOf(binaryHeader) ?: return
+        if (!scryptFitsInMemory(factor)) {
+            throw ScryptMemoryException(
+                factor, scryptMemoryBytes(factor), freeHeapBytes(), whileDecrypting = true,
+            )
+        }
+    }
+
+    /**
+     * Streaming counterpart: peek the header of [binary] (already de-armored age), apply the same
+     * guard, and hand back a stream still positioned at the start for the real decrypt. Only the
+     * small header is read, so the payload is never buffered.
+     */
+    fun guardedPassphraseSource(binary: InputStream): InputStream {
+        val buffered = java.io.BufferedInputStream(binary)
+        buffered.mark(HEADER_PEEK_LIMIT)
+        val factor = try {
+            Age.parseHeaderStream(buffered).stanzas
+                .firstOrNull { it.type == "scrypt" }?.args?.getOrNull(1)?.toIntOrNull()
+        } catch (_: Exception) {
+            null
+        }
+        buffered.reset()
+        if (factor != null && !scryptFitsInMemory(factor)) {
+            throw ScryptMemoryException(
+                factor, scryptMemoryBytes(factor), freeHeapBytes(), whileDecrypting = true,
+            )
+        }
+        return buffered
+    }
 
     /**
      * Encrypt [plaintext] to [recipients] (or, when [passphrase] is non-empty,
@@ -127,6 +200,30 @@ object FileEncryptor {
     /** Suggested output name for an encrypt: `secrets.txt` -> `secrets.txt.age`. */
     fun encryptedName(inputName: String): String = "$inputName.age"
 
+    /**
+     * Encrypt [plaintext] to public-key [recipients] and attach [signatureArmored] (an armored
+     * SSHSIG over the plaintext) as an encrypted agepony.com/sig header stanza. The result is a
+     * real age file: plain age returns the bare plaintext, and only a recipient can read or check
+     * the signature. Not for passphrase encryption, where the scrypt stanza must stand alone, so
+     * that path keeps the SignedBundle wrapper.
+     */
+    fun encryptSigned(
+        plaintext: ByteArray,
+        recipients: List<AgeRecipient>,
+        signatureArmored: String,
+        armor: Boolean,
+    ): ByteArray {
+        if (recipients.isEmpty()) throw FileEncryptorException("No recipients selected.")
+        val ciphertext = try {
+            Age.encrypt(plaintext, recipients) { fileKey ->
+                listOf(SignatureStanza.build(fileKey, signatureArmored))
+            }
+        } catch (e: Exception) {
+            throw FileEncryptorException("Encrypt failed: ${e.message}")
+        }
+        return if (armor) Armor.encode(ciphertext).toByteArray(Charsets.UTF_8) else ciphertext
+    }
+
     // ---- Decrypt ----
 
     /** True if [raw] is ASCII-armored age (starts with the BEGIN marker). */
@@ -183,6 +280,7 @@ object FileEncryptor {
 
     /** Decrypt [binary] with a passphrase (scrypt). Throws [WrongPassphraseException] on mismatch. */
     fun decryptWithPassphrase(binary: ByteArray, passphrase: String): ByteArray {
+        ensurePassphraseFileFits(binary)
         return try {
             Age.decrypt(binary, listOf(ScryptIdentity(passphrase)))
         } catch (e: Age.NoMatchingIdentityException) {
@@ -219,8 +317,9 @@ object FileEncryptor {
         passphrase: String,
         out: OutputStream,
     ) {
+        val guarded = guardedPassphraseSource(binarySource(ciphertext, armored))
         try {
-            Age.decryptStream(binarySource(ciphertext, armored), listOf(ScryptIdentity(passphrase)), out)
+            Age.decryptStream(guarded, listOf(ScryptIdentity(passphrase)), out)
         } catch (e: Age.NoMatchingIdentityException) {
             throw WrongPassphraseException()
         } catch (e: Exception) {
@@ -240,6 +339,30 @@ object FileEncryptor {
             name = name.dropLast(4)
         }
         return if (name == inputName) "$inputName.decrypted" else name
+    }
+
+    /** True if [binary] (plain, de-armored age) carries an agepony.com/sig stanza in its header. */
+    fun headerHasSignatureStanza(binary: InputStream): Boolean =
+        try {
+            SignatureStanza.find(Age.parseHeaderStream(java.io.BufferedInputStream(binary)).stanzas) != null
+        } catch (_: Exception) {
+            false
+        }
+
+    /**
+     * Decrypt [binary] with [identities] and recover the agepony.com/sig signature if present.
+     * Buffered: a signed file's signature lives in the header, so this serves the (small) signed
+     * documents AgePony produces, not a streaming large-file decrypt.
+     */
+    fun decryptSignedBytes(binary: ByteArray, identities: List<AgeIdentity>): Age.DecryptedWithSignature {
+        if (identities.isEmpty()) throw NoMatchingVaultIdentityException()
+        return try {
+            Age.decryptAndRecoverSignature(binary, identities)
+        } catch (e: Age.NoMatchingIdentityException) {
+            throw NoMatchingVaultIdentityException()
+        } catch (e: Exception) {
+            throw FileEncryptorException("Decrypt failed: ${e.message}")
+        }
     }
 
     // ---- Internals ----

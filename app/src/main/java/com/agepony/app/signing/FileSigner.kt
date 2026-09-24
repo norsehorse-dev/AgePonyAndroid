@@ -68,6 +68,9 @@ class FileSigner(
 
         StoredIdentityType.SK_ED25519, StoredIdentityType.SK_ECDSA_P256 ->
             SecurityKeyService(activity).signSSHSIG(identity, message, namespace, pin)
+
+        StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ, StoredIdentityType.YUBIKEY_PIV ->
+            throw FileSignerException("hardware decryption keys can't sign; choose an SSH key or hardware signing key")
     }
 
     /**
@@ -118,6 +121,9 @@ class FileSigner(
 
         StoredIdentityType.MLKEM768X25519 ->
             throw FileSignerException("quantum-safe identities are for encryption, not signing; choose an SSH key or hardware key")
+
+        StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ, StoredIdentityType.YUBIKEY_PIV ->
+            throw FileSignerException("hardware decryption keys can't sign; choose an SSH key or hardware signing key")
     }
 
     /**
