@@ -1,12 +1,17 @@
-AgePony 5.0.1 (security release)
+AgePony 5.0.1 (includes 5.0.0)
 
-- A duress PIN now makes the vault PIN-only
-- Vault locks after using the share sheet
-- No lock with a password now asks for it
-- Waits after wrong PINs, optional erase after 10
-- Screenshots and Recents blocked by default
-- Key transfer: confirm a code on both phones
-- Signatures bind recipients and file name
-- allowed_signers restrictions enforced
-- Failed decrypts leave no partial file
-- Stricter checks on crafted files
+New:
+- Share sheet and text-selection support
+- Hardware decryption keys (age1tag)
+- Decrypt with a YubiKey over NFC
+- Move keys to another phone or onto paper
+- Passphrase tools without unlocking
+- Signed files open with plain age
+
+Security:
+- A duress PIN makes the vault PIN-only
+- Vault locks properly after sharing
+- Waits after wrong PINs
+- Screenshots blocked by default
+- Transfer code on both phones
+- Stronger signatures, stricter file checks
