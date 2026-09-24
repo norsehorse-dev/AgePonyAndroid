@@ -34,7 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.security.BiometricGate
 import com.agepony.app.security.BiometricGateException
-import com.agepony.app.security.PasswordVault
+import com.agepony.app.security.PasswordCheck
+import com.agepony.app.security.UnlockAttempts
 import com.agepony.app.ui.portability.PaperBackupScreen
 import com.agepony.app.vault.KeyPortability
 import com.agepony.app.vault.isDeviceBound
@@ -164,9 +165,17 @@ fun IdentityDetail(
             }
 
             val exportable = identity.isPrivateKeyExportable()
+            // A revealed private key forces FLAG_SECURE even when screenshots are allowed. On
+            // dispose only clear it when the activity-wide setting allows screenshots, so leaving
+            // this screen never lifts the default protection (audit M-5).
             DisposableEffect(revealed) {
-                if (revealed) activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                onDispose { activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+                val forced = revealed
+                if (forced) activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                onDispose {
+                    if (forced && vault.allowScreenshots) {
+                        activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    }
+                }
             }
             if (revealed) {
                 KeyBlock(
@@ -309,13 +318,22 @@ fun IdentityDetail(
             onSubmit = { chars ->
                 showPasswordReauth = false
                 scope.launch {
-                    val ok = withContext(Dispatchers.IO) {
-                        val real = if (vault.passwordKeyBlobExists()) vault.readPasswordKeyBlob() else null
-                        real != null &&
-                            PasswordVault.tryUnlock(chars, real, null) is PasswordVault.Outcome.Real
+                    // Go through the vault's check so wrong guesses count toward the unlock
+                    // backoff and a lockout is honored here too.
+                    val result = try {
+                        withContext(Dispatchers.IO) { vault.verifyAppPassword(chars) }
+                    } catch (e: Exception) {
+                        revealError = e.message ?: "Couldn't check the $secretNoun."
+                        null
+                    } finally {
+                        chars.fill(' ')
                     }
-                    chars.fill(' ')
-                    if (ok) revealed = true else revealError = "Wrong $secretNoun."
+                    when (result) {
+                        PasswordCheck.Ok -> revealed = true
+                        PasswordCheck.Wrong -> revealError = "Wrong $secretNoun."
+                        is PasswordCheck.LockedOut -> revealError = UnlockAttempts.lockoutMessage(result.remainingMillis)
+                        null -> Unit
+                    }
                 }
             },
         )

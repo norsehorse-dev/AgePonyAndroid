@@ -1,8 +1,7 @@
 package com.agepony.core
 
-import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
-import java.io.InputStreamReader
 import java.io.OutputStream
 import java.util.Base64
 
@@ -14,7 +13,13 @@ import java.util.Base64
  * -----END AGE ENCRYPTED FILE-----
  * ```
  *
- * Encode/decode is symmetric. Decode is lenient about trailing whitespace and CRLF.
+ * Encode/decode is symmetric. Decode follows Go age's armor reader (audit L-1): every body line
+ * but the last is exactly 64 columns, the last is shorter (or a full line directly followed by
+ * the END marker), each line is strict padded base64 with zero trailing bits, CRLF is accepted,
+ * and only whitespace may come before BEGIN or after END. On top of Go it still tolerates
+ * whitespace around each line, which pasted text often picks up and which cannot change the
+ * decoded bytes. Lines are length-capped while reading, so input with no newlines cannot
+ * exhaust memory.
  *
  * [encode] / [decode] hold the whole input and the whole result in memory, which is fine for
  * notes and pasted text. [encodeStream] / [decodeStream] are the bounded-memory equivalents
@@ -33,7 +38,14 @@ object Armor {
      */
     private const val GROUP = LINE_WIDTH / 4 * 3   // 48
     private const val READ_CHUNK = GROUP * 1024    // 48 KiB per read
-    private const val FLUSH_AT = 64 * 1024         // decode pending base64 in 64 KiB batches
+    private const val FLUSH_AT = 64 * 1024         // hand decoded bytes back in ~64 KiB batches
+
+    /**
+     * Longest raw line the streaming reader buffers before giving up. Go age rejects any body
+     * line over 64 columns and more than 1 KiB of leading or trailing whitespace, so no input it
+     * accepts has a line anywhere near this long.
+     */
+    private const val MAX_RAW_LINE = 4096
 
     /** Bytes to sniff from the head of a file to recognize armor. */
     const val SNIFF_LEN = 64
@@ -55,17 +67,77 @@ object Armor {
     }
 
     fun decode(armored: String): ByteArray {
-        val normalized = armored.replace("\r\n", "\n").trim()
-        val lines = normalized.split('\n').map { it.trimEnd() }
-        if (lines.size < 2) throw ArmorException("armor too short")
-        if (lines.first() != BEGIN_MARKER) throw ArmorException("missing BEGIN marker")
-        if (lines.last() != END_MARKER) throw ArmorException("missing END marker")
-        val body = if (lines.size > 2) lines.subList(1, lines.size - 1).joinToString("") else ""
-        if (body.isEmpty()) return ByteArray(0)
-        return try {
-            Base64.getDecoder().decode(body)
-        } catch (e: IllegalArgumentException) {
-            throw ArmorException("invalid base64 in armor body: ${e.message}")
+        val out = ByteArrayOutputStream()
+        val parser = LineParser()
+        for (line in armored.split('\n')) parser.line(line, out)
+        parser.end()
+        return out.toByteArray()
+    }
+
+    /**
+     * The armor grammar, one line at a time, shared by [decode] and [DecodingSource] so both
+     * accept exactly the same inputs. Mirrors filippo.io/age/armor's reader.
+     */
+    private class LineParser {
+        private enum class State { BEFORE_BEGIN, BODY, NEED_END, AFTER_END }
+        private var state = State.BEFORE_BEGIN
+
+        /** Feed one line (without its '\n'); decoded bytes are appended to [out]. */
+        fun line(raw: String, out: ByteArrayOutputStream) {
+            val line = raw.trim()   // also drops the '\r' of a CRLF line ending
+            when (state) {
+                State.BEFORE_BEGIN -> {
+                    if (line.isEmpty()) return
+                    if (line != BEGIN_MARKER) throw ArmorException("missing BEGIN marker")
+                    state = State.BODY
+                }
+                State.BODY -> {
+                    if (line == END_MARKER) { state = State.AFTER_END; return }
+                    if (line == BEGIN_MARKER) throw ArmorException("unexpected second BEGIN marker")
+                    val bytes = decodeLine(line)
+                    out.write(bytes)
+                    // A short line ends the body; only the END marker may follow it.
+                    if (bytes.size < GROUP) state = State.NEED_END
+                }
+                State.NEED_END -> {
+                    if (line != END_MARKER) {
+                        throw ArmorException("armor body continues after a short line (lines must be $LINE_WIDTH columns)")
+                    }
+                    state = State.AFTER_END
+                }
+                State.AFTER_END -> {
+                    if (line.isNotEmpty()) throw ArmorException("unexpected content after END marker")
+                }
+            }
+        }
+
+        /** End of input. */
+        fun end() {
+            when (state) {
+                State.BEFORE_BEGIN -> throw ArmorException("missing BEGIN marker")
+                State.BODY, State.NEED_END -> throw ArmorException("missing END marker")
+                State.AFTER_END -> Unit
+            }
+        }
+
+        /**
+         * Strict padded base64 for one line, like Go's `base64.StdEncoding.Strict()`: at most
+         * 64 columns, padding required on a short final group, and zero trailing bits. A full
+         * 48-byte line has no padding or spare bits, so only a short line needs the
+         * re-encode comparison that catches non-canonical input.
+         */
+        private fun decodeLine(line: String): ByteArray {
+            if (line.length > LINE_WIDTH) throw ArmorException("armor line exceeds $LINE_WIDTH columns")
+            if (line.isEmpty()) return ByteArray(0)
+            val bytes = try {
+                Base64.getDecoder().decode(line)
+            } catch (e: IllegalArgumentException) {
+                throw ArmorException("invalid base64 in armor body: ${e.message}")
+            }
+            if (bytes.size < GROUP && Base64.getEncoder().encodeToString(bytes) != line) {
+                throw ArmorException("non-canonical base64 in armor body")
+            }
+            return bytes
         }
     }
 
@@ -176,19 +248,22 @@ object Armor {
 
     /**
      * An [InputStream] that reads armored text and yields the decoded binary, so an armored file
-     * can be fed straight to a binary reader without being decoded whole first. Accepts what
-     * [decode] accepts, including CRLF, trailing whitespace and blank lines around the markers.
+     * can be fed straight to a binary reader without being decoded whole first. Accepts exactly
+     * what [decode] accepts, including CRLF, whitespace around lines and blank lines around the
+     * markers. Each raw line is capped at [MAX_RAW_LINE] bytes while it is read (no unbounded
+     * readLine), so a newline-free multi-gigabyte input fails fast instead of filling memory.
      * [close] leaves the wrapped stream open.
      */
-    class DecodingSource(input: InputStream) : InputStream() {
-        private val reader = BufferedReader(InputStreamReader(input, Charsets.US_ASCII))
-        private val decoder = Base64.getDecoder()
-        private val pending = StringBuilder(FLUSH_AT + LINE_WIDTH)
+    class DecodingSource(private val input: InputStream) : InputStream() {
+        private val parser = LineParser()
+        private val inBuf = ByteArray(8192)
+        private var inPos = 0
+        private var inLim = 0
+        private var inEof = false
+        private val lineBuf = ByteArray(MAX_RAW_LINE)
+        private val decoded = ByteArrayOutputStream(FLUSH_AT + GROUP)
         private var buf = ByteArray(0)
         private var pos = 0
-        private var sawBegin = false
-        private var sawEnd = false
-        private var sawPadding = false
         private var done = false
 
         override fun read(): Int {
@@ -220,53 +295,43 @@ object Armor {
         }
 
         private fun nextChunk(): ByteArray {
+            decoded.reset()
             while (true) {
-                val raw = reader.readLine()
+                val raw = readRawLine()
                 if (raw == null) {
-                    if (!sawBegin) throw ArmorException("missing BEGIN marker")
-                    if (!sawEnd) throw ArmorException("missing END marker")
+                    // Reading continues past END so trailing junk is still rejected.
+                    parser.end()
                     done = true
-                    return decodePending(all = true)
+                    return decoded.toByteArray()
                 }
-                val line = raw.trim()
-
-                if (!sawBegin) {
-                    if (line.isEmpty()) continue
-                    if (line != BEGIN_MARKER) throw ArmorException("missing BEGIN marker")
-                    sawBegin = true
-                    continue
-                }
-
-                if (!sawEnd) {
-                    // Reading continues past END so trailing junk is still rejected, the way
-                    // decode() rejects it by requiring END to be the last line.
-                    if (line == END_MARKER) { sawEnd = true; continue }
-                    if (line == BEGIN_MARKER) throw ArmorException("unexpected second BEGIN marker")
-                    if (line.isEmpty()) continue
-                    if (sawPadding) throw ArmorException("base64 padding before the end of the body")
-                    pending.append(line)
-                    if (pending.length >= FLUSH_AT) {
-                        val chunk = decodePending(all = false)
-                        if (chunk.isNotEmpty()) return chunk
-                    }
-                    continue
-                }
-
-                if (line.isNotEmpty()) throw ArmorException("unexpected content after END marker")
+                parser.line(raw, decoded)
+                if (decoded.size() >= FLUSH_AT) return decoded.toByteArray()
             }
         }
 
-        private fun decodePending(all: Boolean): ByteArray {
-            val take = if (all) pending.length else pending.length - (pending.length % 4)
-            if (take == 0) return ByteArray(0)
-            val chunk = pending.substring(0, take)
-            pending.delete(0, take)
-            if (chunk.indexOf('=') >= 0) sawPadding = true
-            return try {
-                decoder.decode(chunk)
-            } catch (e: IllegalArgumentException) {
-                throw ArmorException("invalid base64 in armor body: ${e.message}")
+        /**
+         * The next line without its '\n', or null at end of input. Bytes map one to one onto
+         * chars (ISO-8859-1), so a non-ASCII byte survives to be rejected by the grammar.
+         */
+        private fun readRawLine(): String? {
+            var n = 0
+            var any = false
+            while (true) {
+                if (inPos >= inLim) {
+                    if (inEof) break
+                    val r = input.read(inBuf, 0, inBuf.size)
+                    if (r < 0) { inEof = true; break }
+                    inPos = 0
+                    inLim = r
+                    continue
+                }
+                val b = inBuf[inPos++]
+                any = true
+                if (b == NEWLINE.toByte()) return String(lineBuf, 0, n, Charsets.ISO_8859_1)
+                if (n == lineBuf.size) throw ArmorException("armor line longer than $MAX_RAW_LINE bytes")
+                lineBuf[n++] = b
             }
+            return if (any) String(lineBuf, 0, n, Charsets.ISO_8859_1) else null
         }
     }
 

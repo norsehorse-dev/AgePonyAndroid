@@ -11,6 +11,15 @@ import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+/** CTAP2 responses here are a few KiB at most; one extended APDU can carry 64 KiB. */
+private const val MAX_RESPONSE_BYTES = 64 * 1024
+
+/** 61xx GET RESPONSE rounds allowed for one command (256 x 256 bytes covers the cap). */
+private const val MAX_CHAINED_RESPONSES = 256
+
+/** How long 9100 keepalives may continue while the key waits for a touch. */
+private const val MAX_KEEPALIVE_NANOS = 120_000_000_000L
+
 /**
  * CTAP2-over-NFC transport. Drives an FIDO security key (YubiKey 5 NFC, Token2) using
  * NFC reader mode and ISO-DEP APDUs.
@@ -95,7 +104,15 @@ class SecurityKeyTransport(private val activity: FragmentActivity) {
             var (data, sw) = transceiveRetry(msg)
             val acc = ByteArrayOutputStream()
             acc.write(data)
+            // Bounds against a hostile or broken authenticator (audit L-11): a key that answers
+            // 9100 forever, chains 61xx forever, or streams an endless response must fail with an
+            // NfcException rather than hang the app or run it out of memory.
+            val keepaliveDeadline = System.nanoTime() + MAX_KEEPALIVE_NANOS
+            var chained = 0
             while (true) {
+                if (acc.size() > MAX_RESPONSE_BYTES) {
+                    throw NfcException("security key response is too large")
+                }
                 when {
                     sw == 0x9000 -> {
                         val resp = acc.toByteArray()
@@ -112,12 +129,18 @@ class SecurityKeyTransport(private val activity: FragmentActivity) {
                     }
                     sw == 0x9100 -> {
                         // keepalive: poll for the result
+                        if (System.nanoTime() - keepaliveDeadline > 0) {
+                            throw NfcException("security key did not answer in time")
+                        }
                         val poll = buildApdu(0x80, 0x11, 0x00, 0x00, ByteArray(0), le = 65536)
                         val r = transceiveRetry(poll); data = r.first; sw = r.second
                         acc.reset(); acc.write(data)
                     }
                     sw shr 8 == 0x61 -> {
                         // ISO chaining: GET RESPONSE for the remaining (sw and 0xff) bytes
+                        if (++chained > MAX_CHAINED_RESPONSES) {
+                            throw NfcException("security key kept chaining its response")
+                        }
                         val remaining = sw and 0xff
                         val get = byteArrayOf(0x00, 0xC0.toByte(), 0x00, 0x00, remaining.toByte())
                         val r = transceiveRetry(get); sw = r.second

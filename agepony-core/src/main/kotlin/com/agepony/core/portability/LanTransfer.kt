@@ -5,6 +5,7 @@ import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -85,6 +86,25 @@ object LanTransfer {
 
     // ---- receiver ----
 
+    /** HELLO with the right token must arrive within this long of connecting (audit AS-3). */
+    const val HANDSHAKE_DEADLINE_MS = 10_000L
+
+    /** Once the token checks out, the whole transfer must arrive within this long. */
+    const val TRANSFER_DEADLINE_MS = 120_000L
+
+    /** Connections served at once; the oldest one without a valid token makes room for a new one. */
+    const val MAX_CONNECTIONS = 4
+
+    private const val IDLE_READ_MS = 30_000L
+    private const val ACCEPT_POLL_MS = 200L
+
+    /**
+     * A listening socket for [receive] on an ephemeral port. Pass the Wi-Fi interface's address as
+     * [bindAddress] so the listener is not reachable over other interfaces (null binds them all).
+     */
+    fun openListener(bindAddress: InetAddress? = null, backlog: Int = 8): ServerSocket =
+        ServerSocket(0, backlog, bindAddress)
+
     /**
      * Wait on [server] until a sender presenting [token] delivers a transfer, and return its
      * bytes (the sealed age file). Connections with the wrong token, or that break the protocol,
@@ -92,37 +112,202 @@ object LanTransfer {
      * "accepted" once the receiver has actually taken the bytes (the app opens the transfer there).
      * Throws [SocketTimeoutException] if nothing valid arrives
      * within the server's SO_TIMEOUT.
+     *
+     * [accept] gets the exact sealed bytes; show [TransferCode.of] over them before importing, so
+     * the user can compare it with the code on the sender's screen (audit M-6).
+     *
+     * Each connection is served on its own thread, at most [MAX_CONNECTIONS] at once, and must
+     * present HELLO with the right token within [HANDSHAKE_DEADLINE_MS] of connecting (a total,
+     * not a per-read timeout), so a connection that trickles bytes, or never sends any, cannot hold
+     * the slot the real sender needs (audit AS-3). When all slots are taken, the oldest connection
+     * that has not yet shown the token is dropped for the newcomer. [accept] calls are serialized,
+     * and after one returns true every other connection is refused.
      */
     fun receive(
         server: ServerSocket,
         token: ByteArray,
         maxBytes: Int = MAX_BYTES,
         accept: (ByteArray) -> Boolean = { true },
+    ): ByteArray = receive(server, token, maxBytes, accept, HANDSHAKE_DEADLINE_MS, MAX_CONNECTIONS)
+
+    /** [receive] with its limits exposed, for tests. */
+    internal fun receive(
+        server: ServerSocket,
+        token: ByteArray,
+        maxBytes: Int,
+        accept: (ByteArray) -> Boolean,
+        handshakeMs: Long,
+        maxConnections: Int,
     ): ByteArray {
-        while (true) {
-            val socket = server.accept()
-            socket.use { s ->
-                s.soTimeout = 30_000
-                val input = BufferedInputStream(s.getInputStream())
-                val out = BufferedOutputStream(s.getOutputStream())
-                val payload = try {
-                    readTransfer(input, token, maxBytes)
-                } catch (e: Exception) {
-                    null
-                }?.takeIf { accept(it) }
-                runCatching { frame(out, ACK, byteArrayOf(if (payload != null) 1 else 0)); out.flush() }
-                if (payload != null) return payload
+        val session = ReceiveSession(token, maxBytes, accept, handshakeMs)
+        // The caller's SO_TIMEOUT keeps its meaning (how long to wait with nothing arriving); the
+        // socket itself polls briefly so a finished connection is noticed promptly.
+        val idleMs = server.soTimeout.toLong()
+        var idleDeadline = if (idleMs > 0) System.currentTimeMillis() + idleMs else Long.MAX_VALUE
+        try {
+            while (true) {
+                session.outcome()?.let { return it }
+                val now = System.currentTimeMillis()
+                if (now >= idleDeadline) {
+                    if (session.active() == 0) throw SocketTimeoutException("no transfer arrived")
+                    idleDeadline = now + idleMs // someone is mid-transfer: let them finish
+                }
+                server.soTimeout = minOf(ACCEPT_POLL_MS, idleDeadline - now).coerceAtLeast(1L).toInt()
+                val socket = try {
+                    server.accept()
+                } catch (_: SocketTimeoutException) {
+                    continue
+                }
+                if (idleMs > 0) idleDeadline = System.currentTimeMillis() + idleMs
+                session.admit(socket, maxConnections)
             }
+        } finally {
+            session.shutdown()
+            runCatching { server.soTimeout = idleMs.toInt() }
         }
     }
 
-    private fun readTransfer(input: InputStream, token: ByteArray, maxBytes: Int): ByteArray {
+    /** The connections of one [receive] call and the transfer they produce. */
+    private class ReceiveSession(
+        private val token: ByteArray,
+        private val maxBytes: Int,
+        private val accept: (ByteArray) -> Boolean,
+        private val handshakeMs: Long,
+    ) {
+        private class Conn(val socket: Socket) {
+            val startedAt: Long = System.nanoTime()
+            @Volatile var authenticated = false
+        }
+
+        private val lock = Any()
+        private val conns = ArrayList<Conn>() // guarded by lock
+        private val acceptLock = Any()
+        private var taken = false // guarded by acceptLock
+        @Volatile private var closed = false
+        @Volatile private var payload: ByteArray? = null
+        @Volatile private var failure: Throwable? = null
+
+        /** The accepted transfer, null while waiting; rethrows a failure from [accept]. */
+        fun outcome(): ByteArray? {
+            payload?.let { return it }
+            failure?.let { throw it }
+            return null
+        }
+
+        fun active(): Int = synchronized(lock) { conns.size }
+
+        fun admit(socket: Socket, max: Int) {
+            synchronized(lock) {
+                if (closed) { closeQuietly(socket); return }
+                if (conns.size >= max) {
+                    val victim = conns.filter { !it.authenticated }.minByOrNull { it.startedAt }
+                    if (victim == null) { closeQuietly(socket); return }
+                    conns.remove(victim)
+                    closeQuietly(victim.socket)
+                }
+                val c = Conn(socket)
+                conns += c
+                try {
+                    Thread({ serve(c) }, "agepony-xfer-conn").apply { isDaemon = true }.start()
+                } catch (t: Throwable) {
+                    conns.remove(c)
+                    closeQuietly(socket)
+                }
+            }
+        }
+
+        fun shutdown() {
+            val all = synchronized(lock) {
+                closed = true
+                ArrayList(conns).also { conns.clear() }
+            }
+            all.forEach { closeQuietly(it.socket) }
+        }
+
+        private fun serve(c: Conn) {
+            try {
+                c.socket.use { s ->
+                    val raw = DeadlineInput(s, System.currentTimeMillis() + handshakeMs)
+                    val input = BufferedInputStream(raw)
+                    val out = BufferedOutputStream(s.getOutputStream())
+                    val bytes = try {
+                        readTransfer(input, token, maxBytes) {
+                            c.authenticated = true
+                            raw.deadline = System.currentTimeMillis() + TRANSFER_DEADLINE_MS
+                        }
+                    } catch (_: Exception) {
+                        null
+                    }
+                    val ok = bytes != null && take(bytes)
+                    runCatching { frame(out, ACK, byteArrayOf(if (ok) 1 else 0)); out.flush() }
+                    if (ok) payload = bytes
+                }
+            } catch (_: Exception) {
+                // A dropped or broken connection only ends itself.
+            } finally {
+                synchronized(lock) { conns.remove(c) }
+            }
+        }
+
+        /** Hand [bytes] to [accept], one connection at a time, until one is taken. */
+        private fun take(bytes: ByteArray): Boolean = synchronized(acceptLock) {
+            if (taken || closed) return false
+            val ok = try {
+                accept(bytes)
+            } catch (t: Throwable) {
+                failure = t
+                taken = true
+                return false
+            }
+            if (ok) taken = true
+            ok
+        }
+    }
+
+    /**
+     * The socket's input with an overall [deadline] (epoch millis): each read waits at most until
+     * the deadline (and at most [IDLE_READ_MS]), so a sender that trickles bytes is cut off on
+     * time rather than resetting a per-read timeout forever.
+     */
+    private class DeadlineInput(private val socket: Socket, @Volatile var deadline: Long) : InputStream() {
+        private val inner = socket.getInputStream()
+
+        override fun read(): Int {
+            arm()
+            return inner.read()
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            arm()
+            return inner.read(b, off, len)
+        }
+
+        override fun close() = inner.close()
+
+        private fun arm() {
+            val left = deadline - System.currentTimeMillis()
+            if (left <= 0) throw SocketTimeoutException("connection deadline passed")
+            socket.soTimeout = minOf(left, IDLE_READ_MS).toInt()
+        }
+    }
+
+    private fun closeQuietly(s: Socket) {
+        runCatching { s.close() }
+    }
+
+    private fun readTransfer(
+        input: InputStream,
+        token: ByteArray,
+        maxBytes: Int,
+        onAuthenticated: () -> Unit = {},
+    ): ByteArray {
         val hello = readFrame(input, 4096) ?: throw LanTransferException("no HELLO")
         if (hello.first != HELLO) throw LanTransferException("expected HELLO")
         val handle = parseHelloHandle(hello.second)
         if (!MessageDigest.isEqual(handle.toByteArray(Charsets.US_ASCII), hex(token).toByteArray(Charsets.US_ASCII))) {
             throw LanTransferException("wrong token")
         }
+        onAuthenticated()
         val begin = readFrame(input, 64) ?: throw LanTransferException("no FILE_BEGIN")
         if (begin.first != FILE_BEGIN || begin.second.size != 8) throw LanTransferException("expected FILE_BEGIN")
         val size = begin.second.fold(0L) { acc, b -> (acc shl 8) or (b.toLong() and 0xff) }
@@ -154,7 +339,8 @@ object LanTransfer {
     /**
      * Deliver [sealed] to the receiver in [invite], trying each advertised address in turn.
      * [connect] opens the socket (the app routes it over Wi-Fi). Returns normally only when the
-     * receiver acknowledged the transfer.
+     * receiver acknowledged the transfer. Show [TransferCode.of] over [sealed] afterwards so the
+     * receiver can check it got this transfer and not someone else's (audit M-6).
      */
     fun send(
         invite: Invite,

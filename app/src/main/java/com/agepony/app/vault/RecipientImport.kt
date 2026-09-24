@@ -1,7 +1,10 @@
 package com.agepony.app.vault
 
 import com.agepony.core.recipients.HybridRecipient
+import com.agepony.core.recipients.MIN_RSA_RECIPIENT_BITS
 import com.agepony.core.recipients.P256Recipient
+import com.agepony.core.recipients.SSHEd25519Recipient
+import com.agepony.core.recipients.SSHRSARecipient
 import com.agepony.core.recipients.TagRecipient
 import com.agepony.core.recipients.X25519Recipient
 import com.agepony.core.ssh.OpenSSHPublicKey
@@ -9,6 +12,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.agepony.app.network.HttpClientFactory
 import okhttp3.Request
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 
 //
 // Android counterpart of iOS's RecipientImportService. Import paths funnel into
@@ -120,9 +125,9 @@ object RecipientImport {
     ): List<RecipientCandidate> =
         withContext(Dispatchers.IO) {
             val user = username.trim()
-            if (user.isEmpty() || !user.all { it.isLetterOrDigit() || it == '-' || it == '_' }) {
+            if (!isValidGitHubUsername(user)) {
                 throw RecipientImportException(
-                    "Usernames may only contain letters, numbers, hyphens, and underscores."
+                    "GitHub usernames are 1 to 39 letters (A to Z), digits and hyphens, and don't start with a hyphen."
                 )
             }
 
@@ -151,6 +156,41 @@ object RecipientImport {
             }
         }
 
+    /** Largest `.keys` response read (audit hardening). A real key list is a few KiB. */
+    const val MAX_GITHUB_KEYS_BYTES = 256 * 1024
+
+    private val GITHUB_USERNAME = Regex("[A-Za-z0-9][A-Za-z0-9-]{0,38}")
+
+    /**
+     * GitHub's own rule: ASCII letters, digits and hyphens, at most 39, not starting with a
+     * hyphen. Unicode letters used to pass (isLetterOrDigit), which put them in the URL path.
+     */
+    fun isValidGitHubUsername(user: String): Boolean = GITHUB_USERNAME.matches(user)
+
+    /**
+     * True for an ssh-rsa key under [MIN_RSA_RECIPIENT_BITS] bits. Encrypting to one now throws
+     * (age requires 2048), so the UI warns and doesn't select it (audit L-4). False for every
+     * other type and for a key that doesn't parse.
+     */
+    fun isRsaBelowMinimum(type: StoredRecipientType, publicKeyB64: String): Boolean =
+        parsedRsa(type, publicKeyB64)?.let { SSHRSARecipient(it).isBelowMinimumSize } ?: false
+
+    /** The modulus size of an ssh-rsa key in storage form, or null for other types or a bad key. */
+    fun rsaBits(type: StoredRecipientType, publicKeyB64: String): Int? =
+        parsedRsa(type, publicKeyB64)?.modulus?.bitLength()
+
+    private fun parsedRsa(type: StoredRecipientType, publicKeyB64: String): OpenSSHPublicKey.RSA? {
+        if (type != StoredRecipientType.SSH_RSA) return null
+        return runCatching {
+            OpenSSHPublicKey.parse(String(b64d(publicKeyB64), Charsets.UTF_8)) as? OpenSSHPublicKey.RSA
+        }.getOrNull()
+    }
+
+    /** One-line warning for a small RSA key, shared by the add, transfer and list screens. */
+    fun rsaTooSmallMessage(bits: Int?): String =
+        "Too small to encrypt to" + (bits?.let { " ($it bits)" } ?: "") +
+            ", $MIN_RSA_RECIPIENT_BITS bits minimum."
+
     // MARK: - Helpers
 
     private fun sshCandidate(
@@ -163,6 +203,15 @@ object RecipientImport {
             OpenSSHPublicKey.parse(line)
         } catch (e: Exception) {
             throw RecipientImportException("Couldn't parse that SSH key (${e.message}).")
+        }
+        if (parsed is OpenSSHPublicKey.Ed25519) {
+            // The line parser only checks the length; a 32-byte value that isn't a curve point
+            // would save fine and then fail every encryption, so refuse it here.
+            try {
+                SSHEd25519Recipient(parsed.publicKey)
+            } catch (e: Exception) {
+                throw RecipientImportException("That ssh-ed25519 key isn't a valid public key (${e.message}).")
+            }
         }
         return when (parsed) {
             is OpenSSHPublicKey.Ed25519 -> RecipientCandidate(
@@ -209,13 +258,35 @@ object RecipientImport {
                 if (!response.isSuccessful) {
                     throw RecipientImportException("GitHub returned HTTP ${response.code}.")
                 }
-                return response.body?.string()
+                val body = response.body
                     ?: throw RecipientImportException("GitHub returned an empty response.")
+                // Read through a cap rather than string(), which buffers whatever arrives: a
+                // hostile proxy or endpoint could otherwise send an endless body.
+                if (body.contentLength() > MAX_GITHUB_KEYS_BYTES) throw tooLarge()
+                val bytes = body.byteStream().use { readCapped(it, MAX_GITHUB_KEYS_BYTES) }
+                return String(bytes, Charsets.UTF_8)
             }
         } catch (e: RecipientImportException) {
             throw e
         } catch (e: Exception) {
             throw RecipientImportException("Network error: ${e.message}")
         }
+    }
+
+    private fun tooLarge() = RecipientImportException(
+        "GitHub's response is larger than ${MAX_GITHUB_KEYS_BYTES / 1024} KiB, which isn't a normal key list. Nothing was imported."
+    )
+
+    /** Read [input] to the end, failing once more than [max] bytes arrive. */
+    private fun readCapped(input: InputStream, max: Int): ByteArray {
+        val out = ByteArrayOutputStream()
+        val buf = ByteArray(8192)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            if (out.size() + n > max) throw tooLarge()
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
     }
 }

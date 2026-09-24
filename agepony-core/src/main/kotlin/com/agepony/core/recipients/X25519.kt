@@ -11,6 +11,7 @@ private const val X25519_HRP_SEC = "AGE-SECRET-KEY-"
 private const val X25519_STANZA_TYPE = "X25519"
 private const val X25519_HKDF_INFO = "age-encryption.org/v1/X25519"
 private val ZERO_NONCE_12 = ByteArray(12)
+private const val X25519_BODY_SIZE = 16 + 16   // file key (16) + ChaCha20Poly1305 tag (16)
 
 /**
  * An age X25519 public-key recipient.
@@ -34,11 +35,10 @@ class X25519Recipient(val publicKey: ByteArray) : AgeRecipient {
     override fun wrap(fileKey: ByteArray): Stanza {
         val ephPriv = X25519Crypto.generatePrivateKey()
         val ephPub = X25519Crypto.publicKey(ephPriv)
-        val shared = X25519Crypto.keyExchange(ephPriv, publicKey)
-        if (isAllZero(shared)) {
-            // RFC 7748 §6.1 / age spec: low-order point yields zero shared secret; reject.
-            throw IllegalArgumentException("X25519 shared secret is zero (low-order point)")
-        }
+        // RFC 7748 section 6.1 / age spec: a low-order recipient key yields an all-zero shared
+        // secret, which BC refuses; report it as a bad recipient instead of an internal error.
+        val shared = X25519Crypto.keyExchangeOrNull(ephPriv, publicKey)
+            ?: throw IllegalArgumentException("X25519 recipient is a low-order point; refusing to encrypt to it")
         val salt = ephPub + publicKey
         val wrapKey = HKDF.derive(shared, salt, X25519_HKDF_INFO.toByteArray(), 32)
         val body = ChaChaPoly.encrypt(wrapKey, ZERO_NONCE_12, fileKey)
@@ -47,8 +47,6 @@ class X25519Recipient(val publicKey: ByteArray) : AgeRecipient {
 
     /** Encode this public key as a Bech32 `age1...` string. */
     fun toBech32(): String = Bech32.encode(X25519_HRP_PUB, publicKey)
-
-    private fun isAllZero(b: ByteArray): Boolean = b.all { it == 0.toByte() }
 
     companion object {
         private fun decodeBech32Pub(s: String): ByteArray {
@@ -89,8 +87,10 @@ class X25519Identity(val privateKey: ByteArray) : AgeIdentity {
             return null
         }
         if (ephPub.size != 32) return null
-        val shared = X25519Crypto.keyExchange(privateKey, ephPub)
-        if (isAllZero(shared)) return null   // low-order ephemeral; reject silently
+        // The wrapped file key is always 32 bytes; anything else is not a valid stanza (audit L-5).
+        if (stanza.body.size != X25519_BODY_SIZE) return null
+        // Low-order ephemeral share: BC refuses the all-zero secret; treat as not for us.
+        val shared = X25519Crypto.keyExchangeOrNull(privateKey, ephPub) ?: return null
         val salt = ephPub + publicKey
         val wrapKey = HKDF.derive(shared, salt, X25519_HKDF_INFO.toByteArray(), 32)
         return try {
@@ -102,8 +102,6 @@ class X25519Identity(val privateKey: ByteArray) : AgeIdentity {
 
     /** Encode this private key as a Bech32 `AGE-SECRET-KEY-1...` string (uppercase per age convention). */
     fun toBech32(): String = Bech32.encode(X25519_HRP_SEC, privateKey).uppercase()
-
-    private fun isAllZero(b: ByteArray): Boolean = b.all { it == 0.toByte() }
 
     companion object {
         /** Generate a fresh X25519 identity from random bytes. */

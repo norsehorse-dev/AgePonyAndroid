@@ -132,6 +132,14 @@ object KeyTransfer {
      */
     fun confirmationCode(recipient: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(recipient.trim().lowercase().toByteArray(Charsets.US_ASCII))
+        return code60(digest)
+    }
+
+    /**
+     * The first 60 bits of [digest] as 12 Crockford base32 characters, `XXXX-XXXX-XXXX`. Shared by
+     * [confirmationCode] and [TransferCode] so both codes look alike on screen.
+     */
+    internal fun code60(digest: ByteArray): String {
         val alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
         var acc = 0L
         for (i in 0 until 8) acc = (acc shl 8) or (digest[i].toLong() and 0xff)
@@ -139,7 +147,7 @@ object KeyTransfer {
         return String(chars).chunked(4).joinToString("-")
     }
 
-    private fun looksArmored(b: ByteArray): Boolean =
+    internal fun looksArmored(b: ByteArray): Boolean =
         String(b, 0, minOf(b.size, 64), Charsets.ISO_8859_1).trimStart().startsWith("-----BEGIN AGE ENCRYPTED FILE-----")
 
     private fun safeName(name: String): String {

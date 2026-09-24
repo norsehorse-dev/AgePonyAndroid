@@ -211,11 +211,13 @@ object TarArchive {
         while (off + BLOCK <= archive.size) {
             val headerBlock = archive.copyOfRange(off, off + BLOCK)
             if (headerBlock.all { it.toInt() == 0 }) break // end-of-archive marker
-            verifyChecksum(headerBlock)
-            val name = readString(headerBlock, 0, NAME_MAX)
-            val size = readOctal(headerBlock, 124, 12).toInt()
+            val info = parseHeaderBlock(headerBlock) ?: break
+            val name = info.name
             off += BLOCK
-            if (size < 0 || off + size > archive.size) throw TarException("entry '$name' size exceeds archive")
+            // Compare as Long: an entry over 2 GiB used to be truncated by toInt() into a
+            // small or negative size, so a header could claim one size and extract another.
+            if (info.size > (archive.size - off).toLong()) throw TarException("entry '$name' size exceeds archive")
+            val size = info.size.toInt()
             entries.add(Entry(name, archive.copyOfRange(off, off + size)))
             off += ((size + BLOCK - 1) / BLOCK) * BLOCK
         }
@@ -231,12 +233,20 @@ object TarArchive {
      * Read one 512-byte header block. Returns null for the all-zero end-of-archive marker, and
      * throws [TarException] for anything that is not a valid USTAR header, which is how a reader
      * decides that a stream is not a tar at all.
+     *
+     * Only regular-file entries are accepted (typeflag '0', or NUL from pre-POSIX tars), which is
+     * all AgePony and the iOS app write. Directories, links, devices and pax or GNU extension
+     * headers would otherwise be extracted as if their header data were file contents.
      */
     fun parseHeaderBlock(block: ByteArray): HeaderInfo? {
         if (block.size != BLOCK) throw TarException("header block must be $BLOCK bytes, got ${block.size}")
         if (block.all { it.toInt() == 0 }) return null
         verifyChecksum(block)
         val name = readString(block, 0, NAME_MAX)
+        val typeflag = block[156].toInt() and 0xff
+        if (typeflag != '0'.code && typeflag != 0) {
+            throw TarException("entry '$name' is not a regular file (typeflag '${typeflag.toChar()}')")
+        }
         val size = readOctal(block, 124, 12)
         if (size < 0) throw TarException("entry '$name' has negative size")
         return HeaderInfo(name, size)
@@ -298,7 +308,10 @@ object TarArchive {
             return r
         }
 
-        override fun available(): Int = minOf(remaining, Int.MAX_VALUE.toLong()).toInt()
+        // What can be read without blocking, never the declared entry size: readBytes() sizes
+        // its first buffer from available(), so reporting a hostile 4 GiB size here allocated
+        // it up front and ran out of memory.
+        override fun available(): Int = minOf(remaining, src.available().toLong()).toInt()
 
         /** Consume whatever the handler left behind, so the next header lines up. */
         fun drain(name: String) {

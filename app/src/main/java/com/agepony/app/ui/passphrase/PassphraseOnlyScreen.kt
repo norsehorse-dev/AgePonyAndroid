@@ -1,6 +1,7 @@
 package com.agepony.app.ui.passphrase
 
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
@@ -109,11 +111,19 @@ private fun PassphraseText(vault: Vault, initialText: String) {
     ) {
         if (result != null) {
             Text(if (resultIsPlaintext) "Decrypted text" else "Armored output", style = MaterialTheme.typography.titleSmall)
-            OutlinedTextField(
-                value = result!!, onValueChange = {}, readOnly = true, minLines = 6,
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            // Non-selectable text, so a long-press Copy can't skip ClipboardGuard (audit L-23).
+            Surface(
+                shape = MaterialTheme.shapes.extraSmall,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier.fillMaxWidth(),
-            )
+            ) {
+                Text(
+                    result!!,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    minLines = 6,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                )
+            }
             Button(onClick = { ClipboardGuard.copySensitive(context, result!!) }, modifier = Modifier.fillMaxWidth()) { Text("Copy") }
             if (!resultIsPlaintext) {
                 OutlinedButton(onClick = { ShareOut.text(context, result!!, "Share encrypted text") }, modifier = Modifier.fillMaxWidth()) {

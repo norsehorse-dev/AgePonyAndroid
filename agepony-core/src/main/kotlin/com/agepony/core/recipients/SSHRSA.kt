@@ -15,6 +15,13 @@ private const val SSH_RSA_LABEL = "age-encryption.org/v1/ssh-rsa"
 private const val SSH_RSA_KEYTYPE = "ssh-rsa"
 private const val RECIPIENT_TAG_LEN = 4
 
+/**
+ * Smallest RSA key AgePony will encrypt to (audit L-4), as Go age's agessh does. Go compares the
+ * modulus byte length (`pk.Size() < 2048/8`), so the check below does too, which keeps every key
+ * Go accepts. Decrypting with a smaller existing identity is still allowed, so old files open.
+ */
+const val MIN_RSA_RECIPIENT_BITS = 2048
+
 private fun buildSSHRSAWireBlob(modulus: BigInteger, exponent: BigInteger): ByteArray {
     val out = ByteArrayOutputStream()
     SSHWire.writeString(out, SSH_RSA_KEYTYPE.toByteArray(Charsets.US_ASCII))
@@ -36,7 +43,17 @@ class SSHRSARecipient(val modulus: BigInteger, val exponent: BigInteger) : AgeRe
 
     constructor(parsed: OpenSSHPublicKey.RSA) : this(parsed.modulus, parsed.exponent)
 
+    /** True if this key is too small to encrypt to (see [MIN_RSA_RECIPIENT_BITS]). */
+    val isBelowMinimumSize: Boolean
+        get() = (modulus.bitLength() + 7) / 8 < MIN_RSA_RECIPIENT_BITS / 8
+
     override fun wrap(fileKey: ByteArray): Stanza {
+        // Refused at encrypt time rather than in the constructor, so a small key already saved
+        // as a recipient still loads (and can be removed) instead of breaking the list.
+        if (isBelowMinimumSize) throw IllegalArgumentException(
+            "ssh-rsa key is ${modulus.bitLength()} bits; age requires at least " +
+                "$MIN_RSA_RECIPIENT_BITS-bit RSA keys to encrypt to"
+        )
         val body = RSAOAEP.encrypt(
             modulus,
             exponent,

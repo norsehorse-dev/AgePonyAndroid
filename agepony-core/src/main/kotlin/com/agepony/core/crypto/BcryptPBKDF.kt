@@ -26,9 +26,25 @@ object BcryptPBKDF {
 
     private const val BCRYPT_HASHSIZE = 32
 
+    /**
+     * Most rounds accepted (audit L-10). OpenSSH defaults to 16 and `ssh-keygen -a 100` is
+     * already a strong setting; each round costs a full eksblowfish setup, so an attacker-chosen
+     * count in the millions would hang the device. 10,000 leaves ample headroom.
+     */
+    const val MAX_ROUNDS = 10_000
+
+    /** Longest salt accepted. OpenSSH uses 16 bytes; OpenBSD allows up to 1 MiB. */
+    const val MAX_SALT_LEN = 1024
+
+    /** OpenBSD's limit: keylen <= sizeof(out) * sizeof(out) = 32 * 32. */
+    const val MAX_KEY_LEN = BCRYPT_HASHSIZE * BCRYPT_HASHSIZE
+
     fun derive(passphrase: ByteArray, salt: ByteArray, rounds: Int, keyLen: Int): ByteArray {
         if (rounds < 1) throw BcryptPBKDFException("rounds must be >= 1")
+        if (rounds > MAX_ROUNDS) throw BcryptPBKDFException("rounds must be <= $MAX_ROUNDS, got $rounds")
         if (keyLen <= 0) throw BcryptPBKDFException("keyLen must be > 0")
+        if (keyLen > MAX_KEY_LEN) throw BcryptPBKDFException("keyLen must be <= $MAX_KEY_LEN")
+        if (salt.size > MAX_SALT_LEN) throw BcryptPBKDFException("salt must be <= $MAX_SALT_LEN bytes")
         if (passphrase.isEmpty()) throw BcryptPBKDFException("passphrase must be non-empty")
         if (salt.isEmpty()) throw BcryptPBKDFException("salt must be non-empty")
 

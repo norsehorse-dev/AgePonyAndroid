@@ -178,7 +178,21 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
-                        FileVerifier.Trust.VALID_UNKNOWN -> {
+                        FileVerifier.Trust.VALID_UNKNOWN -> if (r.untrustedSignerName != null) {
+                            // The key is on the trusted-signers list, but that entry's imported
+                            // options (expiry, namespaces, touch, ...) reject this signature.
+                            Text(
+                                "⚠ Valid signature, but not trusted",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Text(
+                                "The key belongs to \"${r.untrustedSignerName}\" on your trusted signers " +
+                                    "list, but ${r.untrustedReason ?: "that entry does not allow this signature"}.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
                             Text(
                                 "Valid signature — signer not in your vault",
                                 style = MaterialTheme.typography.titleMedium,
@@ -226,7 +240,9 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )
-                    } else if (r.trust == FileVerifier.Trust.VALID_UNKNOWN && r.signerPublicWire != null) {
+                    } else if (r.trust == FileVerifier.Trust.VALID_UNKNOWN && r.signerPublicWire != null &&
+                        r.untrustedSignerName == null
+                    ) {
                         OutlinedButton(
                             onClick = { showAddSigner = true },
                             modifier = Modifier.fillMaxWidth(),

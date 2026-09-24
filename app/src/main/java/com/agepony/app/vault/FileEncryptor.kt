@@ -8,7 +8,9 @@ import com.agepony.core.recipients.AgeIdentity
 import com.agepony.core.recipients.AgeRecipient
 import com.agepony.core.recipients.ScryptIdentity
 import com.agepony.core.recipients.ScryptRecipient
+import com.agepony.core.Stanza
 import com.agepony.core.signing.SignatureStanza
+import com.agepony.core.signing.SignedEncryption
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PushbackInputStream
@@ -98,12 +100,20 @@ object FileEncryptor {
 
     /**
      * The scrypt work factor a passphrase-encrypted file will demand on decrypt, read from the
-     * header without deriving anything, or null if the header carries no scrypt stanza.
+     * header without deriving anything, or null if the header carries no scrypt stanza. With more
+     * than one scrypt stanza (not valid age, but the guard runs before the parser's checks can
+     * matter) this is the largest, so a cheap first stanza can't hide an expensive later one.
      */
     fun scryptWorkFactorOf(binaryHeader: ByteArray): Int? {
         val header = try { AgeHeader.parse(binaryHeader) } catch (_: Exception) { return null }
-        return header.stanzas.firstOrNull { it.type == "scrypt" }?.args?.getOrNull(1)?.toIntOrNull()
+        return maxScryptWorkFactor(header.stanzas)
     }
+
+    /** Largest work factor over every scrypt stanza in [stanzas], or null if there is none. */
+    internal fun maxScryptWorkFactor(stanzas: List<Stanza>): Int? =
+        stanzas.filter { it.type == "scrypt" }
+            .mapNotNull { it.args.getOrNull(1)?.toIntOrNull() }
+            .maxOrNull()
 
     /**
      * Refuse a passphrase decrypt before any scrypt work starts when the file's work factor needs
@@ -130,8 +140,7 @@ object FileEncryptor {
         val buffered = java.io.BufferedInputStream(binary)
         buffered.mark(HEADER_PEEK_LIMIT)
         val factor = try {
-            Age.parseHeaderStream(buffered).stanzas
-                .firstOrNull { it.type == "scrypt" }?.args?.getOrNull(1)?.toIntOrNull()
+            maxScryptWorkFactor(Age.parseHeaderStream(buffered).stanzas)
         } catch (_: Exception) {
             null
         }
@@ -206,6 +215,9 @@ object FileEncryptor {
      * real age file: plain age returns the bare plaintext, and only a recipient can read or check
      * the signature. Not for passphrase encryption, where the scrypt stanza must stand alone, so
      * that path keeps the SignedBundle wrapper.
+     *
+     * Writes the v1 stanza, kept for tests and compatibility. New files use [prepareSigned] and
+     * [encryptSignedV2], whose signature also covers the recipients (audit L-8).
      */
     fun encryptSigned(
         plaintext: ByteArray,
@@ -222,6 +234,63 @@ object FileEncryptor {
             throw FileEncryptorException("Encrypt failed: ${e.message}")
         }
         return if (armor) Armor.encode(ciphertext).toByteArray(Charsets.UTF_8) else ciphertext
+    }
+
+    /**
+     * Step one of a v2 sign-and-encrypt to public-key [recipients] (audit L-8): make and wrap the
+     * file key. Sign [SignedEncryption.messageHash] of the plaintext's SHA-512 under
+     * [SignatureStanza.NAMESPACE_V2] (FileSigner.signHashed), then finish with [encryptSignedV2]
+     * or [encryptSignedV2Stream]. The v2 signature also covers the recipient stanzas, which is
+     * why the file key must exist before signing.
+     */
+    fun prepareSigned(recipients: List<AgeRecipient>): SignedEncryption {
+        if (recipients.isEmpty()) throw FileEncryptorException("No recipients selected.")
+        return try {
+            SignedEncryption.prepare(recipients)
+        } catch (e: Exception) {
+            throw FileEncryptorException("Encrypt failed: ${e.message}")
+        }
+    }
+
+    /** In-memory v2 signed encrypt. Binary age, or armored text bytes when [armor] is true. */
+    fun encryptSignedV2(
+        prepared: SignedEncryption,
+        plaintext: ByteArray,
+        signatureArmored: String,
+        armor: Boolean,
+    ): ByteArray {
+        val ciphertext = try {
+            prepared.encrypt(plaintext, signatureArmored)
+        } catch (e: Exception) {
+            throw FileEncryptorException("Encrypt failed: ${e.message}")
+        }
+        return if (armor) Armor.encode(ciphertext).toByteArray(Charsets.UTF_8) else ciphertext
+    }
+
+    /**
+     * Streaming v2 signed encrypt: [plaintext] is read a second time after hashing, and must hash
+     * to [plaintextSha512] again or this throws at the end (the caller then discards [out]).
+     * Neither stream is closed.
+     */
+    fun encryptSignedV2Stream(
+        prepared: SignedEncryption,
+        plaintext: InputStream,
+        plaintextSha512: ByteArray,
+        signatureArmored: String,
+        armor: Boolean,
+        out: OutputStream,
+    ) {
+        try {
+            if (armor) {
+                val sink = Armor.encodingSink(out)
+                prepared.encryptStream(plaintext, plaintextSha512, signatureArmored, sink)
+                sink.finish()
+            } else {
+                prepared.encryptStream(plaintext, plaintextSha512, signatureArmored, out)
+            }
+        } catch (e: Exception) {
+            throw FileEncryptorException("Encrypt failed: ${e.message}")
+        }
     }
 
     // ---- Decrypt ----

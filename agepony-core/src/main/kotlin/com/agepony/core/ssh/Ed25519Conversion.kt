@@ -1,6 +1,7 @@
 package com.agepony.core.ssh
 
 import org.bouncycastle.crypto.digests.SHA512Digest
+import org.bouncycastle.math.ec.rfc8032.Ed25519
 import java.math.BigInteger
 
 /**
@@ -26,9 +27,20 @@ object Ed25519Conversion {
     private val P: BigInteger = BigInteger.valueOf(2).pow(255).subtract(BigInteger.valueOf(19))
     private val ONE: BigInteger = BigInteger.ONE
 
-    /** Convert a 32-byte Ed25519 public key to a 32-byte X25519 public key. */
+    /**
+     * Convert a 32-byte Ed25519 public key to a 32-byte X25519 public key.
+     *
+     * The key is validated first with Bouncy Castle's partial RFC 8032 check: canonical `y`
+     * (`y < p`), a point actually on the curve, and not one of the small-order points (which
+     * includes `y = 1`, the identity, whose `1 - y` has no inverse). Such keys used to fall
+     * through to the formula and either give a wrong recipient or throw ArithmeticException;
+     * now they throw [IllegalArgumentException] like any other malformed key.
+     */
     fun publicKeyToX25519(edPublicKey: ByteArray): ByteArray {
         require(edPublicKey.size == 32) { "Ed25519 public key must be 32 bytes" }
+        require(Ed25519.validatePublicKeyPartial(edPublicKey, 0)) {
+            "not a valid Ed25519 public key (non-canonical, off the curve, or low order)"
+        }
         // Decode as little-endian with sign bit cleared
         val yBytes = edPublicKey.copyOf()
         yBytes[31] = (yBytes[31].toInt() and 0x7f).toByte()

@@ -1,10 +1,13 @@
 package com.agepony.core.piv
 
+import com.agepony.core.crypto.P256Curve
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.interfaces.ECPublicKey
+import java.security.spec.ECFieldFp
+import java.security.spec.ECParameterSpec
 
 /**
  * The slice of the PIV card interface (NIST SP 800-73-4, plus YubiKey's GET SERIAL) that
@@ -30,6 +33,14 @@ object Piv {
     const val SW_SECURITY_STATUS = 0x6982
     const val SW_AUTH_BLOCKED = 0x6983
     private const val ALG_ECC_P256 = 0x11
+
+    /**
+     * Caps on 61xx GET RESPONSE chaining (audit L-11). The largest PIV object read here is a
+     * certificate of a few KiB; a card that keeps answering 61xx, or streams more than this,
+     * is broken or hostile and must not hang or exhaust the app.
+     */
+    const val MAX_RESPONSE_BYTES = 64 * 1024
+    const val MAX_CHAINED_RESPONSES = 256
 
     private val AID = byteArrayOf(0xA0.toByte(), 0x00, 0x00, 0x03, 0x08)
 
@@ -70,10 +81,34 @@ object Piv {
         val der = Tlv.find(outer, 0x70) ?: throw PivException("Slot %02X holds no certificate.".format(slot))
         val cert = CertificateFactory.getInstance("X.509").generateCertificate(ByteArrayInputStream(der)) as X509Certificate
         val pub = cert.publicKey as? ECPublicKey ?: throw PivException("Slot %02X key isn't elliptic-curve.".format(slot))
-        if (pub.params.curve.field.fieldSize != 256) throw PivException("Slot %02X key isn't P-256.".format(slot))
+        if (!isP256(pub.params)) throw PivException("Slot %02X key isn't P-256.".format(slot))
         val x = fixed32(pub.w.affineX.toByteArray())
         val y = pub.w.affineY
-        return byteArrayOf(if (y.testBit(0)) 0x03 else 0x02) + x
+        val compressed = byteArrayOf(if (y.testBit(0)) 0x03 else 0x02) + x
+        // The point itself must be on the curve (decode validates it).
+        try {
+            P256Curve.decode(compressed)
+        } catch (e: Exception) {
+            throw PivException("Slot %02X holds an invalid P-256 public key.".format(slot))
+        }
+        return compressed
+    }
+
+    /**
+     * True only for secp256r1 itself: same prime field, coefficients, generator, order and
+     * cofactor. Checking the field size alone would also accept any other 256-bit curve
+     * (secp256k1, brainpoolP256r1), whose points would then be misread as P-256.
+     */
+    internal fun isP256(spec: ECParameterSpec): Boolean {
+        val d = P256Curve.domain
+        val field = spec.curve.field as? ECFieldFp ?: return false
+        return field.p == d.curve.field.characteristic &&
+            spec.curve.a == d.curve.a.toBigInteger() &&
+            spec.curve.b == d.curve.b.toBigInteger() &&
+            spec.generator.affineX == d.g.affineXCoord.toBigInteger() &&
+            spec.generator.affineY == d.g.affineYCoord.toBigInteger() &&
+            spec.order == d.n &&
+            spec.cofactor.toBigInteger() == d.h
     }
 
     /**
@@ -102,16 +137,23 @@ object Piv {
         return byteArrayOf(0x5F, 0xC1.toByte(), (0x0D + (slot - 0x82)).toByte())
     }
 
-    /** Send [command], following 61xx GET RESPONSE chaining. Returns (data, SW). */
+    /**
+     * Send [command], following 61xx GET RESPONSE chaining. Returns (data, SW). Chaining stops
+     * with a [PivException] after [MAX_CHAINED_RESPONSES] rounds or [MAX_RESPONSE_BYTES] bytes.
+     */
     fun transceive(card: Card, command: ByteArray): Pair<ByteArray, Int> {
         val acc = ByteArrayOutputStream()
         var r = split(card.transmit(command))
         acc.write(r.first)
+        var rounds = 0
         while (r.second shr 8 == 0x61) {
+            if (++rounds > MAX_CHAINED_RESPONSES) throw PivException("The card kept chaining its response.")
             val le = r.second and 0xff
             r = split(card.transmit(byteArrayOf(0x00, 0xC0.toByte(), 0x00, 0x00, le.toByte())))
             acc.write(r.first)
+            if (acc.size() > MAX_RESPONSE_BYTES) throw PivException("The card's response is too large.")
         }
+        if (acc.size() > MAX_RESPONSE_BYTES) throw PivException("The card's response is too large.")
         return acc.toByteArray() to r.second
     }
 
@@ -152,19 +194,31 @@ object Tlv {
         return out.toByteArray()
     }
 
-    /** Value of the first top-level [tag] in [data], or null. */
+    /**
+     * Value of the first top-level [tag] in [data], or null if no such tag is present. A
+     * truncated or malformed length (including a long-form length whose bytes run past the end)
+     * throws [Piv.PivException] instead of indexing out of bounds (audit L-11).
+     */
     fun find(data: ByteArray, tag: Int): ByteArray? {
         var i = 0
         while (i < data.size) {
             val t = data[i].toInt() and 0xff
             i++
-            if (i >= data.size) return null
+            if (i >= data.size) throw Piv.PivException("Malformed card response (TLV with no length).")
             var len = data[i].toInt() and 0xff
             i++
-            if (len == 0x81) { len = data[i].toInt() and 0xff; i++ }
-            else if (len == 0x82) { len = ((data[i].toInt() and 0xff) shl 8) or (data[i + 1].toInt() and 0xff); i += 2 }
-            else if (len > 0x82) return null
-            if (i + len > data.size) return null
+            if (len == 0x81) {
+                if (i + 1 > data.size) throw Piv.PivException("Malformed card response (truncated TLV length).")
+                len = data[i].toInt() and 0xff
+                i++
+            } else if (len == 0x82) {
+                if (i + 2 > data.size) throw Piv.PivException("Malformed card response (truncated TLV length).")
+                len = ((data[i].toInt() and 0xff) shl 8) or (data[i + 1].toInt() and 0xff)
+                i += 2
+            } else if (len >= 0x80) {
+                throw Piv.PivException("Malformed card response (unsupported TLV length form).")
+            }
+            if (len > data.size - i) throw Piv.PivException("Malformed card response (TLV runs past the end).")
             if (t == tag) return data.copyOfRange(i, i + len)
             i += len
         }

@@ -77,7 +77,7 @@ object IdentityImport {
         val parsed = try {
             OpenSSHPrivateKey.parse(pem.trim(), passphrase?.ifBlank { null })
         } catch (e: Exception) {
-            val m = e.message ?: ""
+            val m = e.message ?: e.javaClass.simpleName
             throw when {
                 m.contains("no passphrase provided") -> IdentityImportException(
                     IdentityImportException.Kind.PASSPHRASE_REQUIRED,
@@ -100,6 +100,27 @@ object IdentityImport {
             }
         }
 
+        // The parsers are stricter since 5.0.1 (Ed25519 points, RSA key consistency, bcrypt round
+        // caps) and throw IllegalArgumentException as well as their own exceptions; anything
+        // thrown past the parse still has to reach the user as a readable import error.
+        return try {
+            storedFromParsed(parsed, pem, passphrase, name)
+        } catch (e: IdentityImportException) {
+            throw e
+        } catch (e: Exception) {
+            throw IdentityImportException(
+                IdentityImportException.Kind.MALFORMED,
+                "Couldn't read that OpenSSH key (${e.message ?: e.javaClass.simpleName})."
+            )
+        }
+    }
+
+    private fun storedFromParsed(
+        parsed: OpenSSHPrivateKey,
+        pem: String,
+        passphrase: String?,
+        name: String,
+    ): StoredIdentity {
         return when (parsed) {
             is OpenSSHPrivateKey.Ed25519 -> {
                 val identity = SSHEd25519Identity(parsed)

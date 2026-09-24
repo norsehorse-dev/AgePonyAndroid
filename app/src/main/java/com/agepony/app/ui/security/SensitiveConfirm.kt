@@ -20,7 +20,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.security.BiometricGate
 import com.agepony.app.security.BiometricGateException
-import com.agepony.app.security.PasswordVault
+import com.agepony.app.security.PasswordCheck
+import com.agepony.app.security.UnlockAttempts
 import com.agepony.app.vault.Vault
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -28,14 +29,24 @@ import kotlinx.coroutines.withContext
 
 /**
  * Re-authentication before private key material leaves the app (sending keys to another device,
- * printing a paper backup). Same rule as revealing a private key: biometric or device credential
- * when available, otherwise the app password or PIN, otherwise straight through for a vault with
- * no lock at all.
+ * printing a paper backup) and before a lock setting is loosened (audit L-15). Same rule as
+ * revealing a private key: biometric or device credential when available, otherwise the app
+ * password or PIN, otherwise straight through for a vault with no lock at all.
+ *
+ * On a password-only vault (No lock plus a password, or any vault with a duress secret, which
+ * is PIN-only) the app password is asked instead of the device credential: the device
+ * credential doesn't open that vault, so it shouldn't unlock its settings either. With
+ * [requireAppPassword] the app password is asked whenever one is set, for changes that only
+ * make sense if the user still knows it (switching to No lock, which leaves the password as
+ * the only way in). Password checks go through the vault's failed-attempt counter (audit M-1).
  *
  * Returns a function to call with a title and the action to run once the user has confirmed.
  */
 @Composable
-fun rememberSensitiveConfirm(vault: Vault): (title: String, onGranted: () -> Unit) -> Unit {
+fun rememberSensitiveConfirm(
+    vault: Vault,
+    requireAppPassword: Boolean = false,
+): (title: String, onGranted: () -> Unit) -> Unit {
     val activity = LocalContext.current as FragmentActivity
     val scope = rememberCoroutineScope()
     var pending by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
@@ -70,12 +81,20 @@ fun rememberSensitiveConfirm(vault: Vault): (title: String, onGranted: () -> Uni
                     val action = pending
                     pending = null
                     scope.launch {
-                        val ok = withContext(Dispatchers.IO) {
-                            val real = if (vault.passwordKeyBlobExists()) vault.readPasswordKeyBlob() else null
-                            real != null && PasswordVault.tryUnlock(chars, real, null) is PasswordVault.Outcome.Real
+                        val result = try {
+                            withContext(Dispatchers.IO) { vault.verifyAppPassword(chars) }
+                        } catch (e: Exception) {
+                            error = e.message ?: "Couldn't check the $noun."
+                            null
+                        } finally {
+                            chars.fill(' ')
                         }
-                        chars.fill(' ')
-                        if (ok) action?.second?.invoke() else error = "Wrong $noun."
+                        when (result) {
+                            PasswordCheck.Ok -> action?.second?.invoke()
+                            PasswordCheck.Wrong -> error = "Wrong $noun."
+                            is PasswordCheck.LockedOut -> error = UnlockAttempts.lockoutMessage(result.remainingMillis)
+                            null -> Unit
+                        }
                     }
                 }) { Text("Continue") }
             },
@@ -92,7 +111,12 @@ fun rememberSensitiveConfirm(vault: Vault): (title: String, onGranted: () -> Uni
     }
 
     return { title, onGranted ->
+        val hasPassword = vault.passwordKeyBlobExists()
         when {
+            hasPassword && (requireAppPassword || vault.passwordIsOnlyUnlock()) -> {
+                pending = title to onGranted
+                askPassword = true
+            }
             BiometricGate.canAuthenticate(activity) -> scope.launch {
                 try {
                     BiometricGate.confirm(activity, title, "Confirm it's you")
@@ -103,7 +127,7 @@ fun rememberSensitiveConfirm(vault: Vault): (title: String, onGranted: () -> Uni
                     }
                 }
             }
-            vault.passwordKeyBlobExists() -> { pending = title to onGranted; askPassword = true }
+            hasPassword -> { pending = title to onGranted; askPassword = true }
             else -> onGranted()
         }
     }

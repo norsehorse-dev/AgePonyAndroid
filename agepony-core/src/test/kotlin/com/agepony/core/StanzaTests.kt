@@ -16,16 +16,20 @@ class StanzaTests {
     }
 
     @Test
-    fun serialize_emptyBody_noBodyLines() {
+    fun serialize_emptyBody_emitsEmptyTerminatorLine() {
+        // Go age writes an empty body as one empty line; the strict parser requires it.
         val s = Stanza("test", listOf("a"), ByteArray(0))
-        assertEquals("-> test a\n", s.serialize())
+        assertEquals("-> test a\n\n", s.serialize())
+        val (parsed, next) = Stanza.parseOne(s.serialize().removeSuffix("\n").split('\n'), 0)
+        assertEquals(0, parsed.body.size)
+        assertEquals(2, next)
     }
 
     @Test
     fun roundTrip_smallBody() {
         val original = Stanza("X25519", listOf("ZGVm"), ByteArray(20) { it.toByte() })
         val text = original.serialize()
-        val lines = text.split('\n').dropLastWhile { it.isEmpty() }   // drop trailing ""
+        val lines = text.removeSuffix("\n").split('\n')   // drop trailing ""
         val (parsed, _) = Stanza.parseOne(lines, 0)
         assertEquals(original.type, parsed.type)
         assertEquals(original.args, parsed.args)
@@ -48,7 +52,7 @@ class StanzaTests {
         assertEquals("", parts[2])         // empty terminator
         assertEquals("", parts[3])         // final \n from terminator
         // Round-trip parse
-        val (parsed, _) = Stanza.parseOne(text.split('\n').dropLastWhile { it.isEmpty() }, 0)
+        val (parsed, _) = Stanza.parseOne(text.removeSuffix("\n").split('\n'), 0)
         assertArrayEquals(body, parsed.body)
     }
 
@@ -62,7 +66,7 @@ class StanzaTests {
         assertEquals(64, parts[1].length)
         assertEquals(64, parts[2].length)
         assertEquals("", parts[3])         // empty terminator (256-char total mod 64 = 0)
-        val (parsed, _) = Stanza.parseOne(text.split('\n').dropLastWhile { it.isEmpty() }, 0)
+        val (parsed, _) = Stanza.parseOne(text.removeSuffix("\n").split('\n'), 0)
         assertArrayEquals(body, parsed.body)
     }
 
@@ -71,7 +75,7 @@ class StanzaTests {
         val body = ByteArray(51) { it.toByte() }   // 68 base64 chars = 64 + 4
         val original = Stanza("X25519", listOf("ZGVm"), body)
         val text = original.serialize()
-        val parts = text.split('\n').dropLastWhile { it.isEmpty() }
+        val parts = text.removeSuffix("\n").split('\n')
         assertEquals(3, parts.size)         // header + 64-char line + 4-char line
         assertEquals(64, parts[1].length)
         assertEquals(4, parts[2].length)

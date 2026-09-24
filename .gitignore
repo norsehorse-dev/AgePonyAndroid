@@ -18,6 +18,7 @@ local.properties
 *.jks
 *.keystore
 keystore.properties
+*.lineage
 *.p12
 
 # Gradle/module build outputs (never commit)

@@ -92,8 +92,22 @@ object Cbor {
         return v
     }
 
+    /**
+     * Deepest nesting of arrays and maps accepted. CTAP2 responses nest three or four levels at
+     * most; the cap keeps a hostile authenticator from overflowing the stack (audit L-11).
+     */
+    const val MAX_DEPTH = 16
+
     /** Decode one value from [buf], leaving any trailing bytes (CTAP responses may append). */
-    fun decodeValue(buf: ByteBuffer): Any? {
+    fun decodeValue(buf: ByteBuffer): Any? = decodeValue(buf, 0)
+
+    /**
+     * Every length and item count is checked against the bytes actually left before anything
+     * is allocated (each array item takes at least one byte, each map entry two), so a device
+     * that claims a 2^31-element array or a 2^63-byte string gets a [CborException] rather than
+     * an OutOfMemoryError (audit L-11).
+     */
+    private fun decodeValue(buf: ByteBuffer, depth: Int): Any? {
         if (!buf.hasRemaining()) throw CborException("unexpected end of CBOR")
         val initial = buf.get().toInt() and 0xff
         val major = initial shr 5
@@ -104,15 +118,21 @@ object Cbor {
             2 -> readBytes(buf, readLength(buf, info))
             3 -> String(readBytes(buf, readLength(buf, info)), Charsets.UTF_8)
             4 -> {
+                if (depth >= MAX_DEPTH) throw CborException("CBOR nesting deeper than $MAX_DEPTH")
                 val n = readLength(buf, info)
-                ArrayList<Any?>(n.toInt()).apply { repeat(n.toInt()) { add(decodeValue(buf)) } }
+                if (n > buf.remaining()) throw CborException("CBOR array of $n items exceeds the remaining ${buf.remaining()} bytes")
+                val count = n.toInt()
+                ArrayList<Any?>(count).apply { repeat(count) { add(decodeValue(buf, depth + 1)) } }
             }
             5 -> {
+                if (depth >= MAX_DEPTH) throw CborException("CBOR nesting deeper than $MAX_DEPTH")
                 val n = readLength(buf, info)
+                if (n > buf.remaining() / 2) throw CborException("CBOR map of $n entries exceeds the remaining ${buf.remaining()} bytes")
+                val count = n.toInt()
                 LinkedHashMap<Any?, Any?>().apply {
-                    repeat(n.toInt()) {
-                        val k = decodeValue(buf)
-                        put(k, decodeValue(buf))
+                    repeat(count) {
+                        val k = decodeValue(buf, depth + 1)
+                        put(k, decodeValue(buf, depth + 1))
                     }
                 }
             }

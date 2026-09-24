@@ -246,7 +246,9 @@ object SSHSigner {
      * time. This catches it at the source.
      */
     private fun selfCheck(armored: String, message: ByteArray, namespace: String, what: String): String {
-        val ok = SSHSigVerifier.isValid(armored.toByteArray(Charsets.US_ASCII), message, namespace)
+        // allowNoTouch: this checks the assembly, not policy. Whether an untouched security-key
+        // signature is acceptable is the verifier's call (audit L-7), made against the signer entry.
+        val ok = SSHSigVerifier.isValid(armored.toByteArray(Charsets.US_ASCII), message, namespace, allowNoTouch = true)
         if (!ok) throw SSHSignerException(
             "$what signature failed self-verification after assembly; " +
             "check the raw signature, flags, counter, and public key material"
@@ -262,7 +264,7 @@ object SSHSigner {
         what: String,
     ): String {
         val result = SSHSigVerifier.verifyHashed(
-            armored.toByteArray(Charsets.US_ASCII), namespace
+            armored.toByteArray(Charsets.US_ASCII), namespace, true
         ) { messageHash }
         if (!result.valid) throw SSHSignerException(
             "$what signature failed self-verification after assembly; " +

@@ -48,8 +48,10 @@ class TagRecipient(publicKey: ByteArray) : LabeledAgeRecipient {
 
     init {
         // Validate the P-256 part up front so a bad key fails at parse time, not at encrypt time.
+        // The ML-KEM modulus check (FIPS 203 section 7.2) runs in decodeBech32 for keys being
+        // entered, and in MLKEM768.publicFromBytes at encrypt time; it is not repeated here so a
+        // hybrid key already stored in a vault keeps loading and displaying.
         P256Curve.decode(p256Part())
-        if (hybrid) MLKEM768.publicFromBytes(publicKey.copyOfRange(0, MLKEM768.ENCAPS_KEY_SIZE))
     }
 
     constructor(bech32: String) : this(decodeBech32(bech32))
@@ -102,6 +104,9 @@ class TagRecipient(publicKey: ByteArray) : LabeledAgeRecipient {
                 }
                 TAGPQ_HRP -> bytes.also {
                     require(it.size == HpkeP256.HYBRID_PUBLIC_KEY_SIZE) { "age1tagpq1 recipient must be ${HpkeP256.HYBRID_PUBLIC_KEY_SIZE} bytes" }
+                    require(MLKEM768.isValidEncapsulationKey(it.copyOfRange(0, MLKEM768.ENCAPS_KEY_SIZE))) {
+                        "age1tagpq1 recipient has a malformed ML-KEM-768 key"
+                    }
                 }
                 else -> throw IllegalArgumentException("expected HRP '$TAG_HRP' or '$TAGPQ_HRP', got '$hrp'")
             }

@@ -3,14 +3,20 @@
    The vault directory (filesDir/vault/) is excluded from both cloud backup and
    device-to-device transfer. The KEK-wrapped vault key is useless without the
    AndroidKeyStore KEK, which is non-exportable and cannot move to another
-   install or device. Backing it up would restore an unopenable vault. Applies
-   to Android 12 (API 31) and higher; see backup_rules.xml for 11 and lower.
+   install or device. Backing it up would restore an unopenable vault. The same
+   directory holds the failed-unlock counter (vault/unlock.attempts).
+
+   The settings file (agepony_vault_settings.xml) is excluded from both as well
+   (audit L-21): it holds proxy credentials in plain text and the lock settings.
+   Applies to Android 12 (API 31) and higher; see backup_rules.xml for 11 and lower.
 -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="vault/"/>
+        <exclude domain="sharedpref" path="agepony_vault_settings.xml"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="vault/"/>
+        <exclude domain="sharedpref" path="agepony_vault_settings.xml"/>
     </device-transfer>
 </data-extraction-rules>

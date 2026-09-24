@@ -1,5 +1,8 @@
 package com.agepony.core.archive
 
+import com.agepony.core.signing.SSHSig
+import com.agepony.core.signing.SSHSigVerifier
+import com.agepony.core.ssh.SSHWire
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -23,14 +26,132 @@ import java.security.MessageDigest
  *
  * [build] / [parse] hold the payload in memory. [buildStream] / [parseStream] are the
  * bounded-memory equivalents for files, and produce and accept exactly the same bytes.
+ *
+ * Versions (audit L-8). Both are read; new bundles should be written as v2 ([buildV2],
+ * [buildStreamV2], [bundleSourceV2]):
+ *
+ *  - v1, manifest `agepony-signed/1\nname=<name>\n`: `payload.sig` is an SSHSIG over the payload
+ *    bytes, namespace "agepony". The name is not covered, so anyone who can re-encrypt the bundle
+ *    (for a passphrase file, anyone with the passphrase) can rename it without breaking the
+ *    signature. [Parsed.nameCovered] is false.
+ *
+ *  - v2, manifest `agepony-signed/2\nname=<name>\n` (first line exactly `agepony-signed/2`):
+ *    `payload.sig` is an SSHSIG under namespace [NAMESPACE_V2] over the message
+ *
+ *    ```
+ *    M = string  "agepony.com/bundle v2"    (MESSAGE_DOMAIN_V2, ASCII, 21 bytes)
+ *        string  manifest                    (the exact bytes of the `.agepony-signed` entry)
+ *        string  SHA-512(payload)            (64 bytes)
+ *    ```
+ *
+ *    where `string` is SSH wire framing (big-endian uint32 length, then the bytes). The manifest
+ *    goes in byte for byte, so the name and any line a later version adds are covered. Rewriting
+ *    the first line back to `/1` does not downgrade it: the v1 check uses namespace "agepony",
+ *    which a v2 signature does not carry. [Parsed.nameCovered] is true.
+ *
+ * Mirrored by the iOS app; docs/SIGNATURE_FORMATS_v2.md carries the same layout.
  */
 object SignedBundle {
     const val MARKER = ".agepony-signed"
     private const val PAYLOAD = "payload"
     private const val SIGNATURE = "payload.sig"
     private const val VERSION_LINE = "agepony-signed/1"
+    private const val VERSION_LINE_V2 = "agepony-signed/2"
 
-    class Parsed(val name: String, val payload: ByteArray, val signatureArmored: String)
+    /** SSHSIG namespace of a v2 bundle signature. */
+    const val NAMESPACE_V2 = "agepony-bundle-v2"
+
+    /** First field of the v2 signed message. */
+    const val MESSAGE_DOMAIN_V2 = "agepony.com/bundle v2"
+
+    /**
+     * A parsed bundle. [version] is 1 or 2, and [manifest] is the marker entry's exact bytes
+     * (what a v2 signature covers).
+     */
+    class Parsed(
+        val name: String,
+        val payload: ByteArray,
+        val signatureArmored: String,
+        val version: Int = 1,
+        val manifest: ByteArray = ByteArray(0),
+    ) {
+        /** True for v2: [name] is covered by the signature. For v1 the UI should call it unsigned. */
+        val nameCovered: Boolean get() = version >= 2
+
+        /** SSHSIG namespace this version signs under. */
+        val namespace: String get() = namespaceFor(version)
+
+        /** The exact message the SSHSIG covers. */
+        fun signedMessage(): ByteArray =
+            if (version >= 2) v2Message(manifest, SSHSig.hashMessage(payload, SSHSig.HASH_SHA512)) else payload
+
+        /** Verify [signatureArmored] under this version's namespace and message. */
+        fun verify(allowNoTouch: Boolean = false): SSHSigVerifier.Result =
+            SSHSigVerifier.verify(signatureArmored.toByteArray(Charsets.UTF_8), signedMessage(), namespace, allowNoTouch)
+    }
+
+    /** The v2 signed message for a bundle whose marker entry holds [manifest]. See the object KDoc. */
+    fun v2Message(manifest: ByteArray, payloadSha512: ByteArray): ByteArray {
+        require(payloadSha512.size == 64) { "payload hash must be SHA-512 (64 bytes)" }
+        val out = ByteArrayOutputStream()
+        SSHWire.writeString(out, MESSAGE_DOMAIN_V2.toByteArray(Charsets.US_ASCII))
+        SSHWire.writeString(out, manifest)
+        SSHWire.writeString(out, payloadSha512)
+        return out.toByteArray()
+    }
+
+    /** The manifest [buildV2] writes for [originalName]. */
+    fun manifestV2(originalName: String): ByteArray =
+        "$VERSION_LINE_V2\nname=${sanitizeName(originalName)}\n".toByteArray(Charsets.UTF_8)
+
+    /**
+     * What to sign for a v2 bundle: SHA-512 of [v2Message] for [originalName] and a payload whose
+     * SHA-512 is [payloadSha512]. Hand it to a hashed signer with namespace [NAMESPACE_V2] and hash
+     * algorithm sha512, then pass the same [originalName] to [buildV2], [buildStreamV2] or
+     * [bundleSourceV2].
+     */
+    fun v2MessageHash(originalName: String, payloadSha512: ByteArray): ByteArray =
+        SSHSig.hashMessage(v2Message(manifestV2(originalName), payloadSha512), SSHSig.HASH_SHA512)
+
+    /** [build] for a v2 bundle; [signatureArmored] must be over [v2MessageHash]'s message. */
+    fun buildV2(originalName: String, payload: ByteArray, signatureArmored: String): ByteArray =
+        TarArchive.create(
+            listOf(
+                TarArchive.Entry(MARKER, manifestV2(originalName)),
+                TarArchive.Entry(PAYLOAD, payload),
+                TarArchive.Entry(SIGNATURE, signatureArmored.toByteArray(Charsets.UTF_8)),
+            )
+        )
+
+    /** [buildStream] for a v2 bundle. Byte-identical to [buildV2] for the same inputs. */
+    fun buildStreamV2(
+        out: OutputStream,
+        originalName: String,
+        payloadSize: Long,
+        payload: InputStream,
+        signatureArmored: String,
+    ) {
+        TarArchive.writeEntry(out, MARKER, manifestV2(originalName))
+        TarArchive.writeEntry(out, PAYLOAD, payloadSize, payload)
+        TarArchive.writeEntry(out, SIGNATURE, signatureArmored.toByteArray(Charsets.UTF_8))
+        TarArchive.finish(out)
+    }
+
+    /** [bundleSource] for a v2 bundle. Produces exactly the bytes [buildV2] would. */
+    fun bundleSourceV2(
+        originalName: String,
+        payloadSize: Long,
+        payload: InputStream,
+        signatureArmored: String,
+    ): InputStream = sourceOf(manifestV2(originalName), payloadSize, payload, signatureArmored)
+
+    private fun versionOf(manifest: ByteArray): Int {
+        val first = String(manifest, Charsets.UTF_8).lineSequence().firstOrNull()
+        return if (first == VERSION_LINE_V2) 2 else 1
+    }
+
+    private fun namespaceFor(version: Int): String =
+        if (version >= 2) NAMESPACE_V2 else SSHSig.NAMESPACE_AGEPONY
 
     /** Build the bundle tar from a payload and its armored SSHSIG. */
     fun build(originalName: String, payload: ByteArray, signatureArmored: String): ByteArray {
@@ -61,7 +182,8 @@ object SignedBundle {
             ?.removePrefix("name=")
             ?.ifBlank { "file" }
             ?: "file"
-        return Parsed(name, payload.data, String(sig.data, Charsets.UTF_8))
+        val manifestBytes = entries[0].data
+        return Parsed(name, payload.data, String(sig.data, Charsets.UTF_8), versionOf(manifestBytes), manifestBytes)
     }
 
     // --- Streaming ---
@@ -79,11 +201,36 @@ object SignedBundle {
         val signatureArmored: String,
         val payloadSize: Long,
         private val hashes: Map<String, ByteArray>,
+        /** 1 or 2; see [SignedBundle]. */
+        val version: Int = 1,
+        /** The marker entry's exact bytes (what a v2 signature covers). */
+        val manifest: ByteArray = ByteArray(0),
     ) {
         /** The payload hash under an SSHSIG hash-algorithm name ("sha512", "sha256"). */
         fun hash(sshsigHashAlg: String): ByteArray =
             hashes[sshsigHashAlg]
                 ?: throw IllegalArgumentException("payload was not hashed with '$sshsigHashAlg'")
+
+        /** True for v2: [name] is covered by the signature. */
+        val nameCovered: Boolean get() = version >= 2
+
+        /** SSHSIG namespace this version signs under. */
+        val namespace: String get() = namespaceFor(version)
+
+        /**
+         * H(signed message) under the SSHSIG hash algorithm [alg]: the payload hash for v1, the
+         * hash of the v2 message for v2. This is the `messageHashFor` a hashed verifier takes.
+         */
+        fun messageHash(alg: String): ByteArray =
+            if (version >= 2) SSHSig.hashMessage(v2Message(manifest, hash(SSHSig.HASH_SHA512)), alg) else hash(alg)
+
+        /** Verify [signatureArmored] under this version's namespace and message. */
+        fun verify(allowNoTouch: Boolean = false): SSHSigVerifier.Result =
+            SSHSigVerifier.verifyHashed(
+                signatureArmored.toByteArray(Charsets.UTF_8),
+                namespace,
+                allowNoTouch,
+            ) { alg -> messageHash(alg) }
     }
 
     /**
@@ -118,6 +265,15 @@ object SignedBundle {
         signatureArmored: String,
     ): InputStream {
         val manifest = "$VERSION_LINE\nname=${sanitizeName(originalName)}\n".toByteArray(Charsets.UTF_8)
+        return sourceOf(manifest, payloadSize, payload, signatureArmored)
+    }
+
+    private fun sourceOf(
+        manifest: ByteArray,
+        payloadSize: Long,
+        payload: InputStream,
+        signatureArmored: String,
+    ): InputStream {
         val signature = signatureArmored.toByteArray(Charsets.UTF_8)
         return TarArchive.source(
             listOf(
@@ -187,7 +343,7 @@ object SignedBundle {
             ?.removePrefix("name=")
             ?.ifBlank { "file" }
             ?: "file"
-        return StreamParsed(name, sig, payloadSize, digests.mapValues { (_, d) -> d.digest() })
+        return StreamParsed(name, sig, payloadSize, digests.mapValues { (_, d) -> d.digest() }, versionOf(m), m)
     }
 
     /**
@@ -309,11 +465,14 @@ object SignedBundle {
                 ?.removePrefix("name=")
                 ?.ifBlank { "file" }
                 ?: "file"
+            val manifestBytes = manifest.toByteArray()
             return StreamParsed(
                 name,
                 String(signature.toByteArray(), Charsets.UTF_8),
                 payloadSize,
                 digests.mapValues { (_, d) -> d.digest() },
+                versionOf(manifestBytes),
+                manifestBytes,
             )
         }
 

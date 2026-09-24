@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import com.agepony.app.security.TempFiles
 import java.io.File
 import java.io.FilterInputStream
 import java.io.InputStream
@@ -43,6 +44,9 @@ object SafIo {
     const val MIME_OCTET = "application/octet-stream"
 
     private const val COPY_BUFFER = 64 * 1024
+
+    /** Staging copies live in cacheDir under the sweep's prefix ("agepony-stage..."). */
+    private const val STAGE_PREFIX = TempFiles.PREFIX + "stage"
 
     fun queryNameSize(context: Context, uri: Uri): Pair<String, Long> {
         var name = "file"
@@ -93,6 +97,26 @@ object SafIo {
     }
 
     /**
+     * Remove a document whose write failed part way (audit L-18), so a failed decrypt leaves no
+     * partial or truncated plaintext at the destination. Deletes it where the provider allows,
+     * and otherwise truncates it to empty. Never throws.
+     */
+    fun discard(context: Context, uri: Uri) {
+        val deleted = try {
+            DocumentsContract.deleteDocument(context.contentResolver, uri)
+        } catch (_: Exception) {
+            false
+        }
+        if (!deleted) {
+            try {
+                openOutput(context, uri).close()
+            } catch (_: Exception) {
+                // Nothing more can be done from here.
+            }
+        }
+    }
+
+    /**
      * Guarantee an exact size. A tar header carries the entry size ahead of the bytes, so a
      * provider that reports no size (some cloud providers do not) forces a staging copy into the
      * app cache. Only used when the size is actually needed.
@@ -101,9 +125,17 @@ object SafIo {
         if (!needSize || ref.size > 0) {
             return PreparedSource(ref.name, ref.size, { openInput(context, ref.uri) }, null)
         }
-        val staged = File.createTempFile("agepony-stage", null, context.cacheDir)
-        openInput(context, ref.uri).use { input ->
-            staged.outputStream().use { out -> input.copyTo(out, COPY_BUFFER) }
+        // TempFiles.PREFIX so the sweep on start and lock also covers a copy left by a killed
+        // process. A copy that fails is removed here, since no PreparedSource exists yet for the
+        // caller to clean up (audit L-19).
+        val staged = File.createTempFile(STAGE_PREFIX, null, context.cacheDir)
+        try {
+            openInput(context, ref.uri).use { input ->
+                staged.outputStream().use { out -> input.copyTo(out, COPY_BUFFER) }
+            }
+        } catch (t: Throwable) {
+            staged.delete()
+            throw t
         }
         return PreparedSource(ref.name, staged.length(), { staged.inputStream() }, staged)
     }

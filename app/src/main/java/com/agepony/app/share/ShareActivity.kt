@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.fragment.app.FragmentActivity
+import com.agepony.app.installWindowProtection
 import com.agepony.app.security.ClipboardGuard
 import com.agepony.app.security.keystore.HardwareAuthBroker
 import com.agepony.app.security.piv.YubiKeyBroker
@@ -47,7 +48,9 @@ class ShareActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val parsed = SharePayload.from(intent)
+        // Drop URIs AgePony must not read on another app's behalf (audit L-20): anything left
+        // with nothing actionable finishes, as before.
+        val parsed = SharePayload.from(intent)?.let { SharePayload.restrictTo(it, packageName) }
         if (parsed == null) {
             finish()
             return
@@ -59,6 +62,9 @@ class ShareActivity : FragmentActivity() {
         } else {
             parsed
         }
+        // This activity sits in the sender's task, so its Recents card would show plaintext
+        // without FLAG_SECURE (audit M-5).
+        installWindowProtection(vaultViewModel.vault)
         enableEdgeToEdge()
         setContent {
             AgePonyTheme {

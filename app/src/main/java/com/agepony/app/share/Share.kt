@@ -56,6 +56,32 @@ sealed class SharePayload {
             }
         }
 
+        /**
+         * [payload] with every file URI AgePony must not read on the sender's behalf removed, or
+         * null when nothing is left (audit L-20). Only content:// URIs are accepted: a file:// URI
+         * would be opened with AgePony's own file permissions, so another app could hand it
+         * `files/vault/...` and have AgePony read its own private files as share input. For the
+         * same reason a content:// URI served by one of this app's own providers ([ownPackage] or
+         * `ownPackage.*`, the convention for `${applicationId}` authorities) is refused.
+         */
+        fun restrictTo(payload: SharePayload, ownPackage: String): SharePayload? = when (payload) {
+            is Text -> payload
+            is Files -> payload.uris.filter { isForeignContentUri(it, ownPackage) }
+                .takeIf { it.isNotEmpty() }
+                ?.let { Files(it) }
+        }
+
+        /** True for a content:// URI whose provider is not part of [ownPackage]. */
+        fun isForeignContentUri(uri: Uri, ownPackage: String): Boolean {
+            if (!uri.scheme.equals("content", ignoreCase = true)) return false
+            // "userId@authority" resolves to the same provider as "authority", so compare the
+            // part after any '@'.
+            val authority = uri.authority?.substringAfterLast('@')?.lowercase() ?: return false
+            if (authority.isEmpty()) return false
+            val own = ownPackage.lowercase()
+            return authority != own && !authority.startsWith("$own.")
+        }
+
         @Suppress("DEPRECATION")
         private fun streamExtra(intent: Intent): Uri? {
             val uri = if (Build.VERSION.SDK_INT >= 33) {

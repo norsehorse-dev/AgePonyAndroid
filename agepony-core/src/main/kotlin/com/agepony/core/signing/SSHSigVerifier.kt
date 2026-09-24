@@ -30,6 +30,8 @@ object SSHSigVerifier {
      * @param signerPublicWire the public-key wire blob from the envelope (for trust checks).
      * @param namespace the namespace the signature was made under.
      * @param reason null when valid; otherwise why it failed.
+     * @param skFlags the FIDO authenticator-data flags byte for an `sk-*` signature, null for
+     *   every other key type. See [userPresent] and [userVerified].
      */
     class Result(
         val valid: Boolean,
@@ -37,29 +39,80 @@ object SSHSigVerifier {
         val signerPublicWire: ByteArray,
         val namespace: String,
         val reason: String?,
-    )
+        val skFlags: Int? = null,
+    ) {
+        /** For an `sk-*` signature: whether the key saw a touch (UP, flags bit 0). Null otherwise. */
+        val userPresent: Boolean? get() = skFlags?.let { it and SK_FLAG_USER_PRESENT != 0 }
+
+        /**
+         * For an `sk-*` signature: whether the key verified the user (UV, flags bit 2, a PIN or
+         * biometric). Null otherwise. An allowed_signers entry with `verify-required` needs this.
+         */
+        val userVerified: Boolean? get() = skFlags?.let { it and SK_FLAG_USER_VERIFIED != 0 }
+    }
+
+    /** FIDO authenticator-data flag: user present (the key was touched). */
+    const val SK_FLAG_USER_PRESENT: Int = 0x01
+
+    /** FIDO authenticator-data flag: user verified (PIN or on-key biometric). */
+    const val SK_FLAG_USER_VERIFIED: Int = 0x04
+
+    /**
+     * Largest signature input accepted, armored or raw (audit AS-8). A real SSHSIG is a few
+     * hundred bytes (about 2 KiB for RSA-8192 armored), so this only turns away crafted blobs that
+     * would carry a huge RSA exponent or modulus into BouncyCastle.
+     */
+    const val MAX_SIGNATURE_BYTES: Int = 16 * 1024
+
+    /** OpenSSH SSH_RSA_MINIMUM_MODULUS_SIZE: RSA signers below this are refused. */
+    const val RSA_MIN_MODULUS_BITS: Int = 1024
+
+    /** OpenSSH SSHBUF_MAX_BIGNUM (2048 bytes): no RSA modulus above this many bits. */
+    const val RSA_MAX_MODULUS_BITS: Int = 16384
+
+    private val RSA_EXPONENT_LIMIT: BigInteger = BigInteger.ONE.shiftLeft(32)
+    private val THREE: BigInteger = BigInteger.valueOf(3)
 
     /**
      * Verify [signature] (armored or raw) over [message]. When [expectedNamespace] is
      * non-null and does not match the envelope, the result is invalid with a reason.
-     * Throws [SSHSig.SSHSigFormatException] only for structurally malformed input.
+     * Throws [SSHSig.SSHSigFormatException] only for structurally malformed input (and for input
+     * over [MAX_SIGNATURE_BYTES]).
+     *
+     * [allowNoTouch]: an `sk-*` signature made without a touch (the UP flag clear) is invalid
+     * unless this is true, matching OpenSSH, which only accepts one when the signer's
+     * allowed_signers entry carries `no-touch-required` (audit L-7). Leave it false unless that
+     * entry says so.
      */
     fun verify(
         signature: ByteArray,
         message: ByteArray,
         expectedNamespace: String? = SSHSig.NAMESPACE_AGEPONY,
-    ): Result = verifyHashed(signature, expectedNamespace) { alg -> SSHSig.hashMessage(message, alg) }
+        allowNoTouch: Boolean = false,
+    ): Result = verifyHashed(signature, expectedNamespace, allowNoTouch) { alg -> SSHSig.hashMessage(message, alg) }
 
     /**
      * Verify [signature] when the message is too large to hold in memory: [messageHashFor] is
      * asked for the message hash under the envelope's hash algorithm, which [SSHSig.hashStream]
-     * can produce by streaming. Same checks and the same [Result] as [verify].
+     * can produce by streaming. Same checks and the same [Result] as [verify], with touch
+     * required for `sk-*` signers.
      */
     fun verifyHashed(
         signature: ByteArray,
         expectedNamespace: String? = SSHSig.NAMESPACE_AGEPONY,
         messageHashFor: (String) -> ByteArray,
+    ): Result = verifyHashed(signature, expectedNamespace, false, messageHashFor)
+
+    /** [verifyHashed] with an explicit [allowNoTouch]; see [verify]. */
+    fun verifyHashed(
+        signature: ByteArray,
+        expectedNamespace: String?,
+        allowNoTouch: Boolean,
+        messageHashFor: (String) -> ByteArray,
     ): Result {
+        if (signature.size > MAX_SIGNATURE_BYTES) throw SSHSig.SSHSigFormatException(
+            "signature is too large (${signature.size} bytes, limit $MAX_SIGNATURE_BYTES)"
+        )
         val blob = SSHSig.decodeArmoredOrRaw(signature)
         val env = SSHSig.decode(blob)
         val keyType = env.keyType
@@ -74,27 +127,48 @@ object SSHSigVerifier {
             )
         }
 
+        // Refuse weak or DoS-shaped RSA keys before any modular arithmetic (audit AS-8).
+        if (keyType == SSHSig.KEY_RSA) {
+            rsaKeyProblem(env.publicKeyBlob)?.let { problem ->
+                return Result(
+                    valid = false,
+                    keyType = keyType,
+                    signerPublicWire = env.publicKeyBlob,
+                    namespace = env.namespace,
+                    reason = problem,
+                )
+            }
+        }
+
         val signedData = SSHSig.signedData(
             env.namespace,
             env.hashAlgorithm,
             messageHashFor(env.hashAlgorithm),
         )
 
+        var skFlags: Int? = null
         val ok = when (keyType) {
             SSHSig.KEY_ED25519 -> verifyEd25519(env, signedData)
             SSHSig.KEY_RSA -> verifyRsa(env, signedData)
             SSHSig.KEY_ECDSA_P256 -> verifyEcdsa(env, signedData)
-            SSHSig.KEY_SK_ED25519 -> verifySkEd25519(env, signedData)
-            SSHSig.KEY_SK_ECDSA_P256 -> verifySkEcdsa(env, signedData)
+            SSHSig.KEY_SK_ED25519 -> verifySkEd25519(env, signedData) { skFlags = it }
+            SSHSig.KEY_SK_ECDSA_P256 -> verifySkEcdsa(env, signedData) { skFlags = it }
             else -> throw SSHSig.SSHSigFormatException("unsupported signer key type: '$keyType'")
         }
 
+        val flags = skFlags
+        val untouched = ok && flags != null && (flags and SK_FLAG_USER_PRESENT) == 0 && !allowNoTouch
         return Result(
-            valid = ok,
+            valid = ok && !untouched,
             keyType = keyType,
             signerPublicWire = env.publicKeyBlob,
             namespace = env.namespace,
-            reason = if (ok) null else "signature did not verify",
+            reason = when {
+                !ok -> "signature did not verify"
+                untouched -> "security key signature was made without a touch (user-presence flag not set)"
+                else -> null
+            },
+            skFlags = flags,
         )
     }
 
@@ -103,7 +177,23 @@ object SSHSigVerifier {
         signature: ByteArray,
         message: ByteArray,
         expectedNamespace: String? = SSHSig.NAMESPACE_AGEPONY,
-    ): Boolean = verify(signature, message, expectedNamespace).valid
+        allowNoTouch: Boolean = false,
+    ): Boolean = verify(signature, message, expectedNamespace, allowNoTouch).valid
+
+    /**
+     * Why an ssh-rsa signer key is refused, or null if it is acceptable: modulus under
+     * [RSA_MIN_MODULUS_BITS] (OpenSSH parity) or over [RSA_MAX_MODULUS_BITS], or a public
+     * exponent that is even, below 3, or at least 2^32. A crafted huge exponent would otherwise
+     * make a single detached `.sig` cost seconds of CPU.
+     */
+    private fun rsaKeyProblem(publicKeyBlob: ByteArray): String? {
+        val (e, n) = parseRsaPublic(publicKeyBlob)
+        val bits = n.bitLength()
+        if (bits < RSA_MIN_MODULUS_BITS) return "RSA key is too small ($bits bits, minimum $RSA_MIN_MODULUS_BITS)"
+        if (bits > RSA_MAX_MODULUS_BITS) return "RSA key is too large ($bits bits, maximum $RSA_MAX_MODULUS_BITS)"
+        if (!e.testBit(0) || e < THREE || e >= RSA_EXPONENT_LIMIT) return "RSA key has an unacceptable public exponent"
+        return null
+    }
 
     // --- Per-algorithm verification ---
 
@@ -132,16 +222,18 @@ object SSHSigVerifier {
         return ecdsaVerify(q, sha256(signedData), r, s)
     }
 
-    private fun verifySkEd25519(env: SSHSig.Decoded, signedData: ByteArray): Boolean {
+    private fun verifySkEd25519(env: SSHSig.Decoded, signedData: ByteArray, onFlags: (Int) -> Unit): Boolean {
         val (pub, application) = parseSkEd25519Public(env.publicKeyBlob)
         val (sig, flags, counter) = parseSkEd25519Sig(env.signatureBlob)
+        onFlags(flags)
         val authMessage = skAuthMessage(application, flags, counter, signedData)
         return ed25519Verify(pub, authMessage, sig)
     }
 
-    private fun verifySkEcdsa(env: SSHSig.Decoded, signedData: ByteArray): Boolean {
+    private fun verifySkEcdsa(env: SSHSig.Decoded, signedData: ByteArray, onFlags: (Int) -> Unit): Boolean {
         val (q, application) = parseSkEcdsaPublic(env.publicKeyBlob)
         val (r, s, flags, counter) = parseSkEcdsaSig(env.signatureBlob)
+        onFlags(flags)
         val authMessage = skAuthMessage(application, flags, counter, signedData)
         return ecdsaVerify(q, sha256(authMessage), r, s)
     }

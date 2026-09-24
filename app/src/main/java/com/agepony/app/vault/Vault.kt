@@ -1,10 +1,18 @@
 package com.agepony.app.vault
 
 import android.content.Context
+import android.os.Build
+import android.os.SystemClock
+import android.provider.Settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.agepony.app.security.PasswordCheck
+import com.agepony.app.security.PasswordDeviceKey
+import com.agepony.app.security.PasswordVault
+import com.agepony.app.security.TempFiles
+import com.agepony.app.security.UnlockAttempts
 import com.agepony.app.security.keystore.HardwareKeyService
 import com.agepony.app.security.keystore.HardwareTagKeyService
 import kotlinx.serialization.json.Json
@@ -36,14 +44,25 @@ object SharedVault {
 
 class Vault(context: Context) {
 
+    private val appContext: Context = context.applicationContext ?: context
+
     // Compose-observable state (mirrors the iOS @Observable arrays + isUnlocked).
     var isUnlocked by mutableStateOf(false)
         private set
 
     // Set true right before launching a system UI (e.g. the SAF file picker) so
     // the lock-on-background handler doesn't drop the vault for an in-app round
-    // trip. Reset to false when the app returns to the foreground (ON_START).
-    var autoLockSuppressed: Boolean = false
+    // trip. Reset to false when the app returns to the foreground (AutoLock). The
+    // exemption is bounded: AutoLock still locks after max(grace, 5 minutes), and
+    // screen-off locks regardless (audit M-4).
+    @Volatile var autoLockSuppressed: Boolean = false
+
+    /**
+     * Called (on whatever thread unlocked it) each time the vault becomes unlocked, so the
+     * process-level AutoLock can schedule a lock if the unlock finished with nothing on
+     * screen (audit H-3). Set once by AutoLock.install.
+     */
+    @Volatile var onUnlocked: (() -> Unit)? = null
 
     val identities = mutableStateListOf<StoredIdentity>()
     val recipients = mutableStateListOf<StoredRecipient>()
@@ -91,7 +110,7 @@ class Vault(context: Context) {
         set(value) { prefs.edit().putBoolean(KEY_ONBOARDED, value).apply() }
 
     // Last selected bottom-nav tab. The vault re-locks whenever the app is
-    // backgrounded (see VaultGate), which tears down the app shell, so the tab
+    // backgrounded (see AutoLock), which tears down the app shell, so the tab
     // is persisted here rather than kept only in composition. Restoring it on
     // unlock keeps the user on the same tab instead of snapping back to Files,
     // and because it's on disk it also survives the process death that
@@ -177,6 +196,29 @@ class Vault(context: Context) {
             prefs.edit().putInt(KEY_AUTO_LOCK_GRACE_SECONDS, value).apply()
         }
 
+    // 5.0.1: whether screenshots, screen recording and the recents preview may show
+    // AgePony's screens. Off by default; the activities apply FLAG_SECURE from it (audit
+    // M-5). Settings asks the user to confirm it's them before turning it on.
+    private var allowScreenshotsState by mutableStateOf(prefs.getBoolean(KEY_ALLOW_SCREENSHOTS, false))
+    var allowScreenshots: Boolean
+        get() = allowScreenshotsState
+        set(value) {
+            allowScreenshotsState = value
+            prefs.edit().putBoolean(KEY_ALLOW_SCREENSHOTS, value).apply()
+        }
+
+    // 5.0.1: erase the vault (the same wipe as the duress secret) once the app password
+    // has been entered wrong UnlockAttempts.ERASE_AFTER times in a row. Off by default
+    // (audit M-1).
+    private var eraseAfterFailedAttemptsState by
+        mutableStateOf(prefs.getBoolean(KEY_ERASE_AFTER_FAILED_ATTEMPTS, false))
+    var eraseAfterFailedAttempts: Boolean
+        get() = eraseAfterFailedAttemptsState
+        set(value) {
+            eraseAfterFailedAttemptsState = value
+            prefs.edit().putBoolean(KEY_ERASE_AFTER_FAILED_ATTEMPTS, value).apply()
+        }
+
     // 4.2.0 — optional proxy for the one network key lookup (RecipientImport's
     // GitHub .keys fetch). Mirrored into Compose state like the defaults above so
     // Settings never shows a stale value. NONE (the default) is a direct
@@ -233,8 +275,8 @@ class Vault(context: Context) {
      * once instead of once per file.
      *
      * Memory only. It is never written to prefs and never enters the vault snapshot, and [lock]
-     * drops it alongside the vault key — and VaultGate locks the vault whenever the app is
-     * backgrounded, so a remembered passphrase does not outlive a visible session. Choosing
+     * drops it alongside the vault key. AutoLock locks the vault after the app is backgrounded
+     * and on screen off, so a remembered passphrase does not outlive a visible session. Choosing
      * recipients instead of a passphrase clears it, so a non-null value always means the last
      * choice was passphrase mode.
      */
@@ -270,6 +312,16 @@ class Vault(context: Context) {
     private val duressKeyFile: File get() = File(vaultDir, "vault.key.duress")
     private val dataFile: File get() = File(vaultDir, "vault.dat")
 
+    /**
+     * Failed app-password attempts, persisted beside the blobs it protects (audit M-1).
+     * Declared after [vaultDir] so the file path is ready when this is built.
+     */
+    val unlockAttempts = UnlockAttempts(
+        file = File(vaultDir, "unlock.attempts"),
+        elapsedNow = { SystemClock.elapsedRealtime() },
+        bootCount = { Settings.Global.getInt(appContext.contentResolver, Settings.Global.BOOT_COUNT, -1) },
+    )
+
     // The in-memory vault key. Non-null only while unlocked.
     private var vk: ByteArray? = null
 
@@ -287,19 +339,25 @@ class Vault(context: Context) {
 
     /** Persist the KEK-wrapped VK blob (iv ‖ wrapped). Called once at bootstrap. */
     fun writeKeyBlob(blob: ByteArray) {
-        ensureDir()
-        keyFile.writeBytes(blob)
+        writeAtomically(keyFile, blob)
     }
 
     /** Read back the stored key blob for unwrapping. */
     fun readKeyBlob(): ByteArray = keyFile.readBytes()
 
+    /**
+     * Delete the auth-KEK blob. Used when the vault goes password-only: a duress secret is
+     * set (audit H-1), or No lock is chosen with a password (audit H-4).
+     */
+    fun deleteKeyBlob() {
+        keyFile.delete()
+    }
+
     // Plain (non-biometric) key blob, present only while biometric is disabled.
     fun plainKeyBlobExists(): Boolean = plainKeyFile.exists()
 
     fun writePlainKeyBlob(blob: ByteArray) {
-        ensureDir()
-        plainKeyFile.writeBytes(blob)
+        writeAtomically(plainKeyFile, blob)
     }
 
     fun readPlainKeyBlob(): ByteArray = plainKeyFile.readBytes()
@@ -315,8 +373,9 @@ class Vault(context: Context) {
     fun passwordKeyBlobExists(): Boolean = passwordKeyFile.exists()
 
     fun writePasswordKeyBlob(blob: ByteArray) {
-        ensureDir()
-        passwordKeyFile.writeBytes(blob)
+        // Often the only wrap of the VK (password-only vaults), and now rewritten on upgrade
+        // from v1 to v2, so never leave it half-written.
+        writeAtomically(passwordKeyFile, blob)
     }
 
     fun readPasswordKeyBlob(): ByteArray = passwordKeyFile.readBytes()
@@ -328,8 +387,7 @@ class Vault(context: Context) {
     fun duressBlobExists(): Boolean = duressKeyFile.exists()
 
     fun writeDuressBlob(blob: ByteArray) {
-        ensureDir()
-        duressKeyFile.writeBytes(blob)
+        writeAtomically(duressKeyFile, blob)
     }
 
     fun readDuressBlob(): ByteArray = duressKeyFile.readBytes()
@@ -340,6 +398,42 @@ class Vault(context: Context) {
 
     /** A copy of the in-memory vault key, or null if locked. Used to re-wrap under a different KEK. */
     fun snapshotVaultKey(): ByteArray? = vk?.copyOf()
+
+    /**
+     * True when the app password is the only way the lock screen can open the vault: a
+     * duress secret is set, which makes the vault PIN-only (audit H-1), or the current lock
+     * mode has no blob of its own (No lock plus a password is password-only, audit H-4).
+     * Removing the password in this state would strand the vault (audit L-16).
+     */
+    fun passwordIsOnlyUnlock(): Boolean {
+        if (!passwordKeyBlobExists()) return false
+        if (duressBlobExists()) return true
+        return when (lockMode) {
+            LockMode.OFF -> !plainKeyBlobExists()
+            LockMode.BIOMETRIC -> !keyBlobExists()
+            LockMode.DEVICE_CREDENTIAL ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) !keyBlobExists() else !plainKeyBlobExists()
+        }
+    }
+
+    /**
+     * Check [secret] against the real password blob for an in-app re-auth, through the same
+     * failed-attempt counter and backoff as the lock screen (audit M-1). The duress blob is
+     * deliberately not consulted, so a decoy entered here is just wrong and wipes nothing.
+     * Blocking (scrypt plus Keystore): call it off the main thread. Does not zero [secret].
+     */
+    fun verifyAppPassword(secret: CharArray): PasswordCheck {
+        val wait = unlockAttempts.remainingLockoutMillis()
+        if (wait > 0L) return PasswordCheck.LockedOut(wait)
+        if (!passwordKeyBlobExists()) return PasswordCheck.Wrong
+        unlockAttempts.recordAttempt()
+        val outcome = PasswordVault.tryUnlock(secret, readPasswordKeyBlob(), null)
+        val ok = outcome is PasswordVault.Outcome.Real
+        outcome.wipe()
+        if (!ok) return PasswordCheck.Wrong
+        unlockAttempts.reset()
+        return PasswordCheck.Ok
+    }
 
     // MARK: - Lifecycle
 
@@ -357,6 +451,7 @@ class Vault(context: Context) {
         trashedRecipients.clear()
         persist()
         isUnlocked = true
+        onUnlocked?.invoke()
     }
 
     /** Unlock an existing vault: open vault.dat with the (already-unwrapped) VK. */
@@ -372,9 +467,13 @@ class Vault(context: Context) {
         trashedRecipients.clear(); trashedRecipients.addAll(snapshot.trashedRecipients)
         isUnlocked = true
         purgeExpiredTrash()
+        onUnlocked?.invoke()
     }
 
-    /** Drop the VK and all decrypted state from memory (called on background). */
+    /**
+     * Drop the VK and all decrypted state from memory (called on background, screen off and
+     * "Lock now"), and sweep plaintext staging files out of the cache (audit M-8).
+     */
     fun lock() {
         vk?.fill(0)
         vk = null
@@ -386,13 +485,18 @@ class Vault(context: Context) {
         trashedIdentities.clear()
         trashedRecipients.clear()
         isUnlocked = false
+        runCatching { TempFiles.sweep(appContext) }
     }
 
     // MARK: - Identity CRUD
 
-    fun addIdentity(identity: StoredIdentity) {
+    /**
+     * [activate] = false for keys that arrive from elsewhere (key transfer, paper restore): an
+     * imported key must never quietly become the encrypt-to-self key (audit M-6).
+     */
+    fun addIdentity(identity: StoredIdentity, activate: Boolean = true) {
         identities.add(identity)
-        if (activeIdentityId == null) activeIdentityId = identity.id
+        if (activate && activeIdentityId == null) activeIdentityId = identity.id
         persist()
     }
 
@@ -562,23 +666,67 @@ class Vault(context: Context) {
 
     // MARK: - Reset
 
-    /** Destroy the on-disk vault. The KEK is deleted by the caller (VaultViewModel). */
-    fun reset() {
+    /**
+     * Destroy the on-disk vault. The KEKs are deleted by the caller (VaultViewModel); the
+     * password device key and the failed-attempt counter go here, with the blobs they serve.
+     *
+     * A plain reset (Settings) keeps the user's encryption and network preferences but
+     * clears every lock-related one, so the next vault starts from the defaults its own
+     * creation path sets (audit L-17).
+     *
+     * [silentWipe] is the duress and erase-after-failed-attempts path (audit M-8): every
+     * setting goes back to what a new user has, proxy settings and credentials and the
+     * launch and review counters included, EXCEPT the onboarding flag. The result has to
+     * look like a long-time install that simply holds no keys, not a fresh one showing the
+     * intro tour. Written with commit so nothing old is left on disk.
+     */
+    fun reset(silentWipe: Boolean = false) {
         lock()
         keyFile.delete()
         plainKeyFile.delete()
         passwordKeyFile.delete()
         duressKeyFile.delete()
         dataFile.delete()
+        unlockAttempts.reset()
         // Hardware keys outlive the vault file otherwise. A decryption key left in the Keystore
         // after a wipe (duress included) would still open files encrypted to it.
         deleteAllDeviceKeys()
-        prefs.edit()
-            .remove(KEY_ACTIVE_IDENTITY)
-            .remove(KEY_ONBOARDED)
-            .remove(KEY_LAST_TAB)
-            .remove(KEY_UNLOCK_SECRET_KIND)
-            .apply()
+        // Makes any stray copy of an old password or duress blob unopenable (audit M-2).
+        runCatching { PasswordDeviceKey.delete() }
+        if (silentWipe) {
+            val onboarded = hasCompletedOnboarding
+            val editor = prefs.edit().clear()
+            if (onboarded) editor.putBoolean(KEY_ONBOARDED, true)
+            editor.commit()
+        } else {
+            prefs.edit()
+                .remove(KEY_ACTIVE_IDENTITY)
+                .remove(KEY_ONBOARDED)
+                .remove(KEY_LAST_TAB)
+                .remove(KEY_UNLOCK_SECRET_KIND)
+                .remove(KEY_LOCK_MODE)
+                .remove(KEY_BIOMETRIC_ENABLED)
+                .remove(KEY_AUTO_LOCK_GRACE_SECONDS)
+                .remove(KEY_ALLOW_SCREENSHOTS)
+                .remove(KEY_ERASE_AFTER_FAILED_ATTEMPTS)
+                .commit()
+        }
+        // lock() above already swept the cache's staging files.
+        reloadMirroredPrefs()
+    }
+
+    /** Re-read the Compose-state mirrors of prefs after [reset] changed prefs underneath them. */
+    private fun reloadMirroredPrefs() {
+        armorDefaultState = prefs.getBoolean(KEY_ARMOR_DEFAULT, true)
+        passphraseModeDefaultState = prefs.getBoolean(KEY_PASSPHRASE_MODE_DEFAULT, false)
+        autoLockGraceState = prefs.getInt(KEY_AUTO_LOCK_GRACE_SECONDS, 30)
+        allowScreenshotsState = prefs.getBoolean(KEY_ALLOW_SCREENSHOTS, false)
+        eraseAfterFailedAttemptsState = prefs.getBoolean(KEY_ERASE_AFTER_FAILED_ATTEMPTS, false)
+        proxyTypeState = ProxyType.fromKey(prefs.getString(KEY_PROXY_TYPE, null))
+        proxyHostState = prefs.getString(KEY_PROXY_HOST, "").orEmpty()
+        proxyPortState = prefs.getInt(KEY_PROXY_PORT, 0)
+        proxyUsernameState = prefs.getString(KEY_PROXY_USERNAME, "").orEmpty()
+        proxyPasswordState = prefs.getString(KEY_PROXY_PASSWORD, "").orEmpty()
     }
 
     private fun deleteAllDeviceKeys() {
@@ -626,6 +774,17 @@ class Vault(context: Context) {
         if (!vaultDir.exists()) vaultDir.mkdirs()
     }
 
+    /** Write [bytes] to a sibling temp file and rename it over [target], as [persist] does. */
+    private fun writeAtomically(target: File, bytes: ByteArray) {
+        ensureDir()
+        val tmp = File(vaultDir, target.name + ".tmp")
+        tmp.writeBytes(bytes)
+        if (!tmp.renameTo(target)) {
+            target.writeBytes(bytes)
+            tmp.delete()
+        }
+    }
+
     private companion object {
         // Recycle-bin retention: soft-deleted entries older than this are purged on unlock.
         const val TRASH_RETENTION_DAYS = 30L
@@ -647,5 +806,7 @@ class Vault(context: Context) {
         const val KEY_PROXY_USERNAME = "proxyUsername"
         const val KEY_PROXY_PASSWORD = "proxyPassword"
         const val KEY_AUTO_LOCK_GRACE_SECONDS = "autoLockGraceSeconds"
+        const val KEY_ALLOW_SCREENSHOTS = "allowScreenshots"
+        const val KEY_ERASE_AFTER_FAILED_ATTEMPTS = "eraseAfterFailedAttempts"
     }
 }

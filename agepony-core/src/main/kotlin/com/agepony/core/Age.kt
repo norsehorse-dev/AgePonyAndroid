@@ -4,6 +4,7 @@ import com.agepony.core.recipients.AgeIdentity
 import com.agepony.core.recipients.AgeRecipient
 import com.agepony.core.recipients.LabeledAgeRecipient
 import com.agepony.core.recipients.HardwareIdentity
+import com.agepony.core.recipients.ScryptIdentity
 import com.agepony.core.signing.SignatureStanza
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -68,7 +69,12 @@ object Age {
      * carried one and it opened under the file key. [signatureArmored] is null for a file with no
      * signature stanza.
      */
-    class DecryptedWithSignature(val plaintext: ByteArray, val signatureArmored: String?)
+    class DecryptedWithSignature(
+        val plaintext: ByteArray,
+        val signatureArmored: String?,
+        /** The sig stanza as a three-way result with its version (audit L-8, L-9). */
+        val signature: SignatureStanza.Opening = SignatureStanza.Opening.Absent,
+    )
 
     fun decrypt(ciphertext: ByteArray, identities: List<AgeIdentity>): ByteArray =
         decryptAndRecoverSignature(ciphertext, identities).plaintext
@@ -84,14 +90,16 @@ object Age {
     ): DecryptedWithSignature {
         require(identities.isNotEmpty()) { "must have at least one identity" }
         val parsed = AgeHeader.parse(ciphertext)
+        requireScryptAlone(parsed.stanzas, identities)
 
         val fileKey = unwrapFileKey(parsed.stanzas, identities)
 
         AgeHeader.verifyMAC(parsed.macInputBytes, parsed.mac, fileKey)
         val payloadBytes = ciphertext.copyOfRange(parsed.payloadStart, ciphertext.size)
         val plaintext = AgePayload.decrypt(fileKey, payloadBytes)
-        val signature = SignatureStanza.find(parsed.stanzas)?.let { SignatureStanza.open(fileKey, it) }
-        return DecryptedWithSignature(plaintext, signature)
+        val opening = SignatureStanza.openHeader(fileKey, parsed.stanzas)
+        val signature = (opening as? SignatureStanza.Opening.Opened)?.signatureArmored
+        return DecryptedWithSignature(plaintext, signature, opening)
     }
 
     /**
@@ -127,6 +135,7 @@ object Age {
 
         val headerBytes = readHeaderBytes(ciphertext)
         val parsed = AgeHeader.parse(headerBytes)
+        requireScryptAlone(parsed.stanzas, identities)
 
         val fileKey = unwrapFileKey(parsed.stanzas, identities)
 
@@ -147,11 +156,13 @@ object Age {
      * True if any of [identities] can unwrap this file's header. Reads the header and stops
      * there, leaving `ciphertext` positioned at the first payload byte, so a caller can find out
      * which key a file needs without decrypting it. Throws the usual header exceptions for input
-     * that is not age at all.
+     * that is not age at all, including a header that mixes scrypt with other stanzas when a
+     * passphrase identity is offered, which no decrypt would accept (audit L-2).
      */
     fun canDecryptStream(ciphertext: InputStream, identities: List<AgeIdentity>): Boolean {
         if (identities.isEmpty()) return false
         val parsed = AgeHeader.parse(readHeaderBytes(ciphertext))
+        requireScryptAlone(parsed.stanzas, identities)
         for (stanza in parsed.stanzas) {
             for (id in identities) {
                 // A hardware identity answers from its key tag, so probing a file never makes a
@@ -166,6 +177,34 @@ object Age {
     // --- Internals ---
 
     /**
+     * Go age: "an scrypt recipient must be the only one". Checked before any identity runs, so a
+     * header that pairs a cheap stanza with a second scrypt stanza at a huge work factor never
+     * reaches the KDF (audit L-2). The app's memory guard only reads the first scrypt stanza,
+     * which is safe once this holds.
+     *
+     * Exactly as in Go, where the check lives in `ScryptIdentity.Unwrap`, it applies when a
+     * passphrase identity is being tried: only that identity would run scrypt. Decrypting a
+     * mixed file with, say, an X25519 key does no KDF work and Go age opens it, so this does too.
+     */
+    private fun requireScryptAlone(stanzas: List<Stanza>, identities: List<AgeIdentity>) {
+        if (stanzas.size > 1 && stanzas.any { it.type == "scrypt" } && identities.any { it is ScryptIdentity }) {
+            throw AgeHeader.HeaderException("an scrypt recipient must be the only one in the file")
+        }
+    }
+
+    /**
+     * A recovered file key must be exactly 16 bytes. The per-type body length checks catch this
+     * earlier for the built-in recipients; this backstop covers ssh-rsa (whose OAEP body is the
+     * modulus size) and any hardware or plugin identity (audit L-5).
+     */
+    private fun checkFileKey(key: ByteArray): ByteArray {
+        if (key.size != FILE_KEY_SIZE) {
+            throw AgeHeader.HeaderException("unwrapped file key is ${key.size} bytes, expected $FILE_KEY_SIZE")
+        }
+        return key
+    }
+
+    /**
      * Find the file key. Software identities go first across every stanza, so a file that also
      * has a software recipient never waits on (or fails because of) a hardware key. Tag
      * identities go last, and an error from one (a cancelled prompt, a key the OS invalidated) is
@@ -174,16 +213,18 @@ object Age {
     private fun unwrapFileKey(stanzas: List<Stanza>, identities: List<AgeIdentity>): ByteArray {
         val (hardware, software) = identities.partition { it is HardwareIdentity }
         for (stanza in stanzas) {
-            for (id in software) id.unwrap(stanza)?.let { return it }
+            for (id in software) id.unwrap(stanza)?.let { return checkFileKey(it) }
         }
         var firstError: Exception? = null
         for (stanza in stanzas) {
             for (id in hardware) {
-                try {
-                    id.unwrap(stanza)?.let { return it }
+                val key = try {
+                    id.unwrap(stanza)
                 } catch (e: Exception) {
                     if (firstError == null) firstError = e
+                    null
                 }
+                if (key != null) return checkFileKey(key)
             }
         }
         throw firstError ?: NoMatchingIdentityException()
@@ -217,6 +258,10 @@ object Age {
      *
      * The MAC line is the first line beginning with the marker "\n--- "; it ends at the next
      * newline. Base64 stanza bodies contain no dashes, so the marker is unambiguous.
+     *
+     * At most [AgeHeader.MAX_HEADER_SIZE] bytes are read (audit L-3): a stream with no MAC line
+     * throws [AgeHeader.HeaderException] instead of being buffered without limit. Never reading
+     * past the cap also keeps a caller's `mark(1 MiB)` valid.
      */
     private fun readHeaderBytes(input: InputStream): ByteArray {
         val buf = ByteArrayOutputStream()
@@ -229,10 +274,11 @@ object Age {
             if (b < 0) throw AgeHeader.HeaderException("unexpected EOF while reading header")
             buf.write(b)
 
-            if (sawMacMarker) {
-                if (b == '\n'.code) return buf.toByteArray()
-                continue
+            if (sawMacMarker && b == '\n'.code) return buf.toByteArray()
+            if (buf.size() >= AgeHeader.MAX_HEADER_SIZE) {
+                throw AgeHeader.HeaderException("header exceeds ${AgeHeader.MAX_HEADER_SIZE} bytes")
             }
+            if (sawMacMarker) continue
 
             // Maintain a sliding window of the last MAC_MARKER.size bytes.
             if (windowLen < window.size) {

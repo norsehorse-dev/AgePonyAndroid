@@ -45,6 +45,8 @@ import com.agepony.core.Age
 import com.agepony.core.archive.SignedBundle
 import com.agepony.core.recipients.AgeIdentity
 import com.agepony.core.recipients.ScryptIdentity
+import com.agepony.core.signing.SSHSig
+import com.agepony.core.signing.SignatureStanza
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,7 +66,12 @@ import java.io.InputStream
 // AgePony signed bundle (encrypt-and-sign): the wrapper is stripped as it streams and the
 // embedded SSHSIG is checked against the vault. The signature sits after the payload in the
 // bundle, so a bad signature is reported once the file is already written; the verdict says so
-// plainly rather than pretending the file was verified before saving.
+// plainly rather than pretending the file was verified before saving. A signature-stanza file is
+// decrypted in memory, so its signature is checked before anything is written (audit L-9).
+//
+// A decrypt that fails after the destination document exists deletes it, so no partial or
+// truncated plaintext is left behind (audit L-18). A bundle whose signature failed is not
+// offered for extraction.
 //
 
 private enum class DecryptStage { PICK, PROBING, NEED_PASSPHRASE, WORKING, DONE }
@@ -92,6 +99,9 @@ fun DecryptFlow(
     var savedDest by remember { mutableStateOf<Uri?>(null) }
     var extracting by remember { mutableStateOf(false) }
     var extractResult by remember { mutableStateOf<String?>(null) }
+    var signatureFailed by remember { mutableStateOf(false) }
+    var nameCovered by remember { mutableStateOf(true) }
+    var signatureNote by remember { mutableStateOf<String?>(null) }
 
     val sourceName = source?.name ?: "file.age"
 
@@ -126,6 +136,9 @@ fun DecryptFlow(
                 }
                 originalName = outcome.originalName
                 verdict = outcome.verdict
+                signatureFailed = outcome.signatureFailed
+                nameCovered = outcome.nameCovered
+                signatureNote = outcome.note
                 savedName = withContext(Dispatchers.IO) { SafIo.queryNameSize(context, dest).first }
                 savedDest = dest
                 isBundle = withContext(Dispatchers.IO) { peekIsBundle(context, dest) }
@@ -151,6 +164,9 @@ fun DecryptFlow(
         verdict = null
         savedName = null
         originalName = null
+        signatureFailed = false
+        nameCovered = true
+        signatureNote = null
         stage = DecryptStage.PROBING
         scope.launch {
             try {
@@ -191,6 +207,8 @@ fun DecryptFlow(
     ) { tree: Uri? ->
         val src = savedDest
         if (tree == null || src == null) return@rememberLauncherForActivityResult
+        // The button is hidden when the signature failed; refuse here too.
+        if (signatureFailed) return@rememberLauncherForActivityResult
         extracting = true
         extractResult = null
         scope.launch {
@@ -208,6 +226,7 @@ fun DecryptFlow(
     fun reset() {
         source = null; passphrase = ""; usePassphrase = false
         error = null; savedName = null; originalName = null; verdict = null
+        signatureFailed = false; nameCovered = true; signatureNote = null
         bytesDone = 0L
         isBundle = false; savedDest = null; extracting = false; extractResult = null
         stage = DecryptStage.PICK
@@ -360,9 +379,13 @@ fun DecryptFlow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 val original = originalName
-                if (original != null && original != savedName) {
+                if (original != null && (original != savedName || !nameCovered)) {
                     Text(
-                        "Original name inside the signed file: $original",
+                        if (nameCovered) {
+                            "Original name inside the signed file: $original"
+                        } else {
+                            "Name inside the file (not covered by the signature): $original"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp),
@@ -374,10 +397,26 @@ fun DecryptFlow(
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (verdict!!.startsWith("⚠")) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = if (signatureNote != null) 4.dp else 16.dp),
+                    )
+                }
+                signatureNote?.let { note ->
+                    Text(
+                        note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
                 }
-                if (isBundle) {
+                if (isBundle && signatureFailed) {
+                    Text(
+                        "This is a bundle of files, but its signature check failed, so AgePony won't " +
+                            "extract it. Only open the saved file if you trust where it came from.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                } else if (isBundle) {
                     Text(
                         "This is a bundle of files. You can extract them into a folder.",
                         style = MaterialTheme.typography.bodySmall,
@@ -408,7 +447,21 @@ fun DecryptFlow(
 
 // ---- Work ----
 
-private class DecryptOutcome(val originalName: String?, val verdict: String?)
+private class DecryptOutcome(
+    val originalName: String?,
+    val verdict: String?,
+    /** A signature was present and failed (invalid or unreadable). Blocks bundle extraction. */
+    val signatureFailed: Boolean = false,
+    /** False for a v1 signed bundle, whose name the signature does not cover (audit L-8). */
+    val nameCovered: Boolean = true,
+    /** What an older (v1) signature does not cover, shown under the verdict. */
+    val note: String? = null,
+)
+
+private const val V1_STANZA_NOTE =
+    "Older signature format (v1): it covers the contents but not who the file was encrypted to."
+private const val V1_BUNDLE_NOTE =
+    "Older signature format (v1): it covers the contents but not the file name."
 
 /**
  * Can any of [identities] unwrap this file? Reads the age header and stops there, so this costs
@@ -441,8 +494,45 @@ private fun headerHasSignatureStanza(context: android.content.Context, source: S
 
 private fun verdictFor(result: FileVerifier.Result): String = when (result.trust) {
     FileVerifier.Trust.TRUSTED -> "Signed by ${result.signerName ?: "a known key"} ✓"
-    FileVerifier.Trust.VALID_UNKNOWN -> "Valid signature (signer not in your vault)"
+    FileVerifier.Trust.VALID_UNKNOWN -> {
+        val listed = result.untrustedSignerName
+        if (listed != null) {
+            "⚠ Valid signature from \"$listed\", but not trusted: ${result.untrustedReason ?: "its trusted-signer entry does not allow it"}"
+        } else {
+            "Valid signature (signer not in your vault)"
+        }
+    }
     FileVerifier.Trust.INVALID -> "⚠ Signature invalid: ${result.reason ?: "verification failed"}"
+}
+
+/**
+ * The verdict for a signature-stanza file, checked against the in-memory plaintext before any of
+ * it is written. A stanza that is present but can't be read is a failed signature, never
+ * "unsigned" (audit L-9). The namespace and signed message come from the stanza's version.
+ */
+private fun stanzaOutcome(
+    recovered: Age.DecryptedWithSignature,
+    known: List<StoredIdentity>,
+    signers: List<StoredSigner>,
+): DecryptOutcome = when (val opening = recovered.signature) {
+    is SignatureStanza.Opening.Absent -> DecryptOutcome(null, null)
+    is SignatureStanza.Opening.Unreadable ->
+        DecryptOutcome(null, "⚠ Signature present but unreadable: ${opening.reason}", signatureFailed = true)
+    is SignatureStanza.Opening.Opened -> {
+        val plaintext = recovered.plaintext
+        val result = FileVerifier().verifyHashed(
+            opening.signatureArmored.toByteArray(Charsets.UTF_8),
+            known,
+            signers,
+            opening.namespace,
+        ) { alg -> opening.messageHash(alg) { hashAlg -> SSHSig.hashMessage(plaintext, hashAlg) } }
+        DecryptOutcome(
+            originalName = null,
+            verdict = verdictFor(result),
+            signatureFailed = result.trust == FileVerifier.Trust.INVALID,
+            note = if (opening.coversRecipients) null else V1_STANZA_NOTE,
+        )
+    }
 }
 
 /**
@@ -450,6 +540,23 @@ private fun verdictFor(result: FileVerifier.Result): String = when (result.trust
  * signed-bundle wrapper stripped on the way past if there is one.
  */
 private fun decryptToDocument(
+    context: android.content.Context,
+    source: SourceRef,
+    dest: Uri,
+    identities: List<AgeIdentity>,
+    passphrase: String?,
+    known: List<StoredIdentity>,
+    signers: List<StoredSigner>,
+    onBytes: (Long) -> Unit,
+): DecryptOutcome = try {
+    writeDecrypted(context, source, dest, identities, passphrase, known, signers, onBytes)
+} catch (t: Throwable) {
+    // The picker already created [dest]; don't leave a partial or empty plaintext file there.
+    SafIo.discard(context, dest)
+    throw t
+}
+
+private fun writeDecrypted(
     context: android.content.Context,
     source: SourceRef,
     dest: Uri,
@@ -466,13 +573,13 @@ private fun decryptToDocument(
         val rawBytes = CountingInputStream(SafIo.openInput(context, source.uri), onBytes)
             .use { it.readBytes() }
         val recovered = FileEncryptor.decryptSignedBytes(FileEncryptor.toBinary(rawBytes), identities)
+        // Everything is in memory, so the verdict is settled before a byte is written.
+        val outcome = stanzaOutcome(recovered, known, signers)
         BufferedOutputStream(SafIo.openOutput(context, dest)).use { out ->
             out.write(recovered.plaintext)
             out.flush()
         }
-        val sig = recovered.signatureArmored ?: return DecryptOutcome(null, null)
-        val result = FileVerifier().verify(sig.toByteArray(Charsets.UTF_8), recovered.plaintext, known, signers)
-        return DecryptOutcome(null, verdictFor(result))
+        return outcome
     }
 
     val (armored, rawInput) = FileEncryptor.sniffArmored(SafIo.openInput(context, source.uri))
@@ -493,12 +600,24 @@ private fun decryptToDocument(
     }
 
     val bundle = parsed ?: return DecryptOutcome(null, null)
+    // Verify under the namespace and message the bundle's version defines (v1: "agepony" over
+    // the payload; v2: its own namespace over manifest and payload hash).
     val result = FileVerifier().verifyHashed(
         bundle.signatureArmored.toByteArray(Charsets.UTF_8),
         known,
         signers,
-    ) { alg -> bundle.hash(alg) }
-    return DecryptOutcome(bundle.name, verdictFor(result))
+        bundle.namespace,
+    ) { alg -> bundle.messageHash(alg) }
+    val failed = result.trust == FileVerifier.Trust.INVALID
+    val verdict = verdictFor(result) +
+        if (failed) ". The file was saved before the signature could be checked: treat its contents as untrusted." else ""
+    return DecryptOutcome(
+        originalName = bundle.name,
+        verdict = verdict,
+        signatureFailed = failed,
+        nameCovered = bundle.nameCovered,
+        note = if (bundle.nameCovered) null else V1_BUNDLE_NOTE,
+    )
 }
 
 private fun peekIsBundle(context: android.content.Context, uri: Uri): Boolean =
@@ -529,7 +648,12 @@ private fun extractBundleToTree(context: android.content.Context, src: Uri, tree
         com.agepony.core.archive.TarArchive.forEachEntry(input) { name, _, data ->
             val unique = SafIo.uniqueName(sanitizeEntryName(name), used)
             val out = SafIo.createInTree(context, tree, unique)
-            SafIo.openOutput(context, out).use { o -> data.copyTo(o, 64 * 1024) }
+            try {
+                SafIo.openOutput(context, out).use { o -> data.copyTo(o, 64 * 1024) }
+            } catch (t: Throwable) {
+                SafIo.discard(context, out) // no truncated entry left in the folder (audit L-18)
+                throw t
+            }
             count++
         }
     }

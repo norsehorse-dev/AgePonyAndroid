@@ -39,6 +39,9 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.review.ReviewPrompt
 import com.agepony.app.security.BiometricGate
+import com.agepony.app.security.PasswordVault
+import com.agepony.app.security.UnlockAttempts
+import com.agepony.app.ui.security.rememberSensitiveConfirm
 import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.LockMode
 import com.agepony.app.vault.ProxyConfig
@@ -53,6 +56,12 @@ import com.agepony.app.ui.portability.SendKeysScreen
 // SettingsView: security lock mode, encryption default, active identity,
 // about, and a guarded reset. The lock-mode selector picks the Keystore/OS gate
 // (Off / device credential / biometric) via VaultViewModel.applyLockMode.
+//
+// 5.0.1 (security audit): anything that loosens the lock asks the user to confirm it's
+// them first (L-15): switching to No lock, changing or removing the password, removing the
+// duress secret, lengthening the auto-lock delay, allowing screenshots, and turning off
+// erase-after-failed-attempts. A duress secret makes the vault PIN-only, so the lock mode
+// rows are disabled while one is set (H-1).
 //
 private enum class SettingsSub { HELP, SECURITY, LICENSES, TRASH, SEND_KEYS, RECEIVE_KEYS, PAPER_RESTORE }
 private enum class ProxyMode { OFF, ORBOT, CUSTOM }
@@ -72,6 +81,15 @@ fun SettingsScreen(
     var pendingReset by remember { mutableStateOf(false) }
     var showSetPassword by remember { mutableStateOf(false) }
     var showSetDuress by remember { mutableStateOf(false) }
+    var confirmRemovePassword by remember { mutableStateOf(false) }
+    var passwordOnlyNotice by remember { mutableStateOf<String?>(null) }
+
+    // Re-auth before loosening the lock (audit L-15). The second form always asks the app
+    // password when one is set: switching to No lock leaves it as the only way in, so the
+    // user has to show they still know it.
+    val confirmIdentity = rememberSensitiveConfirm(vault)
+    val confirmWithPassword = rememberSensitiveConfirm(vault, requireAppPassword = true)
+    val secretNoun = if (vm.unlockSecretKind == "pin") "PIN" else "password"
 
     fun openUrl(url: String) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
@@ -127,13 +145,24 @@ fun SettingsScreen(
         val hasBiometric = remember(vm.isBusy) { BiometricGate.hasBiometric(context) }
         val deviceSecure = remember(vm.isBusy) { BiometricGate.isDeviceSecure(context) }
         val legacy = Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+        // A duress secret makes the vault PIN-only; hardware unlock would let a coercer with
+        // the phone's passcode skip the PIN field where the duress secret fires (audit H-1).
+        val pinOnly = vm.duressEnrolled
         Text(
-            "How AgePony's vault is locked. This is separate from any password you set below, " +
-                "which is its own lock whichever mode you pick.",
+            "How AgePony's vault is locked. A password or PIN set below is a second way in " +
+                "next to Biometric or Device PIN, not an extra step. With No lock, the password " +
+                "is the only way in.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
         )
+        if (pinOnly) {
+            Text(
+                "Turn off the duress $secretNoun to use fingerprint or device unlock.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         LockModeRow(
             selected = vm.lockMode == LockMode.BIOMETRIC,
             title = "Biometric",
@@ -142,7 +171,7 @@ fun SettingsScreen(
             } else {
                 "Needs a fingerprint or face enrolled on this device."
             },
-            enabled = !vm.isBusy && hasBiometric,
+            enabled = !vm.isBusy && hasBiometric && !pinOnly,
             onClick = { vm.applyLockMode(activity, LockMode.BIOMETRIC) },
         )
         LockModeRow(
@@ -155,16 +184,25 @@ fun SettingsScreen(
                 else -> "Your device PIN, pattern, or password is required at every unlock, " +
                     "checked against the key in hardware."
             },
-            enabled = !vm.isBusy && deviceSecure,
+            enabled = !vm.isBusy && deviceSecure && !pinOnly,
             onClick = { vm.applyLockMode(activity, LockMode.DEVICE_CREDENTIAL) },
         )
         LockModeRow(
             selected = vm.lockMode == LockMode.OFF,
             title = "No lock",
-            subtitle = "The vault opens with nothing to confirm. If you set a password below it " +
-                "becomes the gate; with neither, anyone who opens the app is in.",
-            enabled = !vm.isBusy,
-            onClick = { vm.applyLockMode(activity, LockMode.OFF) },
+            subtitle = if (vm.passwordEnrolled) {
+                "No fingerprint or device check. Your $secretNoun below is then the only way in."
+            } else {
+                "The vault opens with nothing to confirm: anyone who opens the app is in. Set a " +
+                    "password below to make it the only way in."
+            },
+            enabled = !vm.isBusy && !pinOnly,
+            onClick = {
+                if (vm.lockMode != LockMode.OFF) {
+                    val confirm = if (vm.passwordEnrolled) confirmWithPassword else confirmIdentity
+                    confirm("Turn off fingerprint and device unlock") { vm.applyLockMode(activity, LockMode.OFF) }
+                }
+            },
         )
 
         // App-owned password / PIN unlock (4.0.0). Coexists with biometric; also the
@@ -182,17 +220,44 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            val noun = if (vm.unlockSecretKind == "pin") "PIN" else "password"
+            val noun = secretNoun
             Text(
                 "Unlock $noun is set.",
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            if (vm.secretBelowMinimum) {
+                Text(
+                    if (noun == "PIN") {
+                        "Your PIN is shorter than the ${PasswordVault.MIN_PIN_LENGTH} digits AgePony now " +
+                            "asks for. It still works, but a longer one is much harder to guess. Change it below."
+                    } else {
+                        "Your password is shorter than the ${PasswordVault.MIN_PASSWORD_LENGTH} characters " +
+                            "AgePony now asks for. It still works, but a longer one is much harder to guess. " +
+                            "Change it below."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             Row {
-                TextButton(onClick = { showSetPassword = true }, enabled = vm.vault.isUnlocked && !vm.isBusy) {
+                TextButton(
+                    onClick = { confirmIdentity("Change your $noun") { showSetPassword = true } },
+                    enabled = vm.vault.isUnlocked && !vm.isBusy,
+                ) {
                     Text("Change")
                 }
-                TextButton(onClick = { vm.removePassword() }, enabled = !vm.isBusy) {
+                TextButton(
+                    onClick = {
+                        // Never strand the vault (audit L-16).
+                        if (vault.passwordIsOnlyUnlock()) {
+                            passwordOnlyNotice = vm.passwordOnlyMessage()
+                        } else {
+                            confirmRemovePassword = true
+                        }
+                    },
+                    enabled = !vm.isBusy,
+                ) {
                     Text("Remove", color = MaterialTheme.colorScheme.error)
                 }
             }
@@ -200,31 +265,72 @@ fun SettingsScreen(
             if (!vm.duressEnrolled) {
                 OutlinedButton(
                     onClick = { showSetDuress = true },
-                    enabled = !vm.isBusy,
+                    enabled = vm.vault.isUnlocked && !vm.isBusy,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                ) { Text("Set a duress password…") }
+                ) { Text("Set a duress $noun…") }
                 Text(
-                    "A second, different password that silently wipes the vault instead of " +
+                    "A second, different $noun that silently wipes the vault instead of " +
                         "opening it. Entered under coercion, it leaves an empty app with nothing " +
-                        "to reveal. There is no confirmation and no undo.",
+                        "to reveal. There is no confirmation and no undo. While one is set, " +
+                        "fingerprint and device unlock are turned off, so the lock screen always " +
+                        "asks for your $noun.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
                 Text(
-                    "Duress password is set — entering it wipes the vault.",
+                    "Duress $noun is set. Entering it wipes the vault. Fingerprint and device " +
+                        "unlock stay off while it is set.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
                 Row {
-                    TextButton(onClick = { showSetDuress = true }, enabled = !vm.isBusy) { Text("Change") }
-                    TextButton(onClick = { vm.removeDuress() }, enabled = !vm.isBusy) {
+                    TextButton(
+                        onClick = { showSetDuress = true },
+                        enabled = vm.vault.isUnlocked && !vm.isBusy,
+                    ) { Text("Change") }
+                    TextButton(
+                        onClick = { confirmIdentity("Remove the duress $noun") { vm.removeDuress() } },
+                        enabled = !vm.isBusy,
+                    ) {
                         Text("Remove", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
+
+            SettingRow(
+                title = "Erase the vault after ${UnlockAttempts.ERASE_AFTER} wrong attempts",
+                subtitle = "After ${UnlockAttempts.ERASE_AFTER} wrong ${noun}s in a row, AgePony " +
+                    "erases the vault at the lock screen the same way the duress $noun does. From " +
+                    "${UnlockAttempts.BACKOFF_AFTER} wrong tries on, each new try also has to wait longer.",
+                checked = vault.eraseAfterFailedAttempts,
+                enabled = !vm.isBusy,
+                onCheckedChange = { on ->
+                    if (on) {
+                        vault.eraseAfterFailedAttempts = true
+                    } else {
+                        confirmIdentity("Stop erasing after wrong attempts") { vault.eraseAfterFailedAttempts = false }
+                    }
+                },
+            )
         }
+
+        // Screenshots (5.0.1). FLAG_SECURE is applied from this setting by the activities.
+        SettingRow(
+            title = "Allow screenshots",
+            subtitle = "Off: AgePony's screens stay out of screenshots, screen recordings and the " +
+                "recent apps preview. Turn on only while you need to capture a screen.",
+            checked = vault.allowScreenshots,
+            enabled = true,
+            onCheckedChange = { on ->
+                if (on) {
+                    confirmIdentity("Allow screenshots") { vault.allowScreenshots = true }
+                } else {
+                    vault.allowScreenshots = false
+                }
+            },
+        )
 
         if (vm.error != null) {
             Text(
@@ -320,7 +426,7 @@ fun SettingsScreen(
             Column(Modifier.weight(1f).padding(end = 12.dp)) {
                 Text("Lock after leaving the app", style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "How long AgePony waits after you switch away before locking the vault. Shorter is safer; longer keeps your place during a quick app switch.",
+                    "How long AgePony waits after you switch away before locking the vault. Shorter is safer; longer keeps your place during a quick app switch. Turning the screen off counts as switching away.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -334,8 +440,13 @@ fun SettingsScreen(
                         DropdownMenuItem(
                             text = { Text(autoLockLabel(seconds)) },
                             onClick = {
-                                vault.autoLockGraceSeconds = seconds
                                 graceMenuOpen = false
+                                // A longer delay loosens the lock: confirm it's you (audit L-15).
+                                if (seconds > vault.autoLockGraceSeconds) {
+                                    confirmIdentity("Lock less often") { vault.autoLockGraceSeconds = seconds }
+                                } else {
+                                    vault.autoLockGraceSeconds = seconds
+                                }
                             },
                         )
                     }
@@ -680,7 +791,8 @@ fun SettingsScreen(
         SetSecretDialog(
             title = "Set a password or PIN",
             allowKindChoice = true,
-            onConfirm = { secret, kind ->
+            initialKind = vm.unlockSecretKind,
+            onConfirm = { secret, kind, _ ->
                 vm.enrollPassword(secret, kind)
                 showSetPassword = false
             },
@@ -690,36 +802,87 @@ fun SettingsScreen(
 
     if (showSetDuress) {
         SetSecretDialog(
-            title = "Set a duress password",
+            title = "Set a duress $secretNoun",
             allowKindChoice = false,
+            // The duress secret is typed into the same lock screen field, so same keyboard.
+            initialKind = vm.unlockSecretKind,
             confirmLabel = "Set duress",
-            body = "Enter a second password, different from your real one. Entering it at " +
+            body = "Enter a second $secretNoun, different from your real one. Entering it at " +
                 "unlock wipes the vault silently. Choose something you can recall under " +
-                "pressure but would not use by habit.",
-            onConfirm = { secret, _ ->
-                vm.setDuressSecret(secret)
+                "pressure but would not use by habit. Fingerprint and device unlock are turned " +
+                "off while it is set, so confirm your current $secretNoun first.",
+            currentLabel = "Current $secretNoun",
+            onConfirm = { secret, _, current ->
+                vm.setDuressSecret(secret, current)
                 showSetDuress = false
             },
             onDismiss = { showSetDuress = false },
         )
     }
+
+    if (confirmRemovePassword) {
+        AlertDialog(
+            onDismissRequest = { confirmRemovePassword = false },
+            title = { Text("Remove your $secretNoun?") },
+            text = {
+                Text(
+                    if (vm.duressEnrolled) {
+                        "The vault will no longer ask for it, and your duress $secretNoun is removed too."
+                    } else {
+                        "The vault will no longer ask for it. It then opens with the lock mode above only."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmRemovePassword = false
+                    confirmIdentity("Remove your $secretNoun") { vm.removePassword() }
+                }) {
+                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRemovePassword = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    passwordOnlyNotice?.let { notice ->
+        AlertDialog(
+            onDismissRequest = { passwordOnlyNotice = null },
+            title = { Text("Can't remove it yet") },
+            text = { Text(notice) },
+            confirmButton = { TextButton(onClick = { passwordOnlyNotice = null }) { Text("OK") } },
+        )
+    }
 }
 
+/**
+ * New-secret entry with a confirm field. [initialKind] preselects "password" or "pin".
+ * With [currentLabel] set, a field for the current secret comes first and must be filled;
+ * it is passed to [onConfirm] as the third argument (null otherwise). New secrets must
+ * meet the minimum length (audit M-1).
+ */
 @Composable
 private fun SetSecretDialog(
     title: String,
     allowKindChoice: Boolean,
+    initialKind: String = "password",
     confirmLabel: String = "Save",
     body: String? = null,
-    onConfirm: (CharArray, String) -> Unit,
+    currentLabel: String? = null,
+    onConfirm: (CharArray, String, CharArray?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var kind by remember { mutableStateOf("password") }
+    var kind by remember { mutableStateOf(if (initialKind == "pin") "pin" else "password") }
+    var current by remember { mutableStateOf("") }
     var value by remember { mutableStateOf("") }
     var again by remember { mutableStateOf("") }
     val isPin = kind == "pin"
     val mismatch = again.isNotEmpty() && value != again
-    val valid = value.isNotEmpty() && value == again
+    val policyError = if (value.isEmpty()) null else PasswordVault.secretPolicyError(value, kind)
+    val valid = value.isNotEmpty() && policyError == null && value == again &&
+        (currentLabel == null || current.isNotEmpty())
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -740,6 +903,17 @@ private fun SetSecretDialog(
                     }
                 }
                 val kb = KeyboardOptions(keyboardType = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password)
+                if (currentLabel != null) {
+                    OutlinedTextField(
+                        value = current,
+                        onValueChange = { current = it },
+                        singleLine = true,
+                        label = { Text(currentLabel) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = kb,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
                 OutlinedTextField(
                     value = value,
                     onValueChange = { value = it },
@@ -747,6 +921,16 @@ private fun SetSecretDialog(
                     label = { Text(if (isPin) "PIN" else "Password") },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = kb,
+                    isError = policyError != null,
+                    supportingText = {
+                        Text(
+                            policyError ?: if (isPin) {
+                                "At least ${PasswordVault.MIN_PIN_LENGTH} digits."
+                            } else {
+                                "At least ${PasswordVault.MIN_PASSWORD_LENGTH} characters."
+                            }
+                        )
+                    },
                     modifier = Modifier.padding(top = 8.dp),
                 )
                 OutlinedTextField(
@@ -765,7 +949,12 @@ private fun SetSecretDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(value.toCharArray(), kind) }, enabled = valid) {
+            TextButton(
+                onClick = {
+                    onConfirm(value.toCharArray(), kind, if (currentLabel != null) current.toCharArray() else null)
+                },
+                enabled = valid,
+            ) {
                 Text(confirmLabel)
             }
         },

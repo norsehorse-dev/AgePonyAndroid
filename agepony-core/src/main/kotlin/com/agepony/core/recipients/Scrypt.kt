@@ -9,6 +9,7 @@ private const val SCRYPT_STANZA_TYPE = "scrypt"
 private const val SCRYPT_LABEL = "age-encryption.org/v1/scrypt"
 private const val SCRYPT_SALT_LEN = 16
 private val ZERO_NONCE_12 = ByteArray(12)
+private const val SCRYPT_BODY_SIZE = 16 + 16   // file key (16) + ChaCha20Poly1305 tag (16)
 
 /**
  * Passphrase recipient via scrypt.
@@ -70,6 +71,8 @@ class ScryptIdentity(
         if (wfStr.length > 1 && wfStr[0] == '0') return null
         val workFactor = wfStr.toIntOrNull() ?: return null
         if (workFactor < 1 || workFactor > maxWorkFactor) return null
+        // Checked before the KDF so a malformed stanza costs nothing (audit L-5).
+        if (stanza.body.size != SCRYPT_BODY_SIZE) return null
 
         val fullSalt = SCRYPT_LABEL.toByteArray() + salt
         val n = 1 shl workFactor

@@ -26,8 +26,8 @@ android {
         applicationId = "com.agepony.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 16
-        versionName = "5.0.0"
+        versionCode = 17
+        versionName = "5.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -58,7 +58,12 @@ android {
             vcsInfo {
                 include = false
             }
-            isMinifyEnabled = false
+            // R8 shrinking, optimization and obfuscation for release (both flavors). Keep rules,
+            // and why each one exists, are in proguard-rules.pro. R8 output is deterministic for
+            // the same inputs and toolchain, so reproducible (F-Droid) builds are unaffected; the
+            // mapping file stays in build/outputs/mapping/ and is not embedded in the APK.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

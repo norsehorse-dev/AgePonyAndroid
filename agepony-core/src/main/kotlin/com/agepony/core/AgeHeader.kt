@@ -27,6 +27,16 @@ object AgeHeader {
     const val VERSION_LINE = "age-encryption.org/v1"
     private const val HEADER_INFO = "header"
 
+    /**
+     * Largest header accepted, MAC line included: 1 MiB, the same cap as iOS (audit L-3). A
+     * real header is a few hundred bytes per recipient; without a cap a file with no `---`
+     * line would be buffered until the process runs out of memory.
+     */
+    const val MAX_HEADER_SIZE = 1024 * 1024
+
+    /** The MAC is 32 bytes, so its unpadded base64 is always exactly 43 characters. */
+    private const val MAC_B64_LEN = 43
+
     class HeaderException(message: String) : Exception(message)
 
     data class ParsedHeader(
@@ -71,20 +81,31 @@ object AgeHeader {
     /**
      * Parse the header from the start of `data`. Returns stanzas, the MAC input bytes
      * (for verification), the parsed MAC, and the index in `data` where the payload begins.
+     *
+     * Strict, matching filippo.io/age `format.Parse` (audit L-1): the header is US-ASCII, the
+     * version line is exact, stanzas follow each other with no stray lines in between (see
+     * [Stanza.parseOne] for the body rules), and the closing line is exactly `--- ` plus 43
+     * characters of canonical unpadded base64. Anything else is a [HeaderException], so a
+     * header has exactly one accepted encoding and cannot be altered without the file key.
      */
     fun parse(data: ByteArray): ParsedHeader {
-        // Find the "---<space>" marker, prefixed by a newline.
+        // Find the "---<space>" marker, prefixed by a newline. A stanza line starts with "->"
+        // and a body line holds only base64, so the first such marker is the MAC line.
         val needle = "\n--- ".toByteArray()
+        val searchEnd = minOf(data.size, MAX_HEADER_SIZE) - needle.size
         var idx = -1
         var i = 0
-        outer@ while (i <= data.size - needle.size) {
+        outer@ while (i <= searchEnd) {
             for (j in needle.indices) {
                 if (data[i + j] != needle[j]) { i++; continue@outer }
             }
             idx = i
             break
         }
-        if (idx < 0) throw HeaderException("missing '--- ' line in header")
+        if (idx < 0) {
+            if (data.size >= MAX_HEADER_SIZE) throw HeaderException("header exceeds $MAX_HEADER_SIZE bytes")
+            throw HeaderException("missing '--- ' line in header")
+        }
 
         // MAC input = bytes from start through and including the 3 dashes.
         // data[idx]    = '\n'
@@ -92,34 +113,53 @@ object AgeHeader {
         // data[idx+4]  = ' '
         val macInputBytes = data.copyOfRange(0, idx + 4)
 
-        // Find newline after the MAC value.
-        var nlPos = idx + 5
-        while (nlPos < data.size && data[nlPos] != '\n'.code.toByte()) nlPos++
-        if (nlPos >= data.size) throw HeaderException("missing newline after MAC")
-
-        val macB64 = String(data, idx + 5, nlPos - (idx + 5), Charsets.US_ASCII)
-        val mac = Stanza.base64Decode(macB64)
+        // The MAC line is exactly 43 base64 characters, then '\n'.
+        val macStart = idx + 5
+        val nlPos = macStart + MAC_B64_LEN
+        if (nlPos > MAX_HEADER_SIZE - 1) throw HeaderException("header exceeds $MAX_HEADER_SIZE bytes")
+        if (nlPos >= data.size) throw HeaderException("truncated MAC line")
+        if (data[nlPos] != '\n'.code.toByte()) throw HeaderException("malformed MAC line")
+        for (k in macStart until nlPos) {
+            if (data[k].toInt() and 0x80 != 0) throw HeaderException("malformed MAC line")
+        }
+        val macB64 = String(data, macStart, MAC_B64_LEN, Charsets.US_ASCII)
+        val mac = try {
+            Stanza.base64Decode(macB64)
+        } catch (e: IllegalArgumentException) {
+            throw HeaderException("malformed MAC line: ${e.message}")
+        }
+        if (mac.size != 32) throw HeaderException("malformed MAC line: MAC must be 32 bytes")
         val payloadStart = nlPos + 1
 
+        // The header is US-ASCII only; any high byte is malformed rather than something to
+        // reinterpret through a charset.
+        for (b in macInputBytes) {
+            if (b.toInt() and 0x80 != 0) throw HeaderException("header is not US-ASCII")
+        }
+
         // Split macInputBytes into lines (no terminating newline after '---').
-        val headerText = String(macInputBytes, Charsets.UTF_8)
+        val headerText = String(macInputBytes, Charsets.US_ASCII)
         val lines = headerText.split('\n')
         if (lines.isEmpty() || lines[0] != VERSION_LINE) {
             throw HeaderException("missing or wrong version line: got '${lines.getOrNull(0)}'")
         }
 
         val stanzas = mutableListOf<Stanza>()
+        val last = lines.size - 1   // lines[last] is the "---" that precedes the MAC
         var li = 1
-        while (li < lines.size && lines[li] != "---") {
-            if (lines[li].startsWith("-> ")) {
-                val (stanza, nextIdx) = Stanza.parseOne(lines, li)
-                stanzas.add(stanza)
-                li = nextIdx
-            } else if (lines[li].isEmpty()) {
-                li++   // empty line — terminator after a 64-aligned stanza body
-            } else {
+        while (li < last) {
+            if (!lines[li].startsWith("-> ")) {
+                // Go age accepts no blank or stray lines between stanzas.
                 throw HeaderException("unexpected header line: '${lines[li]}'")
             }
+            val (stanza, nextIdx) = try {
+                Stanza.parseOne(lines, li)
+            } catch (e: Stanza.Companion.StanzaException) {
+                throw HeaderException("malformed stanza: ${e.message}")
+            }
+            if (nextIdx > last) throw HeaderException("stanza ran into the MAC line")
+            stanzas.add(stanza)
+            li = nextIdx
         }
         return ParsedHeader(stanzas, macInputBytes, mac, payloadStart)
     }

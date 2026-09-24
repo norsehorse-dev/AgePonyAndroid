@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -157,10 +159,12 @@ private fun CreateNote(
     onDone: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    var title by rememberSaveable { mutableStateOf("") }
-    var body by rememberSaveable { mutableStateOf("") }
-    var passphrase by rememberSaveable { mutableStateOf("") }
-    var confirm by rememberSaveable { mutableStateOf("") }
+    // Note text and passphrases stay out of the saved-state Bundle, which the system can write to
+    // disk (audit L-23). A draft lost to a process kill is the accepted cost.
+    var title by remember { mutableStateOf("") }
+    var body by remember { mutableStateOf("") }
+    var passphrase by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
     var show by rememberSaveable { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -253,7 +257,7 @@ private fun NoteDetail(
 ) {
     val note = vault.notes.firstOrNull { it.id == noteId }
     var phase by remember { mutableStateOf(NotePhase.LOCKED) }
-    var passInput by rememberSaveable { mutableStateOf("") }
+    var passInput by remember { mutableStateOf("") } // not saveable (audit L-23)
     var show by rememberSaveable { mutableStateOf(false) }
     var working by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -288,6 +292,7 @@ private fun NoteDetail(
                     label = { Text("Passphrase") },
                     singleLine = true,
                     visualTransformation = if (show) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -414,12 +419,16 @@ private fun PassphraseFields(
     OutlinedTextField(
         value = passphrase, onValueChange = onPassphrase,
         label = { Text("Passphrase") }, singleLine = true,
-        visualTransformation = transform, modifier = Modifier.fillMaxWidth(),
+        visualTransformation = transform,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        modifier = Modifier.fillMaxWidth(),
     )
     OutlinedTextField(
         value = confirm, onValueChange = onConfirm,
         label = { Text("Confirm passphrase") }, singleLine = true,
-        visualTransformation = transform, modifier = Modifier.fillMaxWidth(),
+        visualTransformation = transform,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        modifier = Modifier.fillMaxWidth(),
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
         Switch(checked = show, onCheckedChange = onShow)

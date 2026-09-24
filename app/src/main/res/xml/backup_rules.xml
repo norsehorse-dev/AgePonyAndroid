@@ -5,8 +5,14 @@
    AndroidKeyStore, which never leaves the device and cannot be restored. A
    restored copy of the wrapped key with no KEK is unopenable, so backing it up
    only creates a broken "provisioned but unrecoverable" state on reinstall.
+   The same directory holds the failed-unlock counter (vault/unlock.attempts).
+
+   The settings file (agepony_vault_settings.xml) is excluded too (audit L-21):
+   it holds proxy credentials in plain text and the lock settings, none of which
+   should leave the device or come back to a different install.
    Applies to Android 11 (API 30) and lower; see data_extraction_rules.xml for 12+.
 -->
 <full-backup-content>
     <exclude domain="file" path="vault/"/>
+    <exclude domain="sharedpref" path="agepony_vault_settings.xml"/>
 </full-backup-content>

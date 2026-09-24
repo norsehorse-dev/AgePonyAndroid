@@ -54,6 +54,7 @@ sealed class OpenSSHPublicKey {
 
         const val KEYTYPE_ED25519 = "ssh-ed25519"
         const val KEYTYPE_RSA = "ssh-rsa"
+        private val MIN_RSA_EXPONENT: BigInteger = BigInteger.valueOf(3)
 
         fun parse(line: String): OpenSSHPublicKey {
             val trimmed = line.trim()
@@ -108,9 +109,16 @@ sealed class OpenSSHPublicKey {
                     } catch (ex: SSHMPInt.SSHMPIntException) {
                         throw OpenSSHPublicKeyException("malformed RSA modulus: ${ex.message}")
                     }
+                    // Odd and 3 <= e < 2^32 (audit L-4): rules out degenerate keys and huge
+                    // exponents that would make every public-key operation a CPU sink. Go's
+                    // x/crypto/ssh is stricter still (odd, 3 <= e < 2^24), so no key it accepts
+                    // is refused here.
                     if (e.signum() <= 0) throw OpenSSHPublicKeyException(
                         "RSA exponent must be positive"
                     )
+                    if (e < MIN_RSA_EXPONENT || e.bitLength() > 32 || !e.testBit(0)) {
+                        throw OpenSSHPublicKeyException("RSA exponent must be odd and between 3 and 2^32")
+                    }
                     if (n.signum() <= 0) throw OpenSSHPublicKeyException(
                         "RSA modulus must be positive"
                     )

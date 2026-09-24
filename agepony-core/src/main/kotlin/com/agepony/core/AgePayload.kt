@@ -16,7 +16,9 @@ import java.security.SecureRandom
  * - Each chunk: 64 KiB of plaintext → 64 KiB + 16 B of ciphertext (Poly1305 tag).
  *   The LAST chunk has 0 ≤ plaintext_size ≤ 64 KiB; it may be a full 64 KiB.
  * - Per-chunk nonce = 11-byte BE counter (starting at 0) || 1-byte flag (0 non-last, 1 last).
- * - Empty plaintext encodes as ONE chunk of 0 bytes plaintext + 16-byte tag.
+ * - Empty plaintext encodes as ONE chunk of 0 bytes plaintext + 16-byte tag. That is the only
+ *   place an empty chunk is allowed: an empty final chunk after a full one is rejected on
+ *   decrypt, as Go age does, so every plaintext has exactly one encoding.
  *
  * Two API styles are provided, producing byte-identical output for the same fileKey + nonce:
  *   - Whole-buffer: [encrypt] / [decrypt] operate on ByteArrays (convenient for small data).
@@ -82,6 +84,7 @@ object AgePayload {
             } catch (e: Exception) {
                 throw PayloadException("chunk $counter authentication failed (isLast=$isLast)", e)
             }
+            checkNotEmptyFinal(counter, isLast, pt)
             out.write(pt)
             pos += take
             counter++
@@ -205,7 +208,19 @@ object AgePayload {
         } catch (e: Exception) {
             throw PayloadException("chunk $counter authentication failed (isLast=$isLast)", e)
         }
+        checkNotEmptyFinal(counter, isLast, pt)
         out.write(pt)
+    }
+
+    /**
+     * Go age: "last chunk is empty". A final chunk may only be empty when it is also the first
+     * (empty plaintext). A writer never needs an empty trailing chunk, since a full final chunk
+     * is flagged last directly, so accepting one would make ciphertexts non-canonical.
+     */
+    private fun checkNotEmptyFinal(counter: Long, isLast: Boolean, pt: ByteArray) {
+        if (isLast && counter > 0 && pt.isEmpty()) {
+            throw PayloadException("final chunk $counter is empty (non-canonical STREAM encoding)")
+        }
     }
 
     /**

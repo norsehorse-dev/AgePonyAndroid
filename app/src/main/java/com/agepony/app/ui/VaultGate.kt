@@ -21,7 +21,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,9 +43,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.agepony.app.security.BiometricGate
+import com.agepony.app.security.PasswordVault
+import com.agepony.app.security.UnlockAttempts
 import com.agepony.app.ui.passphrase.PassphraseOnlyScreen
 import com.agepony.app.vault.LockMode
 import com.agepony.app.vault.VaultViewModel
@@ -54,10 +53,10 @@ import com.agepony.app.vault.VaultViewModel
 //
 // Gates the app shell behind the vault state, mirroring the iOS launch gate:
 // first run shows "create vault", a provisioned-but-locked vault shows "unlock",
-// and an unlocked vault shows AgePonyApp(). The vault locks again when the app
-// stops (backgrounds) — UNLESS a system picker (SAF) was launched from inside
-// the app, in which case the round trip is exempt so the in-progress flow and
-// its result launcher survive.
+// and an unlocked vault shows AgePonyApp(). Locking itself is process-level since
+// 5.0.1 (security/AutoLock, audit H-3): after the grace period once no AgePony
+// activity is visible, at once on screen off, and after at most 5 minutes during
+// a system picker (SAF) round trip launched from inside the app.
 //
 // Creation offers two paths: a biometric-sealed vault (when the device has a
 // screen lock or fingerprint), and an app-owned password/PIN vault (always, and
@@ -65,12 +64,15 @@ import com.agepony.app.vault.VaultViewModel
 // possible without a screen lock, 4.0.0).
 //
 // Unlock paths, in the order the locked screen offers them:
-//   - biometric, when enabled;
+//   - biometric or device credential, when that is the lock mode and no duress
+//     secret is set (a duress secret makes the vault PIN-only, audit H-1);
 //   - app-owned password / PIN, when enrolled; the same field is where a decoy
-//     password is entered, and the wipe it triggers is invisible here — it just
-//     resolves to an unlocked, empty vault;
-//   - silent (no-lock) auto-unlock, only when biometric is off AND a plain blob
-//     exists — the deliberate "no lock at all" mode.
+//     password is entered, and the wipe it triggers is invisible here: it just
+//     resolves to an unlocked, empty vault. Wrong entries are counted, with a
+//     backoff after 5 (audit M-1);
+//   - silent (no-lock) auto-unlock, only when the mode is No lock, a plain blob
+//     exists AND no password is set: the deliberate "no lock at all" mode. No lock
+//     plus a password is password-only (audit H-4).
 //
 @Composable
 fun VaultGate(
@@ -85,24 +87,11 @@ fun VaultGate(
 
     val activity = LocalContext.current as FragmentActivity
 
-    // Lock when backgrounding, but skip the lock for an in-app SAF round trip.
-    DisposableEffect(activity) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_STOP -> vm.onEnterBackground()
-                Lifecycle.Event.ON_START -> vm.onEnterForeground()
-                else -> Unit
-            }
-        }
-        activity.lifecycle.addObserver(observer)
-        onDispose { activity.lifecycle.removeObserver(observer) }
-    }
-
     // "No lock" mode only: biometric off and a plain (non-auth) blob present.
-    // Password-enrolled vaults are NOT auto-unlocked — the password is the gate.
-    LaunchedEffect(vm.provisioned, vm.vault.isUnlocked, vm.lockMode, vm.isBusy, vm.error) {
+    // Password-enrolled vaults are NOT auto-unlocked: the password is the gate (audit H-4).
+    LaunchedEffect(vm.provisioned, vm.vault.isUnlocked, vm.lockMode, vm.passwordEnrolled, vm.isBusy, vm.error) {
         if (vm.provisioned && !vm.vault.isUnlocked && vm.lockMode == LockMode.OFF &&
-            vm.vault.plainKeyBlobExists() && !vm.isBusy && vm.error == null
+            !vm.passwordEnrolled && vm.vault.plainKeyBlobExists() && !vm.isBusy && vm.error == null
         ) {
             vm.unlock(activity)
         }
@@ -207,9 +196,22 @@ private fun WelcomeScreen(vm: VaultViewModel, activity: FragmentActivity) {
 private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassphraseOnly: () -> Unit) {
     val isPin = vm.unlockSecretKind == "pin"
     val secretNoun = if (isPin) "PIN" else "password"
+    // A duress secret makes the vault PIN-only: no OS gate is offered (audit H-1).
+    val hardwareUnlock = !vm.duressEnrolled
     // With an OS gate, that gate leads and the password field is opt-in; a no-lock
-    // (OFF) vault shows the password field straight away.
-    var showPasswordField by remember { mutableStateOf(vm.lockMode == LockMode.OFF) }
+    // (OFF) or PIN-only vault shows the password field straight away.
+    var showPasswordField by remember { mutableStateOf(vm.lockMode == LockMode.OFF || !hardwareUnlock) }
+    // Failed-attempt backoff (audit M-1): count down while a wait is running.
+    var lockoutSeconds by remember { mutableStateOf(0L) }
+    var confirmLegacyOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(vm.isBusy, vm.error) {
+        while (true) {
+            val remaining = vm.lockoutRemainingMillis()
+            lockoutSeconds = (remaining + 999L) / 1000L
+            if (remaining <= 0L) break
+            delay(1000L)
+        }
+    }
     val credentialLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -233,11 +235,12 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                 textAlign = TextAlign.Center,
             )
             Text(
-                when (vm.lockMode) {
-                    LockMode.BIOMETRIC -> "Unlock your vault to access your keys and notes."
-                    LockMode.DEVICE_CREDENTIAL ->
+                when {
+                    !hardwareUnlock -> "Enter your $secretNoun to unlock."
+                    vm.lockMode == LockMode.BIOMETRIC -> "Unlock your vault to access your keys and notes."
+                    vm.lockMode == LockMode.DEVICE_CREDENTIAL ->
                         "Confirm your device PIN, pattern, or password to unlock."
-                    LockMode.OFF -> "Enter your $secretNoun to unlock."
+                    else -> "Enter your $secretNoun to unlock."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -248,7 +251,7 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
             if (vm.isBusy) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             } else {
-                when (vm.lockMode) {
+                when (if (hardwareUnlock) vm.lockMode else LockMode.OFF) {
                     LockMode.BIOMETRIC ->
                         Button(onClick = { vm.unlock(activity) }, modifier = Modifier.width(240.dp)) {
                             Text("Unlock")
@@ -286,7 +289,7 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                             ),
                             modifier = Modifier.fillMaxWidth()
                                 .focusRequester(focusRequester)
-                                .padding(top = if (vm.lockMode != LockMode.OFF) 24.dp else 0.dp),
+                                .padding(top = if (hardwareUnlock && vm.lockMode != LockMode.OFF) 24.dp else 0.dp),
                         )
                         LaunchedEffect(Unit) {
                             // Cold start and some OEM skins (MIUI) hand the window focus late, so
@@ -308,9 +311,52 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                                 secret = ""
                                 vm.unlockWithPassword(chars)
                             },
-                            enabled = secret.isNotEmpty(),
+                            enabled = secret.isNotEmpty() && lockoutSeconds == 0L,
                             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                         ) { Text("Unlock with $secretNoun") }
+                        if (lockoutSeconds > 0L) {
+                            Text(
+                                "Too many wrong attempts. Try again in " +
+                                    UnlockAttempts.describeWait(lockoutSeconds * 1000L) + ".",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                        // 5.0.0 opened a No lock vault without ever asking for its password, so
+                        // someone upgrading may not remember it. Offered only while that
+                        // vault's old no-prompt key is still on disk (gone after the first
+                        // password unlock) and never with a duress secret set (audit H-4).
+                        if (vm.legacyNoLockFallbackAvailable) {
+                            TextButton(
+                                onClick = { confirmLegacyOpen = true },
+                                modifier = Modifier.padding(top = 8.dp),
+                            ) { Text("Forgot it? Open without the $secretNoun") }
+                        }
+                        if (confirmLegacyOpen) {
+                            AlertDialog(
+                                onDismissRequest = { confirmLegacyOpen = false },
+                                title = { Text("Open without the $secretNoun?") },
+                                text = {
+                                    Text(
+                                        "Until this update, No lock opened the vault without asking for the " +
+                                            "$secretNoun. This opens it that way one more time and removes the " +
+                                            "$secretNoun, so the vault stays on No lock with nothing to confirm. " +
+                                            "You can set a new one in Settings.",
+                                    )
+                                },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        confirmLegacyOpen = false
+                                        vm.openLegacyNoLockAndRemovePassword()
+                                    }) { Text("Open and remove") }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { confirmLegacyOpen = false }) { Text("Cancel") }
+                                },
+                            )
+                        }
                     } else {
                         TextButton(
                             onClick = { showPasswordField = true },
@@ -357,7 +403,9 @@ private fun CreateSecretDialog(
     val view = LocalView.current
     val isPin = kind == "pin"
     val mismatch = again.isNotEmpty() && value != again
-    val valid = value.isNotEmpty() && value == again
+    // Minimum length for a new secret (audit M-1).
+    val policyError = if (value.isEmpty()) null else PasswordVault.secretPolicyError(value, kind)
+    val valid = value.isNotEmpty() && policyError == null && value == again
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -393,6 +441,16 @@ private fun CreateSecretDialog(
                     label = { Text(if (isPin) "PIN" else "Password") },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = kb,
+                    isError = policyError != null,
+                    supportingText = {
+                        Text(
+                            policyError ?: if (isPin) {
+                                "At least ${PasswordVault.MIN_PIN_LENGTH} digits."
+                            } else {
+                                "At least ${PasswordVault.MIN_PASSWORD_LENGTH} characters."
+                            }
+                        )
+                    },
                     modifier = Modifier.padding(top = 8.dp).focusRequester(focusRequester),
                 )
                 LaunchedEffect(Unit) {

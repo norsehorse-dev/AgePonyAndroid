@@ -2,8 +2,12 @@ package com.agepony.app.signing
 
 import com.agepony.app.vault.StoredIdentity
 import com.agepony.app.vault.StoredIdentityType
+import com.agepony.app.vault.StoredSigner
+import com.agepony.app.vault.StoredSignerSource
 import com.agepony.app.vault.b64e
+import com.agepony.core.signing.SSHSig
 import com.agepony.core.signing.SSHSigner
+import com.agepony.core.signing.SignatureStanza
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -46,6 +50,71 @@ class FileVerifierTest {
         val r = FileVerifier().verify(signature(), message, emptyList())
         assertEquals(FileVerifier.Trust.VALID_UNKNOWN, r.trust)
         assertNull(r.signerName)
+    }
+
+    private fun signer(options: String?) = StoredSigner(
+        id = "s1",
+        name = "Alice",
+        keyType = "ssh-ed25519",
+        publicKeyWireB64 = b64e(SSHSig.ed25519PublicWire(pub32)),
+        source = StoredSignerSource.IMPORT_ALLOWED_SIGNERS,
+        createdAt = 0L,
+        options = options,
+    )
+
+    @Test
+    fun storedSignerWithoutOptionsIsTrusted() {
+        val r = FileVerifier().verify(signature(), message, emptyList(), listOf(signer(null)))
+        assertEquals(FileVerifier.Trust.TRUSTED, r.trust)
+        assertEquals("Alice", r.signerName)
+    }
+
+    // audit L-6: imported allowed_signers options are enforced, never silently dropped.
+    @Test
+    fun expiredStoredSignerIsValidButNotTrusted() {
+        val r = FileVerifier().verify(signature(), message, emptyList(), listOf(signer("valid-before=\"20200101Z\"")))
+        assertEquals(FileVerifier.Trust.VALID_UNKNOWN, r.trust)
+        assertNull(r.signerName)
+        assertEquals("Alice", r.untrustedSignerName)
+        assertNotNull(r.untrustedReason)
+    }
+
+    @Test
+    fun otherNamespaceStoredSignerIsNotTrusted() {
+        val r = FileVerifier().verify(signature(), message, emptyList(), listOf(signer("namespaces=\"git\"")))
+        assertEquals(FileVerifier.Trust.VALID_UNKNOWN, r.trust)
+        assertEquals("Alice", r.untrustedSignerName)
+    }
+
+    @Test
+    fun certAuthorityAndUnknownOptionsAreNotTrusted() {
+        for (opts in listOf("cert-authority", "frobnicate")) {
+            val r = FileVerifier().verify(signature(), message, emptyList(), listOf(signer(opts)))
+            assertEquals(opts, FileVerifier.Trust.VALID_UNKNOWN, r.trust)
+        }
+    }
+
+    @Test
+    fun ageponyRestrictionAlsoPermitsTheV2Namespace() {
+        val hash = SSHSig.hashMessage(message)
+        val v2 = SSHSigner.signEd25519Hashed(seed32, pub32, hash, SignatureStanza.NAMESPACE_V2).toByteArray(Charsets.UTF_8)
+        val r = FileVerifier().verifyHashed(v2, emptyList(), listOf(signer("namespaces=\"agepony\"")), SignatureStanza.NAMESPACE_V2) { hash }
+        assertEquals(FileVerifier.Trust.TRUSTED, r.trust)
+    }
+
+    @Test
+    fun malformedSignatureIsInvalidNotAnException() {
+        val r = FileVerifier().verify("not a signature".toByteArray(), message, listOf(identity("Work key")))
+        assertEquals(FileVerifier.Trust.INVALID, r.trust)
+        assertNotNull(r.reason)
+        val huge = FileVerifier().verify(ByteArray(20_000), message, emptyList())
+        assertEquals(FileVerifier.Trust.INVALID, huge.trust)
+    }
+
+    @Test
+    fun wrongNamespaceIsInvalid() {
+        val r = FileVerifier().verify(signature(), message, listOf(identity("Work key")), namespace = SignatureStanza.NAMESPACE_V2)
+        assertEquals(FileVerifier.Trust.INVALID, r.trust)
     }
 
     @Test

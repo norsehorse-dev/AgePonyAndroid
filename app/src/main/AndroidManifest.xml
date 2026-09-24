@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.NFC" />
+    <!-- Lets the app hide other apps' overlay windows over its own (API 31+), so a hostile
+         overlay can't trick taps on Import, Send or Reset. Normal permission, no prompt. -->
+    <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
@@ -16,6 +19,7 @@
     </queries>
 
     <application
+        android:name=".AgePonyApplication"
         android:allowBackup="true"
         android:largeHeap="true"
         android:dataExtractionRules="@xml/data_extraction_rules"

@@ -168,6 +168,13 @@ object OpenSSHEncryptedKey {
         if (rounds < 1) throw OpenSSHEncryptedKeyException(
             "bcrypt rounds must be >= 1, got $rounds"
         )
+        // A crafted key with billions of rounds would otherwise hang the import (audit L-10).
+        if (rounds > BcryptPBKDF.MAX_ROUNDS) throw OpenSSHEncryptedKeyException(
+            "bcrypt rounds $rounds exceed the supported maximum of ${BcryptPBKDF.MAX_ROUNDS}"
+        )
+        if (salt.size > BcryptPBKDF.MAX_SALT_LEN) throw OpenSSHEncryptedKeyException(
+            "bcrypt salt is ${salt.size} bytes, more than ${BcryptPBKDF.MAX_SALT_LEN}"
+        )
         if (kdfBuf.hasRemaining()) throw OpenSSHEncryptedKeyException(
             "trailing bytes in kdfOpts: ${kdfBuf.remaining()}"
         )

@@ -49,6 +49,7 @@ import com.agepony.core.archive.SignedBundle
 import com.agepony.core.archive.TarArchive
 import com.agepony.core.recipients.AgeRecipient
 import com.agepony.core.signing.SSHSig
+import com.agepony.core.signing.SignatureStanza
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -642,8 +643,12 @@ private suspend fun encryptToDocument(
     // of declared length, so those paths need exact sizes; a plain single-file encrypt does not.
     if (sources.isEmpty()) throw IllegalStateException("No files chosen.")
     val needSizes = bundle || signer != null
-    val prepared = sources.map { SafIo.prepare(context, it, needSizes) }
+    // Staging copies are collected inside the try, so one that fails part way through a batch
+    // still has every earlier copy removed in the finally (audit L-19).
+    val prepared = ArrayList<PreparedSource>(sources.size)
     try {
+        sources.forEach { prepared += SafIo.prepare(context, it, needSizes) }
+
         val entries = if (bundle) {
             val used = HashSet<String>()
             prepared.map { p ->
@@ -664,28 +669,47 @@ private suspend fun encryptToDocument(
         }
 
         if (signer != null && passphrase.isNullOrEmpty()) {
-            // Signed to public-key recipients: the signature rides in an encrypted header stanza
-            // (agepony.com/sig), so the output stays a real age file that plain age still reads.
-            // The payload is buffered because the signature must sit in the header, ahead of the
-            // payload bytes.
+            // Signed to public-key recipients: the signature rides in an encrypted v2 header
+            // stanza (agepony.com/sig v2), so the output stays a real age file that plain age
+            // still reads. The v2 signature covers the plaintext hash and the recipient stanzas
+            // (audit L-8), so the file key is made and wrapped first, then the payload is hashed,
+            // signed, and read a second time to encrypt. Nothing is buffered.
             onPhase("Signing")
-            val payloadBytes = openPayload(counting = true).use { it.readBytes() }
-            val hash = SSHSig.hashMessage(payloadBytes)
-            val signature = signer.fileSigner.signHashed(signer.identity, hash)
+            val signedEncryption = FileEncryptor.prepareSigned(recipients)
+            val payloadSha512 = openPayload(counting = true).use { SSHSig.hashStream(it, SSHSig.HASH_SHA512) }
+            val signature = signer.fileSigner.signHashed(
+                signer.identity,
+                signedEncryption.messageHash(payloadSha512),
+                SignatureStanza.NAMESPACE_V2,
+            )
             onPhase("Encrypting")
-            val ciphertext = FileEncryptor.encryptSigned(payloadBytes, recipients, signature, armor)
-            BufferedOutputStream(SafIo.openOutput(context, dest)).use { out ->
-                out.write(ciphertext)
-                out.flush()
+            try {
+                openPayload(counting = true).use { input ->
+                    BufferedOutputStream(SafIo.openOutput(context, dest)).use { out ->
+                        FileEncryptor.encryptSignedV2Stream(signedEncryption, input, payloadSha512, signature, armor, out)
+                        out.flush()
+                    }
+                }
+            } catch (t: Throwable) {
+                // A source that changed between the two reads throws only after the whole file
+                // is written, and its signature would not verify: don't leave it behind.
+                SafIo.discard(context, dest)
+                throw t
             }
         } else {
             val plaintext: InputStream = if (signer == null) {
                 openPayload(counting = true)
             } else {
+                // Passphrase files can't carry a sig stanza (scrypt must stand alone), so the
+                // signature travels in a v2 SignedBundle, which also covers the name (audit L-8).
                 onPhase("Signing")
-                val hash = openPayload(counting = true).use { SSHSig.hashStream(it) }
-                val signature = signer.fileSigner.signHashed(signer.identity, hash)
-                SignedBundle.bundleSource(payloadName, payloadSize, openPayload(counting = true), signature)
+                val payloadSha512 = openPayload(counting = true).use { SSHSig.hashStream(it, SSHSig.HASH_SHA512) }
+                val signature = signer.fileSigner.signHashed(
+                    signer.identity,
+                    SignedBundle.v2MessageHash(payloadName, payloadSha512),
+                    SignedBundle.NAMESPACE_V2,
+                )
+                SignedBundle.bundleSourceV2(payloadName, payloadSize, openPayload(counting = true), signature)
             }
 
             onPhase("Encrypting")

@@ -50,11 +50,49 @@ object MLKEM768 {
         return KeyPair(pub.encoded, priv)
     }
 
-    /** Reconstruct a public (encapsulation) key from its 1184-byte encoding. */
-    fun publicFromBytes(encapsKey: ByteArray): MLKEMPublicKeyParameters {
+    /** ML-KEM modulus q. */
+    private const val Q = 3329
+
+    /** Bytes of ByteEncode12(t): k = 3 polynomials of 256 12-bit coefficients. */
+    private const val T_BYTES = 1152
+
+    /**
+     * FIPS 203 section 7.2 encapsulation-key modulus check: ByteDecode12 the first 1152 bytes
+     * and require every coefficient to be below q = 3329, i.e. the key re-encodes to itself.
+     * Implemented here rather than trusting the provider to do it (audit L-12 on iOS; the same
+     * gap applies to BC 1.78/1.79). A key that fails it would produce files nobody can decrypt.
+     */
+    fun isValidEncapsulationKey(encapsKey: ByteArray): Boolean {
+        if (encapsKey.size != ENCAPS_KEY_SIZE) return false
+        var i = 0
+        while (i < T_BYTES) {
+            val b0 = encapsKey[i].toInt() and 0xff
+            val b1 = encapsKey[i + 1].toInt() and 0xff
+            val b2 = encapsKey[i + 2].toInt() and 0xff
+            val c0 = b0 or ((b1 and 0x0f) shl 8)
+            val c1 = (b1 ushr 4) or (b2 shl 4)
+            if (c0 >= Q || c1 >= Q) return false
+            i += 3
+        }
+        return true
+    }
+
+    /** Throws [IllegalArgumentException] unless [encapsKey] passes [isValidEncapsulationKey]. */
+    fun requireValidEncapsulationKey(encapsKey: ByteArray) {
         require(encapsKey.size == ENCAPS_KEY_SIZE) {
             "ML-KEM encapsulation key must be $ENCAPS_KEY_SIZE bytes, got ${encapsKey.size}"
         }
+        require(isValidEncapsulationKey(encapsKey)) {
+            "ML-KEM encapsulation key is malformed (a coefficient is not reduced mod $Q)"
+        }
+    }
+
+    /**
+     * Reconstruct a public (encapsulation) key from its 1184-byte encoding, after the FIPS 203
+     * modulus check, so encrypting to a malformed key fails here instead of writing a file.
+     */
+    fun publicFromBytes(encapsKey: ByteArray): MLKEMPublicKeyParameters {
+        requireValidEncapsulationKey(encapsKey)
         return MLKEMPublicKeyParameters(params, encapsKey)
     }
 

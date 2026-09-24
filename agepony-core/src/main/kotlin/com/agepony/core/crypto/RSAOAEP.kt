@@ -2,10 +2,13 @@ package com.agepony.core.crypto
 
 import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.encodings.OAEPEncoding
+import org.bouncycastle.crypto.engines.RSABlindedEngine
 import org.bouncycastle.crypto.engines.RSAEngine
+import org.bouncycastle.crypto.params.ParametersWithRandom
 import org.bouncycastle.crypto.params.RSAKeyParameters
 import org.bouncycastle.crypto.params.RSAPrivateCrtKeyParameters
 import java.math.BigInteger
+import java.security.SecureRandom
 
 /**
  * RSA-OAEP with SHA-256 hash and MGF1-SHA-256, with a custom label.
@@ -53,11 +56,16 @@ object RSAOAEP {
         val qMinusOne = q.subtract(BigInteger.ONE)
         val dp = privateExponent.mod(pMinusOne)
         val dq = privateExponent.mod(qMinusOne)
-        val oaep = OAEPEncoding(RSAEngine(), SHA256Digest(), SHA256Digest(), label)
+        // Blinded private-key operation, so decrypt timing does not depend on the ciphertext
+        // (the plain RSAEngine is unblinded).
+        val oaep = OAEPEncoding(RSABlindedEngine(), SHA256Digest(), SHA256Digest(), label)
         oaep.init(
             false,
-            RSAPrivateCrtKeyParameters(
-                modulus, publicExponent, privateExponent, p, q, dp, dq, iqmp
+            ParametersWithRandom(
+                RSAPrivateCrtKeyParameters(
+                    modulus, publicExponent, privateExponent, p, q, dp, dq, iqmp
+                ),
+                SecureRandom(),
             )
         )
         return try {

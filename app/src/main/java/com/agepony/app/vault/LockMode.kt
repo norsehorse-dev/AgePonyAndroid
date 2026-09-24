@@ -2,13 +2,15 @@ package com.agepony.app.vault
 
 /**
  * How the Keystore/OS gate protects the vault (4.1.0), replacing the pre-4.1.0
- * `biometricEnabled` boolean. Orthogonal to the app-owned password/PIN
- * (PasswordVault): when a password is set it is its own gate, whatever this mode is.
+ * `biometricEnabled` boolean. The app-owned password/PIN (PasswordVault) is a second
+ * way in next to the mode's own gate, not an extra step. Two exceptions (5.0.1 audit):
+ * with [OFF] the password is the only way in, and with a duress secret set the vault is
+ * PIN-only and is kept at [OFF].
  *
- *  - [OFF]: no OS gate. The vault opens with no prompt via the non-auth "plain"
- *    KEK. This is the only mode the silent auto-unlock path runs from. If an app
- *    password is set, that password is the real gate; with neither, the app opens
- *    unprotected.
+ *  - [OFF]: no OS gate. Without a password the vault opens with no prompt via the
+ *    non-auth "plain" KEK; this is the only mode the silent auto-unlock path runs
+ *    from. With a password there is no plain blob at all and only the password opens
+ *    the vault (audit H-4).
  *  - [DEVICE_CREDENTIAL]: the phone's PIN / pattern / password is required at every
  *    unlock. On API 30+ this is a hardware-bound gate on the auth KEK
  *    (BiometricPrompt, DEVICE_CREDENTIAL only). Below API 30 the Cipher-bound

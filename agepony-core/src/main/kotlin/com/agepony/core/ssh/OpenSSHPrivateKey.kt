@@ -2,6 +2,7 @@ package com.agepony.core.ssh
 
 import com.agepony.core.crypto.AESCTR
 import com.agepony.core.crypto.BcryptPBKDF
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.util.Base64
@@ -71,6 +72,10 @@ sealed class OpenSSHPrivateKey {
         override val comment: String?,
     ) : OpenSSHPrivateKey() {
         override val keyType: String = KEYTYPE_RSA
+
+        /** Redacted like [Ed25519]: a data class would otherwise print d, p and q. */
+        override fun toString(): String =
+            "OpenSSHPrivateKey.RSA(bits=${n.bitLength()}, e=$e, comment=$comment)"
     }
 
     companion object {
@@ -191,13 +196,30 @@ sealed class OpenSSHPrivateKey {
                 "outer keytype '$pubKeyType' doesn't match inner '$privKeyType'"
             )
 
-            return when (privKeyType) {
+            val key = when (privKeyType) {
                 KEYTYPE_ED25519 -> parseEd25519Body(pubBuf, privBuf)
                 KEYTYPE_RSA -> parseRSABody(pubBuf, privBuf)
                 else -> throw OpenSSHPrivateKeyException(
                     "unsupported key type: '$privKeyType' " +
                     "(supported: ssh-ed25519, ssh-rsa)"
                 )
+            }
+            checkPadding(privBuf)
+            return key
+        }
+
+        /**
+         * The private section ends with padding bytes 1, 2, 3, ... (OpenSSH and Go's x/crypto/ssh
+         * both check this). Anything else means the section was not what it claims to be.
+         */
+        private fun checkPadding(privBuf: ByteBuffer) {
+            var expected = 1
+            while (privBuf.hasRemaining()) {
+                val b = privBuf.get().toInt() and 0xff
+                if (b != (expected and 0xff)) throw OpenSSHPrivateKeyException(
+                    "private key padding is malformed"
+                )
+                expected++
             }
         }
 
@@ -223,6 +245,13 @@ sealed class OpenSSHPrivateKey {
             }
             if (rounds < 1) throw OpenSSHPrivateKeyException(
                 "bcrypt rounds must be >= 1, got $rounds"
+            )
+            // A crafted key with billions of rounds would otherwise hang the import (audit L-10).
+            if (rounds > BcryptPBKDF.MAX_ROUNDS) throw OpenSSHPrivateKeyException(
+                "bcrypt rounds $rounds exceed the supported maximum of ${BcryptPBKDF.MAX_ROUNDS}"
+            )
+            if (salt.size > BcryptPBKDF.MAX_SALT_LEN) throw OpenSSHPrivateKeyException(
+                "bcrypt salt is ${salt.size} bytes, more than ${BcryptPBKDF.MAX_SALT_LEN}"
             )
             if (kdfBuf.hasRemaining()) throw OpenSSHPrivateKeyException(
                 "trailing bytes in kdfOpts: ${kdfBuf.remaining()}"
@@ -274,6 +303,12 @@ sealed class OpenSSHPrivateKey {
             if (!embeddedPub.contentEquals(outerPubKey)) throw OpenSSHPrivateKeyException(
                 "embedded pubkey in private blob doesn't match"
             )
+            // The seed must actually derive the stored public key; otherwise the app would show
+            // and export one public key while decrypting and signing as another.
+            val derivedPub = Ed25519PrivateKeyParameters(seed, 0).generatePublicKey().encoded
+            if (!derivedPub.contentEquals(outerPubKey)) throw OpenSSHPrivateKeyException(
+                "ed25519 private seed does not match its public key"
+            )
             val comment = readWireString(privBuf, "comment")
             return Ed25519(outerPubKey, seed, comment.ifEmpty { null })
         }
@@ -302,8 +337,19 @@ sealed class OpenSSHPrivateKey {
                 || p.signum() <= 0 || q.signum() <= 0 || iqmp.signum() <= 0) {
                 throw OpenSSHPrivateKeyException("RSA parameters must all be positive")
             }
+            if (p <= BigInteger.ONE || q <= BigInteger.ONE) throw OpenSSHPrivateKeyException(
+                "RSA primes must be greater than 1"
+            )
             if (p.multiply(q) != n) throw OpenSSHPrivateKeyException(
                 "RSA invariant violated: p*q != n"
+            )
+            // e*d = 1 mod lcm(p-1, q-1). Holds for d taken mod phi(n) or mod lambda(n), so every
+            // real key passes, while a key with a mismatched d is refused up front.
+            val pm1 = p.subtract(BigInteger.ONE)
+            val qm1 = q.subtract(BigInteger.ONE)
+            val lambda = pm1.divide(pm1.gcd(qm1)).multiply(qm1)
+            if (e.multiply(d).mod(lambda) != BigInteger.ONE.mod(lambda)) throw OpenSSHPrivateKeyException(
+                "RSA invariant violated: e*d != 1 mod lcm(p-1, q-1)"
             )
 
             val comment = readWireString(privBuf, "comment")

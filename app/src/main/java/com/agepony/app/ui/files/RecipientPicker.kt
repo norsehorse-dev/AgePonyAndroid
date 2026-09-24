@@ -41,6 +41,7 @@ import com.agepony.app.vault.toAgeRecipient
 import com.agepony.core.crypto.Diceware
 import com.agepony.core.recipients.AgeRecipient
 import com.agepony.core.recipients.HybridRecipient
+import com.agepony.core.recipients.MIN_RSA_RECIPIENT_BITS
 import com.agepony.core.recipients.P256Recipient
 import com.agepony.core.recipients.TagRecipient
 import com.agepony.core.recipients.SSHEd25519Recipient
@@ -102,13 +103,26 @@ internal class RecipientSelection(
         if (preselectIdentityId != null) identityIds.add(preselectIdentityId)
     }
 
-    /** Hydrate the chosen identities, saved recipients and one-time keys into age recipients. */
-    fun buildRecipients(vault: Vault): List<AgeRecipient> = buildList {
-        vault.identities.filter { identityIds.contains(it.id) }
-            .forEach { runCatching { add(it.toAgeRecipient()) } }
-        vault.recipients.filter { recipientIds.contains(it.id) }
-            .forEach { runCatching { add(it.toAgeRecipient()) } }
-        adHoc.forEach { add(it.recipient) }
+    /**
+     * Hydrate the chosen identities, saved recipients and one-time keys into age recipients.
+     * A selected entry that can't be loaded is an error, not a silent drop: quietly skipping it
+     * would encrypt the file to fewer people than the user ticked (audit follow-up to L-4).
+     */
+    fun buildRecipients(vault: Vault): List<AgeRecipient> {
+        val failed = mutableListOf<String>()
+        val out = buildList {
+            vault.identities.filter { identityIds.contains(it.id) }.forEach {
+                try { add(it.toAgeRecipient()) } catch (e: Exception) { failed.add(it.name) }
+            }
+            vault.recipients.filter { recipientIds.contains(it.id) }.forEach {
+                try { add(it.toAgeRecipient()) } catch (e: Exception) { failed.add(it.name) }
+            }
+            adHoc.forEach { add(it.recipient) }
+        }
+        if (failed.isNotEmpty()) {
+            throw IllegalStateException("Can't encrypt to: " + failed.joinToString(", ") + ". Untick it and try again.")
+        }
+        return out
     }
 
     val selectedCount: Int get() = identityIds.size + recipientIds.size + adHoc.size
@@ -143,7 +157,9 @@ internal fun rememberRecipientSelection(
     val preselect = if (vault.encryptToSelfDefault) {
         val encryptable = vault.identities.filter { !it.type.isSigningOnly }
         val active = vault.activeIdentityId
-        encryptable.firstOrNull { it.id == active }?.id ?: encryptable.firstOrNull()?.id
+        // Only the identity the user made active. Falling back to "the first one" could tick a
+        // key that arrived by transfer or paper restore and was never chosen (audit M-6).
+        encryptable.firstOrNull { it.id == active }?.id
     } else {
         null
     }
@@ -193,6 +209,7 @@ internal fun RecipientPickerContent(
 ) {
     var pasteText by remember { mutableStateOf("") }
     var pasteError by remember { mutableStateOf<String?>(null) }
+    var confirmError by remember { mutableStateOf<String?>(null) }
 
     var savingKey by remember { mutableStateOf<String?>(null) }
     var saveName by remember { mutableStateOf("") }
@@ -347,10 +364,20 @@ internal fun RecipientPickerContent(
             if (vault.recipients.isNotEmpty()) {
                 SectionHeader("Saved recipients")
                 vault.recipients.forEach { recipient ->
+                    // An ssh-rsa key under 2048 bits can't be encrypted to any more (audit L-4),
+                    // so it's shown but can't be ticked.
+                    val tooSmall = RecipientImport.isRsaBelowMinimum(recipient.type, recipient.publicKeyB64)
                     CheckRow(
                         checked = selection.recipientIds.contains(recipient.id),
                         title = recipient.name,
-                        subtitle = recipientTypeLabel(recipient.type),
+                        subtitle = if (tooSmall) {
+                            RecipientImport.rsaTooSmallMessage(
+                                RecipientImport.rsaBits(recipient.type, recipient.publicKeyB64)
+                            )
+                        } else {
+                            recipientTypeLabel(recipient.type)
+                        },
+                        enabled = !tooSmall,
                         onToggle = { toggle(selection.recipientIds, recipient.id) },
                     )
                 }
@@ -452,6 +479,9 @@ internal fun RecipientPickerContent(
             ) { Text("Add one-time recipient") }
         }
 
+        if (confirmError != null) {
+            Text(confirmError!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
         HorizontalDivider()
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             Button(
@@ -465,7 +495,16 @@ internal fun RecipientPickerContent(
                         // A recipient choice replaces passphrase mode; don't leave a stale
                         // passphrase behind for the next file to silently pick up.
                         if (rememberPassphrase) vault.forgetSessionPassphrase()
-                        onConfirm(selection.buildRecipients(vault), null)
+                        val built = try {
+                            selection.buildRecipients(vault)
+                        } catch (e: Exception) {
+                            confirmError = e.message ?: "Couldn't load a selected recipient."
+                            null
+                        }
+                        if (built != null) {
+                            confirmError = null
+                            onConfirm(built, null)
+                        }
                     }
                 },
                 enabled = canConfirm,
@@ -496,15 +535,21 @@ private fun SectionHeader(text: String) {
 }
 
 @Composable
-private fun CheckRow(checked: Boolean, title: String, subtitle: String, onToggle: () -> Unit) {
+private fun CheckRow(
+    checked: Boolean,
+    title: String,
+    subtitle: String,
+    enabled: Boolean = true,
+    onToggle: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
+            .clickable(enabled = enabled, onClick = onToggle)
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(checked = checked, onCheckedChange = { onToggle() })
+        Checkbox(checked = checked, onCheckedChange = { onToggle() }, enabled = enabled)
         Column(Modifier.padding(start = 8.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(
@@ -546,8 +591,16 @@ private fun parseAdHoc(raw: String): AdHocRecipient {
             is OpenSSHPublicKey.Ed25519 ->
                 AdHocRecipient("SSH Ed25519 (one-time)", SSHEd25519Recipient(parsed.publicKey), t)
 
-            is OpenSSHPublicKey.RSA ->
-                AdHocRecipient("SSH RSA (one-time)", SSHRSARecipient(parsed), t)
+            is OpenSSHPublicKey.RSA -> {
+                val r = SSHRSARecipient(parsed)
+                if (r.isBelowMinimumSize) {
+                    throw IllegalArgumentException(
+                        "That ssh-rsa key is ${parsed.modulus.bitLength()} bits. " +
+                            "age needs at least $MIN_RSA_RECIPIENT_BITS bits to encrypt to it."
+                    )
+                }
+                AdHocRecipient("SSH RSA (one-time)", r, t)
+            }
         }
     }
     throw IllegalArgumentException("Expected an age1… / age1pq… / age1tag1… / age1yubikey1… recipient or an ssh-ed25519 / ssh-rsa line.")

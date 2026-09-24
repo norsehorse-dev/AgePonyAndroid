@@ -80,9 +80,15 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
     var pdf by remember { mutableStateOf<ByteArray?>(null) }
     var suggested by remember { mutableStateOf<String?>(null) }
 
+    var acceptedWeak by remember { mutableStateOf(false) }
+
+    // This screen always forces FLAG_SECURE. Leaving it only clears the flag when the
+    // activity-wide setting allows screenshots, so the default protection stays on (audit M-5).
     DisposableEffect(Unit) {
         activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+        onDispose {
+            if (vault.allowScreenshots) activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
     }
 
     val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri: Uri? ->
@@ -131,7 +137,7 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
 
         if (protect) {
             OutlinedTextField(
-                value = passphrase, onValueChange = { passphrase = it; suggested = null; error = null },
+                value = passphrase, onValueChange = { passphrase = it; suggested = null; error = null; acceptedWeak = false },
                 label = { Text("Passphrase") }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -147,7 +153,7 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
             if (wordlist.isNotEmpty()) {
                 TextButton(onClick = {
                     val p = Diceware.generate(wordlist, Diceware.DEFAULT_WORD_COUNT)
-                    passphrase = p; confirm = p; suggested = p
+                    passphrase = p; confirm = p; suggested = p; acceptedWeak = false
                 }) { Text("Suggest a ${Diceware.DEFAULT_WORD_COUNT}-word passphrase") }
                 suggested?.let {
                     Text("Write this down now, apart from the page: $it", style = MaterialTheme.typography.bodyMedium)
@@ -166,9 +172,32 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
             )
         }
 
-        val ready = !busy && (!protect || (passphrase.isNotEmpty() && passphrase == confirm))
+        // A paper page can be photographed or found, and then the passphrase is all that stands
+        // between it and the key, offline and at the attacker's leisure. Warn on a weak one and
+        // make the user say so explicitly before building the page.
+        val weakness = if (protect && passphrase.isNotEmpty()) paperPassphraseWeakness(passphrase) else null
+        val ready = !busy && (!protect || (passphrase.isNotEmpty() && passphrase == confirm && (weakness == null || acceptedWeak)))
         if (protect && confirm.isNotEmpty() && passphrase != confirm) {
             Text("The passphrases don't match.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+        if (weakness != null) {
+            Text(
+                "This passphrase is weak: $weakness. Anyone who finds the page can try guesses offline " +
+                    "for as long as they like. Use the suggested passphrase, or a longer one of your own.",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (acceptedWeak) {
+                Text(
+                    "Using the weak passphrase anyway.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                OutlinedButton(onClick = { acceptedWeak = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Use it anyway")
+                }
+            }
         }
         Button(
             onClick = {
@@ -194,6 +223,21 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
         if (busy) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
+}
+
+/**
+ * Why [passphrase] is too weak to protect a paper backup, or null when it is fine. Under 12
+ * characters is weak; so is a passphrase made of words (diceware style) with fewer than
+ * [Diceware.MIN_WORD_COUNT] of them, whatever its length.
+ */
+private fun paperPassphraseWeakness(passphrase: String): String? {
+    if (passphrase.length < 12) return "it is shorter than 12 characters"
+    val words = passphrase.trim().split(Regex("[\\s._-]+")).filter { it.isNotEmpty() }
+    val looksLikeWords = words.size >= 2 && words.all { w -> w.all { it.isLetter() } }
+    if (looksLikeWords && words.size < Diceware.MIN_WORD_COUNT) {
+        return "it has only ${words.size} words, and at least ${Diceware.MIN_WORD_COUNT} are needed"
+    }
+    return null
 }
 
 private fun safeFileName(name: String): String =
@@ -253,6 +297,15 @@ private enum class RestoreStage { SCAN, INPUT, PASSPHRASE, PREVIEW, DONE }
 @Composable
 fun PaperRestoreScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
+    val activity = LocalContext.current as FragmentActivity
+    // The typed or scanned page can be a plain secret key: keep it out of screenshots and Recents
+    // even when screenshots are allowed elsewhere (audit M-5).
+    DisposableEffect(Unit) {
+        activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose {
+            if (vault.allowScreenshots) activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
     var stage by remember { mutableStateOf(RestoreStage.INPUT) }
     var scanned by remember { mutableStateOf("") }
     var passphrase by remember { mutableStateOf("") }

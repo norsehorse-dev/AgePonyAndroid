@@ -17,6 +17,7 @@ private const val SSH_ED25519_INFO = "age-encryption.org/v1/ssh-ed25519"
 private const val SSH_ED25519_KEYTYPE = "ssh-ed25519"
 private const val RECIPIENT_TAG_LEN = 4
 private val ZERO_NONCE_12 = ByteArray(12)
+private const val SSH_ED25519_BODY_SIZE = 16 + 16   // file key (16) + ChaCha20Poly1305 tag (16)
 
 /** Build the SSH wire blob: `<len="ssh-ed25519">"ssh-ed25519"<len=32><pubKey>`. */
 private fun buildSSHWireBlob(edPublicKey: ByteArray): ByteArray {
@@ -25,8 +26,6 @@ private fun buildSSHWireBlob(edPublicKey: ByteArray): ByteArray {
     SSHWire.writeString(out, edPublicKey)
     return out.toByteArray()
 }
-
-private fun isAllZero(b: ByteArray): Boolean = b.all { it == 0.toByte() }
 
 /**
  * Recipient using an ssh-ed25519 public key. See age spec for the filippo HKDF tweak.
@@ -48,12 +47,12 @@ class SSHEd25519Recipient(val edPublicKey: ByteArray) : AgeRecipient {
     override fun wrap(fileKey: ByteArray): Stanza {
         val ephPriv = X25519Crypto.generatePrivateKey()
         val ephPub = X25519Crypto.publicKey(ephPriv)
-        var shared = X25519Crypto.keyExchange(ephPriv, x25519PublicKey)
-        if (isAllZero(shared)) {
-            throw IllegalArgumentException("X25519 shared secret is zero (low-order point)")
-        }
+        // BC refuses an all-zero shared secret (low-order point); report a bad recipient.
+        var shared = X25519Crypto.keyExchangeOrNull(ephPriv, x25519PublicKey)
+            ?: throw IllegalArgumentException("ssh-ed25519 recipient is a low-order point; refusing to encrypt to it")
         val tweak = HKDF.derive(ByteArray(0), sshWireBlob, SSH_ED25519_INFO.toByteArray(), 32)
-        shared = X25519Crypto.keyExchange(tweak, shared)
+        shared = X25519Crypto.keyExchangeOrNull(tweak, shared)
+            ?: throw IllegalArgumentException("ssh-ed25519 tweaked shared secret is zero")
         val salt = ephPub + x25519PublicKey
         val wrapKey = HKDF.derive(shared, salt, SSH_ED25519_INFO.toByteArray(), 32)
         val body = ChaChaPoly.encrypt(wrapKey, ZERO_NONCE_12, fileKey)
@@ -107,12 +106,14 @@ class SSHEd25519Identity(val edSeed: ByteArray) : AgeIdentity {
 
         val ephPub = try { Stanza.base64Decode(stanza.args[1]) } catch (_: Exception) { return null }
         if (ephPub.size != 32) return null
+        // The wrapped file key is always 32 bytes; anything else is not a valid stanza (audit L-5).
+        if (stanza.body.size != SSH_ED25519_BODY_SIZE) return null
 
-        var shared = X25519Crypto.keyExchange(x25519PrivateKey, ephPub)
-        if (isAllZero(shared)) return null
+        // Low-order ephemeral share: BC refuses the all-zero secret; treat as not for us.
+        var shared = X25519Crypto.keyExchangeOrNull(x25519PrivateKey, ephPub) ?: return null
 
         val tweak = HKDF.derive(ByteArray(0), sshWireBlob, SSH_ED25519_INFO.toByteArray(), 32)
-        shared = X25519Crypto.keyExchange(tweak, shared)
+        shared = X25519Crypto.keyExchangeOrNull(tweak, shared) ?: return null
 
         val salt = ephPub + x25519PublicKey
         val wrapKey = HKDF.derive(shared, salt, SSH_ED25519_INFO.toByteArray(), 32)

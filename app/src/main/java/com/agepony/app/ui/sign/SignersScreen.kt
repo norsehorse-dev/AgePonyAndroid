@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -21,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -31,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.agepony.app.ui.files.SafIo
+import com.agepony.app.vault.AllowedSignerReview
 import com.agepony.app.vault.StoredRecipient
 import com.agepony.app.vault.StoredRecipientType
 import com.agepony.app.vault.StoredSigner
@@ -64,6 +67,8 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
     var showPaste by remember { mutableStateOf(false) }
     var showFromRecipient by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf<StoredSigner?>(null) }
+    // Audit L-6: an allowed_signers file is reviewed entry by entry before anything is trusted.
+    var review by remember { mutableStateOf<ImportReview?>(null) }
 
     val importFile = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -75,16 +80,12 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                     SafIo.openInput(context, uri).use { String(it.readBytes(), Charsets.UTF_8) }
                 }
                 val entries = AllowedSigners.parse(text)
-                var added = 0
-                var skipped = 0
-                entries.forEach { entry ->
-                    val signer = StoredSigner.fromAllowedSigner(entry, StoredSignerSource.IMPORT_ALLOWED_SIGNERS)
-                    if (signer != null && vault.addSigner(signer)) added++ else skipped++
-                }
-                status = when {
-                    entries.isEmpty() -> "No allowed_signers entries found in that file."
-                    skipped == 0 -> "Imported $added signer${if (added == 1) "" else "s"}."
-                    else -> "Imported $added, skipped $skipped (already present or unreadable)."
+                if (entries.isEmpty()) {
+                    status = "No allowed_signers entries found in that file."
+                } else {
+                    val known = vault.signers.toList()
+                    val rows = entries.map { AllowedSignerReview.of(it, StoredSignerSource.IMPORT_ALLOWED_SIGNERS, known) }
+                    review = ImportReview(rows, entryLines(text) - entries.size)
                 }
             } catch (e: Exception) {
                 status = "Import failed: ${e.message}"
@@ -107,6 +108,27 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                 status = "Export failed: ${e.message}"
             }
         }
+    }
+
+    val pending = review
+    if (pending != null) {
+        val r = pending
+        ImportReviewPane(
+            review = r,
+            modifier = modifier,
+            onImport = { chosen ->
+                var added = 0
+                var skipped = 0
+                chosen.forEach { signer -> if (vault.addSigner(signer)) added++ else skipped++ }
+                val left = r.rows.size - chosen.size
+                status = "Imported $added signer${if (added == 1) "" else "s"}" +
+                    (if (skipped > 0) ", $skipped already present" else "") +
+                    (if (left > 0) ", $left not imported." else ".")
+                review = null
+            },
+            onCancel = { review = null; status = "Nothing imported." },
+        )
+        return
     }
 
     Column(
@@ -147,6 +169,18 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                             )
+                            // Imported restrictions (audit L-6), kept and exported as written.
+                            val restrictions = signer.restrictions()
+                            if (restrictions.isNotEmpty()) {
+                                Text(
+                                    restrictions.joinToString(" · "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            signer.agePonyWarning()?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            }
                         }
                         TextButton(onClick = { confirmDelete = signer }) { Text("Delete") }
                     }
@@ -236,6 +270,98 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
             },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancel") } },
         )
+    }
+}
+
+/** A parsed allowed_signers file waiting for the user's choice (audit L-6). */
+private class ImportReview(val rows: List<AllowedSignerReview>, val unreadable: Int)
+
+/** Non-blank, non-comment lines, counted the way [AllowedSigners.parse] reads them. */
+private fun entryLines(text: String): Int =
+    text.replace("\r\n", "\n").replace('\r', '\n').split('\n')
+        .map { it.trim() }
+        .count { it.isNotEmpty() && !it.startsWith("#") }
+
+/**
+ * The allowed_signers import preview (audit L-6). Every entry is listed with its principal, key
+ * and options in plain words. Entries AgePony can't enforce (cert-authority, unknown or unreadable
+ * options) are listed and never imported; expired entries and ones not allowed to sign AgePony
+ * files start unticked.
+ */
+@Composable
+private fun ImportReviewPane(
+    review: ImportReview,
+    modifier: Modifier,
+    onImport: (List<StoredSigner>) -> Unit,
+    onCancel: () -> Unit,
+) {
+    val picked = remember(review) {
+        mutableStateListOf<Int>().apply { review.rows.forEachIndexed { i, r -> if (r.checkedByDefault) add(i) } }
+    }
+    Column(
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Import allowed_signers", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+        Text(
+            "Tick the signers to trust. Files signed by a trusted signer show as signed by that name.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (review.unreadable > 0) {
+            Text(
+                "${review.unreadable} line${if (review.unreadable == 1) "" else "s"} couldn't be read and ${if (review.unreadable == 1) "was" else "were"} skipped.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        review.rows.forEachIndexed { i, row ->
+            Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+                Checkbox(
+                    checked = i in picked && row.importable,
+                    onCheckedChange = { if (i in picked) picked.remove(i) else picked.add(i) },
+                    enabled = row.importable,
+                )
+                Column(Modifier.weight(1f).padding(top = 12.dp)) {
+                    Text(row.entry.principals.joinToString(", "), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "${row.entry.keyType} · ${row.signer?.let { runCatching { it.fingerprint() }.getOrNull() } ?: "(unreadable key)"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    row.restrictions.forEach {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (row.alreadyPresent) {
+                        Text(
+                            "Already on your list.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    row.blocked?.let {
+                        Text("$it Not imported.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                    row.warning?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+            HorizontalDivider()
+        }
+        val count = picked.count { review.rows.getOrNull(it)?.importable == true }
+        Button(
+            onClick = {
+                onImport(review.rows.filterIndexed { i, r -> i in picked && r.importable }.mapNotNull { it.signer })
+            },
+            enabled = count > 0,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(if (count > 0) "Import $count" else "Import") }
+        OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
     }
 }
 

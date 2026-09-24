@@ -681,7 +681,7 @@ private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit, onCancel: () -
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    var pin by rememberSaveable { mutableStateOf("") }
+    var pin by remember { mutableStateOf("") } // not saveable (audit L-23)
     var needsPin by remember { mutableStateOf(false) }
 
     Column(
@@ -767,8 +767,9 @@ private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit, onCancel: () -
 @Composable
 private fun ImportIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
-    var keyText by rememberSaveable { mutableStateOf("") }
-    var passphrase by rememberSaveable { mutableStateOf("") }
+    // The pasted private key and its passphrase stay out of the saved-state Bundle (audit L-23).
+    var keyText by remember { mutableStateOf("") }
+    var passphrase by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -811,6 +812,8 @@ private fun ImportIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
             onValueChange = { passphrase = it; error = null },
             label = { Text("Passphrase (only if the OpenSSH key is encrypted)") },
             singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth(),
         )
         if (error != null) {

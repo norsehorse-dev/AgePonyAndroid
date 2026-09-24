@@ -3,6 +3,7 @@ package com.agepony.core.recipients
 import com.agepony.core.Stanza
 import com.agepony.core.bech32.Bech32
 import com.agepony.core.crypto.HpkeMlkem768X25519
+import com.agepony.core.crypto.MLKEM768
 import java.security.SecureRandom
 
 private const val HYBRID_HRP_PUB = "age1pq"
@@ -65,6 +66,18 @@ class HybridRecipient(val publicKey: ByteArray) : LabeledAgeRecipient {
             )
             if (bytes.size != HpkeMlkem768X25519.PUBLIC_KEY_SIZE) throw IllegalArgumentException(
                 "expected ${HpkeMlkem768X25519.PUBLIC_KEY_SIZE}-byte public key, got ${bytes.size}"
+            )
+            // Parse-time validation (FIPS 203 section 7.2): a newly entered age1pq1 key with an
+            // unreduced ML-KEM coefficient is refused here, before it can be saved. The raw-bytes
+            // constructor stays size-only so a key already stored in a vault still loads and
+            // displays; encrypting to one fails in MLKEM768.publicFromBytes instead.
+            val ekPQ = bytes.copyOfRange(0, MLKEM768.ENCAPS_KEY_SIZE)
+            if (!MLKEM768.isValidEncapsulationKey(ekPQ)) throw IllegalArgumentException(
+                "age1pq1 recipient has a malformed ML-KEM-768 key"
+            )
+            val ekT = bytes.copyOfRange(MLKEM768.ENCAPS_KEY_SIZE, bytes.size)
+            if (ekT.size != 32) throw IllegalArgumentException(
+                "age1pq1 recipient X25519 key must be 32 bytes, got ${ekT.size}"
             )
             return bytes
         }

@@ -687,3 +687,51 @@ With the signing track complete (P1 through P8), bumped `versionName` from 1.0 t
 `versionCode` from 3 to 4 in `app/build.gradle.kts`. This is the first 2.0 release: age
 encryption plus SSHSIG signing with software, hardware, and FIDO security keys, and multi-file
 tar bundling. Release AAB is signed with the existing upload keystore.
+
+## 5.0.1 / versionCode 17: security release
+
+Fixes from the September 2026 security audit, plus R8. Full finding-by-finding map, the
+signing-key rotation steps and the device test pass are in `AgePony_5.0.1_Plan.md`.
+
+### User-visible
+- Duress PIN makes the vault PIN-only (no fingerprint or device unlock while it's set).
+- Vault locks after a share-sheet session; auto-lock is app-wide.
+- No lock plus a password asks for the password (one-time "Forgot it?" for 5.0.0 vaults).
+- Waits after wrong PINs (30 s after 5, doubling to 1 h), optional erase after 10, new PINs
+  6+ digits, new passwords 8+ characters.
+- Screenshots and Recents blocked by default, "Allow screenshots" in Settings.
+- Key transfer shows a transfer code on both phones; Import waits for confirmation; signers
+  opt-in; imported keys never become active.
+- Signature v2 (recipients and bundle name bound); v1 still verifies with a note.
+- allowed_signers options enforced and round-tripped; import preview.
+- Failed decrypts delete their partial output; invalid bundles don't extract.
+- Re-auth before weakening the lock; paper backup weak-passphrase warning.
+
+### Android implementation
+- New: `AgePonyApplication`, `security/AutoLock.kt`, `security/PasswordDeviceKey.kt`,
+  `security/UnlockAttempts.kt`, `security/TempFiles.kt`, `portability/TransferCode.kt`,
+  `signing/SignedEncryption.kt`, `docs/SIGNATURE_FORMATS_v2.md`.
+- Password blob v2: HMAC(AndroidKeyStore key, scrypt 2^16); v1 re-wrapped on unlock after the
+  new blob is proven to open.
+- Core parsers tightened to Go age's grammar and tested against a Go age binary; CBOR, PIV,
+  tar, bcrypt, armor and header size bounds.
+- R8 on for both flavors; rules in `app/proguard-rules.pro`.
+- Manifest: `android:name=".AgePonyApplication"`, new normal permission
+  `HIDE_OVERLAY_WINDOWS`.
+
+### iOS port notes
+- Signature v2 read and write per `docs/SIGNATURE_FORMATS_v2.md` (namespaces
+  `agepony-sig-v2`, `agepony-bundle-v2`); until then iOS shows 5.0.1-signed files as signed but
+  unverifiable.
+- Same duress decision on iOS (PIN-only once a duress PIN is set). The iOS-only audit findings
+  stay in the private report until they ship.
+- TransferCode derivation must match if iOS gets key transfer.
+
+### Files touched and iOS counterparts
+- `vault/Vault.kt`, `vault/VaultViewModel.kt`, `ui/VaultGate.kt`, `ui/settings/SettingsScreen.kt`
+  ↔ `Vault/Vault.swift`, `Features/Home/RootView.swift`, `Features/Settings/LockSettingsView.swift`
+- `security/PasswordVault.kt` ↔ `Sources/AgePonyCore/PasswordKeyBlob.swift`
+- `signing/FileVerifier.kt` ↔ `Services/FileVerifier.swift`
+- `vault/FileEncryptor.kt`, `ui/files/*` ↔ `Services/FileEncryptor.swift`, `Features/Files/*`
+- `agepony-core` signing/archive ↔ `Sources/AgePonyCore/Signing/*`, `Archive/*`
+- `ssh/AllowedSigners.kt` ↔ `Sources/AgePonyCore/Signing/AllowedSigners.swift`

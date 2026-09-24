@@ -1,5 +1,6 @@
 package com.agepony.app.ui.text
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -111,9 +113,9 @@ internal fun TextEncrypt(
     replaceUnavailableNote: String? = null,
 ) {
     var stage by remember { mutableStateOf(EncStage.FORM) }
-    // Shared text can be large; keep big inputs out of the saved-state Bundle (1 MB binder limit).
-    var input by if (initialText.length > MAX_SAVED_INPUT) remember { mutableStateOf(initialText) }
-    else rememberSaveable { mutableStateOf(initialText) }
+    // Plaintext stays out of the saved-state Bundle, which the system writes to disk on process
+    // death (audit L-23). Losing a draft to a process kill is the accepted cost.
+    var input by remember { mutableStateOf(initialText) }
     var recipients by remember { mutableStateOf<List<AgeRecipient>>(emptyList()) }
     var passphrase by remember { mutableStateOf<String?>(null) }
     var result by remember { mutableStateOf<String?>(null) }
@@ -414,14 +416,21 @@ private fun CopyableResult(label: String, value: String) {
         if (copied) { delay(1500); copied = false }
     }
     Text(label, style = MaterialTheme.typography.titleSmall)
-    OutlinedTextField(
-        value = value,
-        onValueChange = {},
-        readOnly = true,
-        minLines = 6,
-        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+    // Plain, non-selectable text rather than a read-only text field: a text field offers the
+    // system's long-press Copy, which would skip ClipboardGuard's sensitive flag and timed clear
+    // (audit L-23). The Copy button below is the only way out.
+    Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth(),
-    )
+    ) {
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            minLines = 6,
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+        )
+    }
     Button(
         onClick = { ClipboardGuard.copySensitive(context, value); copied = true },
         modifier = Modifier.fillMaxWidth(),

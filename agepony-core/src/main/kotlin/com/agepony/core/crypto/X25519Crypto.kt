@@ -27,7 +27,9 @@ object X25519Crypto {
     }
 
     /**
-     * X25519 Diffie-Hellman: returns the 32-byte shared secret.
+     * X25519 Diffie-Hellman: returns the 32-byte shared secret. Throws [IllegalStateException]
+     * (from Bouncy Castle) when the peer key is a low-order point and the result would be all
+     * zeros; see [keyExchangeOrNull].
      */
     fun keyExchange(privateKey: ByteArray, peerPublicKey: ByteArray): ByteArray {
         require(privateKey.size == 32) { "private key must be 32 bytes" }
@@ -39,5 +41,17 @@ object X25519Crypto {
         val shared = ByteArray(agreement.agreementSize)
         agreement.calculateAgreement(pub, shared, 0)
         return shared
+    }
+
+    /**
+     * [keyExchange], but null for a low-order peer point. Bouncy Castle already refuses the
+     * all-zero shared secret RFC 7748 section 6.1 warns about by throwing
+     * [IllegalStateException], which made the old `isAllZero` checks after it unreachable; this
+     * turns that into the "not for me" answer an identity needs (audit L-14 parity).
+     */
+    fun keyExchangeOrNull(privateKey: ByteArray, peerPublicKey: ByteArray): ByteArray? = try {
+        keyExchange(privateKey, peerPublicKey)
+    } catch (_: IllegalStateException) {
+        null
     }
 }

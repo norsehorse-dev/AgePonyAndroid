@@ -28,24 +28,45 @@ Website: https://agepony.com
 
 ## Verifying your download
 
-AgePony is signed with the same certificate for every release, and that fingerprint does not change between versions. The APK on GitHub Releases and the F-Droid build both carry it, because the F-Droid build is reproducible and ships this signature. A Google Play copy is re-signed by Google, so its certificate differs there by design.
+This section is about the APK on GitHub Releases. The F-Droid build is built and signed by
+F-Droid with its own key, and a Google Play copy is re-signed by Google, so their
+certificates differ from the one below by design.
 
-To check the signer with [AppVerifier](https://github.com/soupslurpr/AppVerifier), paste this as the verification info:
+GitHub releases from 5.0.1 on are signed with a new certificate. The key behind the old one
+was exposed in this repository's history, so it can't be trusted for anything newer than
+5.0.0. Each release carries a signed rotation from the old key to the new one, which lets
+Android 9 and later update a 5.0.0 install normally and then refuse updates signed only with
+the old key.
+
+To check the signer with [AppVerifier](https://github.com/soupslurpr/AppVerifier), paste this
+as the verification info:
 
 ```
 AgePony
 com.agepony.app
-6D:02:B1:83:9D:3D:1A:11:9F:24:E9:2B:12:F9:72:86:69:4D:00:1F:F9:96:ED:20:74:B6:B8:39:CC:D0:83:BA
+1B:28:44:FA:FC:B9:B1:71:97:B8:8E:AD:54:E4:22:79:56:1C:D4:F9:A3:3E:C8:F1:E8:0A:AD:DA:9A:06:83:58
 ```
 
 The same certificate from `apksigner verify --print-certs` or `keytool`:
+
+```
+SHA-256  1B:28:44:FA:FC:B9:B1:71:97:B8:8E:AD:54:E4:22:79:56:1C:D4:F9:A3:3E:C8:F1:E8:0A:AD:DA:9A:06:83:58
+SHA-1    93:79:40:57:7B:95:DB:9D:8E:09:7E:EF:F4:BC:70:9F:C4:27:F4:DF
+```
+
+`apksigner lineage --in AgePony-5.0.1-foss.apk --print-certs` shows the rotation: the old
+certificate first, then the one above. The old certificate is still in the APK's v2
+signature, which is the only scheme Android 8.x checks, so on Android 8.x key rotation
+offers no protection. On Android 8.x, only install AgePony from GitHub Releases or F-Droid.
+
+Old certificate (5.0.0 and earlier, and the first link of the rotation):
 
 ```
 SHA-256  6D:02:B1:83:9D:3D:1A:11:9F:24:E9:2B:12:F9:72:86:69:4D:00:1F:F9:96:ED:20:74:B6:B8:39:CC:D0:83:BA
 SHA-1    6A:A2:2B:04:B9:8F:0F:0E:1B:D6:16:D3:E0:06:D1:EA:2E:EB:2C:E1
 ```
 
-Each GitHub release also lists the whole-file `sha256sum` of its APK, for checking the download itself. That value changes every release and only matches the exact file from GitHub Releases, so an F-Droid or Play copy shows a different file hash while carrying the same signing certificate above.
+Each GitHub release also lists the whole-file `sha256sum` of its APK, for checking the download itself. That value changes every release and only matches the exact file from GitHub Releases.
 
 ## Modules
 

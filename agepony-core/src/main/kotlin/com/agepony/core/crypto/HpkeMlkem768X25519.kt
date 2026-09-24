@@ -85,7 +85,8 @@ object HpkeMlkem768X25519 {
 
         val ephPriv = testRandom?.copyOfRange(32, 64) ?: X25519Crypto.generatePrivateKey()
         val ctT = X25519Crypto.publicKey(ephPriv)
-        val ssT = X25519Crypto.keyExchange(ephPriv, ekT)
+        val ssT = X25519Crypto.keyExchangeOrNull(ephPriv, ekT)
+            ?: throw IllegalArgumentException("hybrid recipient X25519 key is a low-order point; refusing to encrypt to it")
 
         val ss = combine(ssPQ, ssT, ctT, ekT)
         return ss to (ctPQ + ctT)

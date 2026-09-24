@@ -112,6 +112,9 @@ private fun RecipientRow(recipient: StoredRecipient, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         KeyAvatar(seed = recipient.publicKeyB64, name = recipient.name)
+        val tooSmall = remember(recipient.type, recipient.publicKeyB64) {
+            RecipientImport.isRsaBelowMinimum(recipient.type, recipient.publicKeyB64)
+        }
         Column(Modifier.weight(1f)) {
             Text(recipient.name, style = MaterialTheme.typography.bodyLarge)
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -137,6 +140,15 @@ private fun RecipientRow(recipient: StoredRecipient, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            // Audit L-4: encrypting to an ssh-rsa key under 2048 bits now fails, so say so here
+            // rather than only when a file is encrypted.
+            if (tooSmall) {
+                Text(
+                    RecipientImport.rsaTooSmallMessage(null),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
         }
@@ -225,6 +237,14 @@ internal fun RecipientDetail(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (RecipientImport.isRsaBelowMinimum(recipient.type, recipient.publicKeyB64)) {
+                Text(
+                    RecipientImport.rsaTooSmallMessage(RecipientImport.rsaBits(recipient.type, recipient.publicKeyB64)) +
+                        " Files can't be encrypted to this key; ask for a larger or an Ed25519 key.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
 
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
@@ -253,7 +273,9 @@ private enum class AddRecipientSource(val label: String) { PASTE("Paste"), GITHU
 private class EditableCandidate(val candidate: RecipientCandidate) {
     val key: String = UUID.randomUUID().toString()
     var name by mutableStateOf("")
-    var include by mutableStateOf(true)
+    /** An ssh-rsa key too small to encrypt to starts unselected (audit L-4). */
+    val tooSmall: Boolean = RecipientImport.isRsaBelowMinimum(candidate.type, candidate.publicKeyB64)
+    var include by mutableStateOf(!tooSmall)
 }
 
 @Composable
@@ -494,6 +516,15 @@ private fun CandidateRow(ec: EditableCandidate, onDiscard: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (ec.tooSmall) {
+                    Text(
+                        RecipientImport.rsaTooSmallMessage(
+                            RecipientImport.rsaBits(ec.candidate.type, ec.candidate.publicKeyB64)
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             }
