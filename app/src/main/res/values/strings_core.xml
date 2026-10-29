@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Vault setup and unlock (VaultViewModel) -->
+    <string name="core_vault_no_screen_lock">Set up a screen lock or biometrics to protect your AgePony vault.</string>
+    <string name="core_prompt_create_title">Create AgePony vault</string>
+    <string name="core_prompt_create_subtitle">Confirm it\'s you to protect your keys</string>
+    <string name="core_prompt_add_lock_subtitle">Add this lock to your AgePony vault</string>
+    <string name="core_auth_failed">Authentication failed.</string>
+    <string name="core_vault_create_failed">Couldn\'t create the vault.</string>
+    <string name="core_vault_unlock_failed">Couldn\'t unlock the vault.</string>
+    <string name="core_vault_orphaned">AgePony was reinstalled or restored from a backup, and the device key that sealed your old vault is gone, so it can\'t be reopened. Set up a new vault to continue.</string>
+    <string name="core_unlock_vault_first">Unlock the vault first.</string>
+    <string name="core_set_device_lock_first">Set a device PIN, pattern, or password in Android settings first.</string>
+    <string name="core_lock_change_failed">Couldn\'t change the lock setting.</string>
+
+    <!-- %1$d: the number of wrong attempts that erases the vault -->
+    <plurals name="core_vault_erased_pin">
+        <item quantity="one">The PIN was entered wrong %1$d time, so the vault was erased as set in Settings.</item>
+        <item quantity="other">The PIN was entered wrong %1$d times, so the vault was erased as set in Settings.</item>
+    </plurals>
+    <plurals name="core_vault_erased_password">
+        <item quantity="one">The password was entered wrong %1$d time, so the vault was erased as set in Settings.</item>
+        <item quantity="other">The password was entered wrong %1$d times, so the vault was erased as set in Settings.</item>
+    </plurals>
+    <!-- %1$d: wrong tries left before the vault is erased (1 to 3) -->
+    <plurals name="core_wrong_pin_erase_warning">
+        <item quantity="one">Wrong PIN. %1$d more wrong try will erase the vault.</item>
+        <item quantity="other">Wrong PIN. %1$d more wrong tries will erase the vault.</item>
+    </plurals>
+    <plurals name="core_wrong_password_erase_warning">
+        <item quantity="one">Wrong password. %1$d more wrong try will erase the vault.</item>
+        <item quantity="other">Wrong password. %1$d more wrong tries will erase the vault.</item>
+    </plurals>
+
+    <!-- App password or PIN, and the duress secret (VaultViewModel) -->
+    <string name="core_remove_duress_first_pin">Remove the duress PIN first to switch between a password and a PIN.</string>
+    <string name="core_remove_duress_first_password">Remove the duress password first to switch between a password and a PIN.</string>
+    <string name="core_differs_from_duress_pin">The new PIN must differ from your duress PIN.</string>
+    <string name="core_differs_from_duress_password">The new password must differ from your duress password.</string>
+    <string name="core_secret_set_device_failed_pin">Couldn\'t set the PIN on this device.</string>
+    <string name="core_secret_set_device_failed_password">Couldn\'t set the password on this device.</string>
+    <string name="core_secret_save_failed_pin">Couldn\'t save the PIN.</string>
+    <string name="core_secret_save_failed_password">Couldn\'t save the password.</string>
+    <string name="core_secret_set_failed_pin">Couldn\'t set the PIN.</string>
+    <string name="core_secret_set_failed_password">Couldn\'t set the password.</string>
+    <string name="core_secret_remove_failed_pin">Couldn\'t remove the PIN.</string>
+    <string name="core_secret_remove_failed_password">Couldn\'t remove the password.</string>
+    <string name="core_duress_needs_secret_pin">Set a PIN before a duress PIN.</string>
+    <string name="core_duress_needs_secret_password">Set a password before a duress password.</string>
+    <string name="core_enter_current_pin">Enter your current PIN first.</string>
+    <string name="core_enter_current_password">Enter your current password first.</string>
+    <string name="core_duress_differs_pin">The duress PIN must differ from your real one.</string>
+    <string name="core_duress_differs_password">The duress password must differ from your real one.</string>
+    <string name="core_duress_set_failed_pin">Couldn\'t set the duress PIN.</string>
+    <string name="core_duress_set_failed_password">Couldn\'t set the duress password.</string>
+    <string name="core_duress_remove_failed_pin">Couldn\'t remove the duress PIN.</string>
+    <string name="core_duress_remove_failed_password">Couldn\'t remove the duress password.</string>
+    <string name="core_password_only_pin">Your PIN is the only way into the vault. Pick Biometric or Device PIN, pattern, or password above before removing it.</string>
+    <string name="core_password_only_password">Your password is the only way into the vault. Pick Biometric or Device PIN, pattern, or password above before removing it.</string>
+    <string name="core_password_only_duress_pin">Your PIN is the only way into the vault. Remove the duress PIN, then pick Biometric or Device PIN, pattern, or password above before removing it.</string>
+    <string name="core_password_only_duress_password">Your password is the only way into the vault. Remove the duress password, then pick Biometric or Device PIN, pattern, or password above before removing it.</string>
+
+    <!-- New password or PIN rules (PasswordVault) -->
+    <string name="core_pin_digits_only">A PIN can only contain digits.</string>
+    <plurals name="core_pin_min_digits">
+        <item quantity="one">Use at least %1$d digit.</item>
+        <item quantity="other">Use at least %1$d digits.</item>
+    </plurals>
+    <plurals name="core_password_min_chars">
+        <item quantity="one">Use at least %1$d character.</item>
+        <item quantity="other">Use at least %1$d characters.</item>
+    </plurals>
+
+    <!-- A lockout wait, inserted into app_lockout_wait ("Try again in %1$s.") -->
+    <plurals name="core_wait_seconds">
+        <item quantity="one">%1$d second</item>
+        <item quantity="other">%1$d seconds</item>
+    </plurals>
+    <plurals name="core_wait_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="core_wait_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+
+    <!-- System prompts for hardware keys and YubiKeys -->
+    <string name="core_prompt_sign_title">Sign with hardware key</string>
+    <string name="core_prompt_hw_decrypt_title">Decrypt with your hardware key</string>
+    <string name="core_prompt_hw_decrypt_subtitle">Confirm it\'s you to use this key</string>
+    <string name="core_yubikey_tap_read">Hold your YubiKey to the back of the phone to read its age key.</string>
+    <string name="core_yubikey_tap_decrypt">Hold your YubiKey to the back of the phone to decrypt.</string>
+
+    <!-- Private key field for keys that have no exportable private key (IdentityDetail) -->
+    <string name="core_private_ssh_ed25519">SSH Ed25519: the private key is stored in the vault and can\'t be exported as text.</string>
+    <string name="core_private_hardware">Hardware key: the private key stays in the device keystore and can\'t be exported.</string>
+    <string name="core_private_security_key">Security key: signing happens on the FIDO device over NFC. There is no private key to export.</string>
+    <string name="core_private_hardware_tag">Hardware key: decryption happens inside this device\'s secure hardware. The key can\'t be exported.</string>
+
+    <!-- Key transfer preview (KeyPortability) -->
+    <string name="core_transfer_lives_on_security_key">Lives on a security key: its public key can\'t be checked without that key.</string>
+    <string name="core_transfer_lives_on_yubikey">Lives on a YubiKey: decrypting with it needs that YubiKey.</string>
+
+    <!-- Trusted signer options from an allowed_signers file, one per line -->
+    <string name="core_signer_opt_cert_authority">Certificate authority (signs certificates, not files)</string>
+    <!-- %1$s: namespaces, such as "git, file" -->
+    <string name="core_signer_opt_only_for">Only for %1$s</string>
+    <string name="core_signer_opt_not_for">Not for %1$s</string>
+    <!-- %1$s: a date, or a date and time -->
+    <string name="core_signer_opt_valid_from">Valid from %1$s</string>
+    <string name="core_signer_opt_valid_until">Valid until %1$s</string>
+    <string name="core_signer_opt_no_touch">Security key touch not required</string>
+    <string name="core_signer_opt_verify_required">Security key PIN or fingerprint required</string>
+    <string name="core_signer_opt_unknown">Unknown option: %1$s</string>
+    <string name="core_signer_opt_unreadable">Unreadable options: %1$s</string>
+
+    <!-- Why a trusted signer entry can't be imported -->
+    <string name="core_signer_blocked_cert_authority">A certificate authority key. AgePony doesn\'t support SSH certificates, so it can\'t enforce this entry.</string>
+    <!-- %1$s: what the parser says is wrong -->
+    <string name="core_signer_blocked_unreadable">Its options can\'t be read (%1$s), so AgePony can\'t enforce them.</string>
+    <!-- %1$s: the option names -->
+    <string name="core_signer_blocked_unknown">It has options AgePony doesn\'t understand (%1$s), so AgePony can\'t enforce them.</string>
+    <string name="core_signer_blocked_bad_key">Its key can\'t be read.</string>
+
+    <!-- Why a trusted signer entry is not ticked by default -->
+    <string name="core_signer_warn_expired">Expired on %1$s.</string>
+    <string name="core_signer_warn_not_yet_valid">Not valid until %1$s.</string>
+    <!-- %1$s: the namespaces the entry allows -->
+    <string name="core_signer_warn_not_agepony">Not allowed to sign AgePony files (only for %1$s).</string>
+    <string name="core_share_chooser_text">Share</string>
+    <string name="core_share_chooser_file">Share encrypted file</string>
+</resources>

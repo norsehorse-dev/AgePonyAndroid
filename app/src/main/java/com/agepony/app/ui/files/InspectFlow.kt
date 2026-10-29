@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -28,9 +27,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.agepony.app.R
 import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.Vault
 import com.agepony.app.vault.toAgeIdentity
@@ -44,6 +46,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.InputStream
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Warning
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.PostQuantumBadge
+import com.agepony.app.ui.components.SectionHeader
+import com.agepony.app.ui.components.VerdictPanel
+import com.agepony.app.ui.theme.AgeStatus
+import com.agepony.app.ui.theme.mono
 
 //
 // Header inspector: what is this .age file encrypted to?
@@ -96,34 +111,37 @@ fun InspectFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 result = withContext(Dispatchers.IO) { inspect(context, uri, identities) }
                 stage = InspectStage.RESULT
             } catch (e: Exception) {
-                error = e.message ?: "That doesn't look like an age file."
+                error = e.message ?: context.getString(R.string.files_not_age_file)
                 stage = InspectStage.PICK
             }
         }
     }
 
-    Column(modifier.fillMaxSize()) {
+    // Back is held while the header is read; the scope belongs to this screen.
+    if (stage == InspectStage.WORKING) BackHandler {}
+
+    AgeScreen(
+        title = stringResource(R.string.files_inspect),
+        modifier = modifier,
+        onBack = if (stage == InspectStage.WORKING) null else onClose,
+    ) { padding ->
+    Column(Modifier.fillMaxSize().padding(padding)) {
         when (stage) {
             InspectStage.PICK -> Column(
                 Modifier.fillMaxSize().padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text("Inspect a file", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                 Text(
-                    "Shows what an age file is encrypted to, without decrypting it. Only the header " +
-                        "is read, so this is instant even for very large files, and it reveals nothing " +
-                        "that is not already public in the file.",
+                    stringResource(R.string.files_inspect_intro),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (error != null) {
-                    Text(error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                }
+                if (error != null) ErrorText(error!!)
                 Button(
                     onClick = { error = null; vault.autoLockSuppressed = true; openInput.launch(arrayOf("*/*")) },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Pick a file…") }
-                TextButton(onClick = onClose) { Text("Cancel") }
+                ) { Text(stringResource(R.string.files_pick_file)) }
+                TextButton(onClick = onClose) { Text(stringResource(R.string.action_cancel)) }
             }
 
             InspectStage.WORKING -> Column(
@@ -133,7 +151,7 @@ fun InspectFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
             ) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 Text(
-                    "Reading the header…",
+                    stringResource(R.string.files_reading_header),
                     modifier = Modifier.padding(top = 16.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -146,57 +164,64 @@ fun InspectFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 } else {
                     Column(
                         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
                             r.name,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontFamily = FontFamily.Monospace,
+                            style = MaterialTheme.typography.mono,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            "${SafIo.humanSize(r.size)}  •  ${if (r.armored) "armored text" else "binary"}" +
-                                "  •  ${r.headerBytes} byte header",
+                            when {
+                                // 0 means the provider reported no size, so leave the size out.
+                                r.size <= 0 && r.armored ->
+                                    stringResource(R.string.files_inspect_summary_armored_no_size, r.headerBytes)
+                                r.size <= 0 ->
+                                    stringResource(R.string.files_inspect_summary_binary_no_size, r.headerBytes)
+                                r.armored ->
+                                    stringResource(R.string.files_inspect_summary_armored, SafIo.humanSize(r.size), r.headerBytes)
+                                else ->
+                                    stringResource(R.string.files_inspect_summary_binary, SafIo.humanSize(r.size), r.headerBytes)
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
 
-                        HorizontalDivider()
+                        when {
+                            r.opensWithVault -> VerdictPanel(
+                                title = stringResource(R.string.files_inspect_can_decrypt),
+                                detail = null,
+                                color = AgeStatus.colors.success,
+                                icon = Icons.Filled.CheckCircle,
+                            )
+                            r.passphraseOnly -> VerdictPanel(
+                                title = stringResource(R.string.files_inspect_needs_passphrase),
+                                detail = null,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                icon = Icons.Filled.Lock,
+                            )
+                            else -> VerdictPanel(
+                                title = stringResource(R.string.files_inspect_cannot_open),
+                                detail = null,
+                                color = AgeStatus.colors.warning,
+                                icon = Icons.Filled.Warning,
+                            )
+                        }
 
-                        Text(
-                            when {
-                                r.opensWithVault -> "You can decrypt this ✓"
-                                r.passphraseOnly -> "Needs the passphrase it was encrypted with"
-                                else -> "⚠ No identity in your vault can open this"
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (r.opensWithVault) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-
-                        HorizontalDivider()
-
-                        Text(
-                            if (r.stanzas.size == 1) "Encrypted to 1 recipient"
-                            else "Encrypted to ${r.stanzas.size} recipients",
-                            style = MaterialTheme.typography.titleSmall,
+                        SectionHeader(
+                            pluralStringResource(R.plurals.files_inspect_encrypted_to, r.stanzas.size, r.stanzas.size),
                         )
                         r.stanzas.forEachIndexed { index, s ->
                             Column(Modifier.fillMaxWidth()) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        "${index + 1}. ${s.title}",
+                                        stringResource(R.string.files_inspect_stanza_row, index + 1, s.title),
                                         style = MaterialTheme.typography.bodyMedium,
                                         modifier = Modifier.weight(1f, fill = false),
                                     )
                                     if (s.postQuantum) {
-                                        Text(
-                                            "  quantum-safe",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
+                                        PostQuantumBadge(Modifier.padding(start = 8.dp))
                                     }
                                 }
                                 Text(
@@ -206,12 +231,11 @@ fun InspectFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                                     fontFamily = FontFamily.Monospace,
                                 )
                             }
-                            HorizontalDivider()
+                            ListDivider()
                         }
 
                         Text(
-                            "Recipient stanzas are not secret: anyone holding the file can read them. " +
-                                "They say which keys can open it, not what is inside.",
+                            stringResource(R.string.files_inspect_footer),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -219,15 +243,16 @@ fun InspectFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                         Button(
                             onClick = { result = null; error = null; stage = InspectStage.PICK },
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Inspect another") }
+                        ) { Text(stringResource(R.string.files_inspect_another)) }
                         OutlinedButton(
                             onClick = onClose,
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        ) { Text("Done") }
+                        ) { Text(stringResource(R.string.files_action_done)) }
                     }
                 }
             }
         }
+    }
     }
 }
 
@@ -241,7 +266,7 @@ private fun inspect(context: Context, uri: Uri, identities: List<AgeIdentity>): 
         Age.parseHeaderStream(binary)
     }
 
-    val stanzas = parsed.stanzas.map { describe(it) }
+    val stanzas = parsed.stanzas.map { describe(context, it) }
     // An identity that can unwrap any stanza can open the file. scrypt is excluded because it
     // needs the passphrase, which we are deliberately not asking for here.
     // Hardware tag identities are matched on their tag alone, so inspecting never asks the
@@ -266,69 +291,75 @@ private fun inspect(context: Context, uri: Uri, identities: List<AgeIdentity>): 
 }
 
 /** Turn a stanza into something a person can act on. */
-private fun describe(stanza: Stanza): StanzaInfo = when (stanza.type) {
+private fun describe(context: Context, stanza: Stanza): StanzaInfo = when (stanza.type) {
     "scrypt" -> {
         val factor = stanza.args.getOrNull(1)?.toIntOrNull()
         StanzaInfo(
-            title = "Passphrase (scrypt)",
+            title = context.getString(R.string.files_inspect_scrypt),
             detail = if (factor != null) {
-                "Work factor 2^$factor, about ${FileEncryptor.scryptMemoryBytes(factor) shr 20} MB " +
-                    "of memory to derive the key"
+                context.getString(
+                    R.string.files_inspect_scrypt_detail,
+                    factor,
+                    FileEncryptor.scryptMemoryBytes(factor) shr 20,
+                )
             } else {
-                "Work factor not readable"
+                context.getString(R.string.files_inspect_scrypt_unreadable)
             },
             postQuantum = false,
         )
     }
     "X25519" -> StanzaInfo(
-        title = "age recipient (X25519)",
-        detail = "ephemeral share " + shortArg(stanza.args.getOrNull(0)),
+        title = context.getString(R.string.files_inspect_x25519),
+        detail = context.getString(R.string.files_inspect_ephemeral_share, shortArg(context, stanza.args.getOrNull(0))),
         postQuantum = false,
     )
     "mlkem768x25519" -> StanzaInfo(
-        title = "Post-quantum age recipient (ML-KEM-768 with X25519)",
-        detail = "encapsulation " + shortArg(stanza.args.getOrNull(0)),
+        title = context.getString(R.string.files_inspect_mlkem),
+        detail = context.getString(R.string.files_inspect_encapsulation, shortArg(context, stanza.args.getOrNull(0))),
         postQuantum = true,
     )
     "ssh-ed25519" -> StanzaInfo(
-        title = "SSH Ed25519 recipient",
-        detail = "key tag " + shortArg(stanza.args.getOrNull(0)),
+        title = context.getString(R.string.files_inspect_ssh_ed25519),
+        detail = context.getString(R.string.files_inspect_key_tag, shortArg(context, stanza.args.getOrNull(0))),
         postQuantum = false,
     )
     "ssh-rsa" -> StanzaInfo(
-        title = "SSH RSA recipient",
-        detail = "key tag " + shortArg(stanza.args.getOrNull(0)),
+        title = context.getString(R.string.files_inspect_ssh_rsa),
+        detail = context.getString(R.string.files_inspect_key_tag, shortArg(context, stanza.args.getOrNull(0))),
         postQuantum = false,
     )
     "p256tag" -> StanzaInfo(
-        title = "Hardware-key recipient (age1tag, P-256)",
-        detail = "key tag " + shortArg(stanza.args.getOrNull(0)),
+        title = context.getString(R.string.files_inspect_p256tag),
+        detail = context.getString(R.string.files_inspect_key_tag, shortArg(context, stanza.args.getOrNull(0))),
         postQuantum = false,
     )
     "mlkem768p256tag" -> StanzaInfo(
-        title = "Post-quantum hardware-key recipient (age1tagpq, ML-KEM-768 with P-256)",
-        detail = "key tag " + shortArg(stanza.args.getOrNull(0)),
+        title = context.getString(R.string.files_inspect_mlkem_p256tag),
+        detail = context.getString(R.string.files_inspect_key_tag, shortArg(context, stanza.args.getOrNull(0))),
         postQuantum = true,
     )
     SignatureStanza.TYPE -> StanzaInfo(
-        title = "AgePony signature (encrypted)",
-        detail = "Only a recipient can read who signed. Plain age ignores this stanza.",
+        title = context.getString(R.string.files_inspect_signature),
+        detail = context.getString(R.string.files_inspect_signature_detail),
         postQuantum = false,
     )
     "piv-p256" -> StanzaInfo(
-        title = "YubiKey recipient (PIV P-256)",
-        detail = "key tag " + shortArg(stanza.args.getOrNull(0)),
+        title = context.getString(R.string.files_inspect_piv),
+        detail = context.getString(R.string.files_inspect_key_tag, shortArg(context, stanza.args.getOrNull(0))),
         postQuantum = false,
     )
     else -> StanzaInfo(
-        title = "Unrecognised stanza: ${stanza.type}",
-        detail = "Written by a newer or different age implementation. " +
-            stanza.args.size.toString() + " argument(s)",
+        title = context.getString(R.string.files_inspect_unknown, stanza.type),
+        detail = context.resources.getQuantityString(
+            R.plurals.files_inspect_unknown_detail,
+            stanza.args.size,
+            stanza.args.size,
+        ),
         postQuantum = false,
     )
 }
 
-private fun shortArg(arg: String?): String {
-    if (arg.isNullOrEmpty()) return "(none)"
+private fun shortArg(context: Context, arg: String?): String {
+    if (arg.isNullOrEmpty()) return context.getString(R.string.files_inspect_arg_none)
     return if (arg.length <= 20) arg else arg.take(10) + "…" + arg.takeLast(6)
 }

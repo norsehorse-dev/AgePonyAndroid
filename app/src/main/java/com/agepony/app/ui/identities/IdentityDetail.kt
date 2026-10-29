@@ -11,8 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -53,6 +51,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
+import androidx.compose.foundation.layout.fillMaxSize
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.QuietAction
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
+import androidx.annotation.StringRes
 
 //
 // Detail screen for a single identity (Android counterpart of iOS's
@@ -90,21 +95,12 @@ fun IdentityDetail(
     val canBioConfirm = remember(identityId) { BiometricGate.canAuthenticate(activity) }
     val passwordEnrolled = vault.passwordKeyBlobExists()
     val isPin = vault.unlockSecretKind == "pin"
-    val secretNoun = if (isPin) "PIN" else "password"
 
-    Column(modifier = modifier.verticalScroll(rememberScrollState())) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 8.dp, end = 12.dp, top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onBack) { Text("‹ Back") }
-        }
-
+    AgeScreen(title = stringResource(R.string.identity_title), modifier = modifier, onBack = onBack) { padding ->
+    Column(modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
         if (identity == null) {
             Text(
-                text = "Identity not found.",
+                text = stringResource(R.string.identities_not_found),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(24.dp),
             )
@@ -112,27 +108,28 @@ fun IdentityDetail(
         }
 
         Column(
-            modifier = Modifier.padding(horizontal = 20.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = identity.name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(onClick = {
                     renameDraft = identity.name
                     renaming = true
-                }) { Text("Rename") }
+                }) { Text(stringResource(R.string.identities_rename)) }
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "${typeLabel(identity.type)}  •  created ${
-                        DateFormat.getDateInstance().format(Date(identity.createdAt))
-                    }",
+                    text = stringResource(
+                        R.string.identities_type_created,
+                        stringResource(typeLabel(identity.type)),
+                        DateFormat.getDateInstance().format(Date(identity.createdAt)),
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f, fill = false),
@@ -142,18 +139,18 @@ fun IdentityDetail(
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            ListDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-            KeyBlock(label = "Public", value = identity.publicDisplayString())
+            KeyBlock(label = stringResource(R.string.identities_key_public), value = identity.publicDisplayString())
             Text(
-                text = "Safe to share. Anyone with this can encrypt to you.",
+                text = stringResource(R.string.identities_public_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             var showQr by remember(identityId) { mutableStateOf(false) }
             TextButton(onClick = { showQr = !showQr }) {
-                Text(if (showQr) "Hide QR code" else "Show as QR code")
+                Text(stringResource(if (showQr) R.string.identities_hide_qr else R.string.identities_show_qr))
             }
             if (showQr) {
                 QrImage(
@@ -179,8 +176,8 @@ fun IdentityDetail(
             }
             if (revealed) {
                 KeyBlock(
-                    label = "Private",
-                    value = identity.privateDisplayString(),
+                    label = stringResource(R.string.identities_key_private),
+                    value = identity.privateDisplayString(LocalContext.current),
                     isSensitive = exportable,
                     copyable = exportable,
                 )
@@ -192,8 +189,8 @@ fun IdentityDetail(
                                 try {
                                     BiometricGate.confirm(
                                         activity,
-                                        title = "Reveal private key",
-                                        subtitle = "Confirm it's you",
+                                        title = activity.getString(R.string.identities_reveal_private),
+                                        subtitle = activity.getString(R.string.identities_reveal_prompt_subtitle),
                                     )
                                     revealed = true
                                 } catch (e: BiometricGateException) {
@@ -210,14 +207,15 @@ fun IdentityDetail(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Reveal private key")
+                    Text(stringResource(R.string.identities_reveal_private))
                 }
                 Text(
                     text = when {
-                        canBioConfirm ->
-                            "Revealing the private key requires your biometric or device credential."
-                        passwordEnrolled -> "Revealing the private key requires your $secretNoun."
-                        else -> "Your vault has no lock set, so the private key can be revealed directly."
+                        canBioConfirm -> stringResource(R.string.identities_reveal_needs_biometric)
+                        passwordEnrolled -> stringResource(
+                            if (isPin) R.string.identities_reveal_needs_pin else R.string.identities_reveal_needs_password
+                        )
+                        else -> stringResource(R.string.identities_reveal_no_lock)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -226,55 +224,54 @@ fun IdentityDetail(
 
             if (KeyPortability.isPaperBackable(identity)) {
                 OutlinedButton(onClick = { paperBackup = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    Text("Paper backup…")
+                    Text(stringResource(R.string.identities_paper_backup_button))
                 }
             }
             if (identity.type.isDeviceBound) {
                 Text(
-                    "This key lives in this device's secure hardware. It can't be exported, moved, or backed up.",
+                    stringResource(R.string.identities_device_bound_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            ListDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             if (activeId != identity.id) {
                 TextButton(onClick = {
                     vault.activeIdentityId = identity.id
                     activeId = identity.id
-                }) { Text("Set as active identity") }
+                }) { Text(stringResource(R.string.identities_set_active)) }
             } else {
                 Text(
-                    text = "This is your active identity (default encrypt-to-self recipient).",
+                    text = stringResource(R.string.identities_is_active_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            TextButton(onClick = { confirmingDelete = true }) {
-                Text("Delete identity", color = MaterialTheme.colorScheme.error)
-            }
+            QuietAction(text = stringResource(R.string.identities_delete_button), onClick = { confirmingDelete = true }, destructive = true)
             Text(
-                text = "Files encrypted to this identity will no longer be decryptable on this device.",
+                text = stringResource(R.string.identities_delete_warning),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 24.dp),
             )
         }
     }
+    }
 
     if (renaming) {
         AlertDialog(
             onDismissRequest = { renaming = false },
-            title = { Text("Rename identity") },
+            title = { Text(stringResource(R.string.identities_rename_title)) },
             text = {
                 OutlinedTextField(
                     value = renameDraft,
                     onValueChange = { renameDraft = it },
                     singleLine = true,
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.identities_name_label)) },
                 )
             },
             confirmButton = {
@@ -282,10 +279,10 @@ fun IdentityDetail(
                     val trimmed = renameDraft.trim()
                     if (trimmed.isNotEmpty()) vault.renameIdentity(identityId, trimmed)
                     renaming = false
-                }) { Text("Save") }
+                }) { Text(stringResource(R.string.identities_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { renaming = false }) { Text("Cancel") }
+                TextButton(onClick = { renaming = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -293,26 +290,30 @@ fun IdentityDetail(
     if (confirmingDelete) {
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
-            title = { Text("Delete \"${identity?.name ?: "this identity"}\"?") },
+            title = {
+                Text(
+                    if (identity != null) stringResource(R.string.identities_delete_title, identity.name)
+                    else stringResource(R.string.identities_delete_title_unnamed)
+                )
+            },
             text = {
-                Text("Files encrypted to this identity will no longer be decryptable on this device.")
+                Text(stringResource(R.string.identities_delete_warning))
             },
             confirmButton = {
                 TextButton(onClick = {
                     confirmingDelete = false
                     vault.deleteIdentity(identityId)
                     onBack()
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmingDelete = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmingDelete = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
 
     if (showPasswordReauth) {
         ReauthPasswordDialog(
-            secretNoun = secretNoun,
             isPin = isPin,
             onDismiss = { showPasswordReauth = false },
             onSubmit = { chars ->
@@ -323,15 +324,19 @@ fun IdentityDetail(
                     val result = try {
                         withContext(Dispatchers.IO) { vault.verifyAppPassword(chars) }
                     } catch (e: Exception) {
-                        revealError = e.message ?: "Couldn't check the $secretNoun."
+                        revealError = e.message ?: activity.getString(
+                            if (isPin) R.string.identities_error_check_pin else R.string.identities_error_check_password
+                        )
                         null
                     } finally {
                         chars.fill(' ')
                     }
                     when (result) {
                         PasswordCheck.Ok -> revealed = true
-                        PasswordCheck.Wrong -> revealError = "Wrong $secretNoun."
-                        is PasswordCheck.LockedOut -> revealError = UnlockAttempts.lockoutMessage(result.remainingMillis)
+                        PasswordCheck.Wrong -> revealError = activity.getString(
+                            if (isPin) R.string.identities_error_wrong_pin else R.string.identities_error_wrong_password
+                        )
+                        is PasswordCheck.LockedOut -> revealError = UnlockAttempts.lockoutMessage(activity, result.remainingMillis)
                         null -> Unit
                     }
                 }
@@ -342,26 +347,27 @@ fun IdentityDetail(
     if (revealError != null) {
         AlertDialog(
             onDismissRequest = { revealError = null },
-            title = { Text("Couldn't reveal private key") },
+            title = { Text(stringResource(R.string.identities_reveal_failed_title)) },
             text = { Text(revealError ?: "") },
             confirmButton = {
-                TextButton(onClick = { revealError = null }) { Text("OK") }
+                TextButton(onClick = { revealError = null }) { Text(stringResource(R.string.identities_ok)) }
             },
         )
     }
 }
 
-private fun typeLabel(t: StoredIdentityType): String = when (t) {
-    StoredIdentityType.X25519 -> "age X25519"
-    StoredIdentityType.MLKEM768X25519 -> "Quantum-safe (ML-KEM-768 + X25519)"
-    StoredIdentityType.SSH_ED25519 -> "SSH Ed25519"
-    StoredIdentityType.SSH_RSA -> "SSH RSA"
-    StoredIdentityType.HARDWARE_KEY -> "Hardware Key (P-256)"
-    StoredIdentityType.SK_ED25519 -> "Security Key (Ed25519)"
-    StoredIdentityType.SK_ECDSA_P256 -> "Security Key (P-256)"
-    StoredIdentityType.HARDWARE_TAG -> "Hardware decryption key (P-256)"
-    StoredIdentityType.HARDWARE_TAG_PQ -> "Hardware decryption key, quantum-safe"
-    StoredIdentityType.YUBIKEY_PIV -> "YubiKey (PIV P-256)"
+@StringRes
+private fun typeLabel(t: StoredIdentityType): Int = when (t) {
+    StoredIdentityType.X25519 -> R.string.identities_type_x25519
+    StoredIdentityType.MLKEM768X25519 -> R.string.identities_type_mlkem
+    StoredIdentityType.SSH_ED25519 -> R.string.identities_type_ssh_ed25519
+    StoredIdentityType.SSH_RSA -> R.string.identities_type_ssh_rsa
+    StoredIdentityType.HARDWARE_KEY -> R.string.identities_type_hardware_key
+    StoredIdentityType.SK_ED25519 -> R.string.identities_type_sk_ed25519
+    StoredIdentityType.SK_ECDSA_P256 -> R.string.identities_type_sk_p256
+    StoredIdentityType.HARDWARE_TAG -> R.string.identities_type_hardware_tag
+    StoredIdentityType.HARDWARE_TAG_PQ -> R.string.identities_type_hardware_tag_pq
+    StoredIdentityType.YUBIKEY_PIV -> R.string.identities_type_yubikey
 }
 
 /**
@@ -371,7 +377,6 @@ private fun typeLabel(t: StoredIdentityType): String = when (t) {
  */
 @Composable
 private fun ReauthPasswordDialog(
-    secretNoun: String,
     isPin: Boolean,
     onDismiss: () -> Unit,
     onSubmit: (CharArray) -> Unit,
@@ -379,13 +384,17 @@ private fun ReauthPasswordDialog(
     var value by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Confirm your $secretNoun") },
+        title = {
+            Text(stringResource(if (isPin) R.string.identities_confirm_pin else R.string.identities_confirm_password))
+        },
         text = {
             OutlinedTextField(
                 value = value,
                 onValueChange = { value = it },
                 singleLine = true,
-                label = { Text(secretNoun.replaceFirstChar { it.uppercase() }) },
+                label = {
+                    Text(stringResource(if (isPin) R.string.identities_pin_label else R.string.identities_password_label))
+                },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password,
@@ -395,9 +404,9 @@ private fun ReauthPasswordDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSubmit(value.toCharArray()) }, enabled = value.isNotEmpty()) {
-                Text("Reveal")
+                Text(stringResource(R.string.action_reveal))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }

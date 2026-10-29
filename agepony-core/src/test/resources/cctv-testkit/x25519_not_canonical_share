@@ -1,0 +1,10 @@
+expect: header failure
+file key: 59454c4c4f57205355424d4152494e45
+identity: AGE-SECRET-KEY-1EGTZVFFV20835NWYV6270LXYVK2VKNX2MMDKWYKLMGR48UAWX40Q2P2LM0
+comment: the base64 encoding of the share is not canonical
+
+age-encryption.org/v1
+-> X25519 TEiF0ypqr+bpvcqXNyCVJpL7OuwPdVwPL7KQEbFDOCd
+hjabGXwSLQ9c3S6Lw2i+S2Tu2fiwQHHslbBN6B41FLE
+--- ngoKTEDpJF0jTrD7UALMpTyjZC8ONeH6kqCvSYCvm2g
+îÏbÇÎ‘´3'NhÔòùL·L[þ÷¾ªRÈð¼™,ƒ1ûf

@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings tab -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_ok">OK</string>
+    <string name="settings_action_change">Change</string>
+    <string name="settings_action_remove">Remove</string>
+
+    <!-- Security: lock mode -->
+    <string name="settings_section_security">Security</string>
+    <string name="settings_lock_intro">How AgePony\'s vault is locked. A password or PIN set below is a second way in next to Biometric or Device PIN, not an extra step. With No lock, the password is the only way in.</string>
+    <string name="settings_pin_only_note_pin">Turn off the duress PIN to use fingerprint or device unlock.</string>
+    <string name="settings_pin_only_note_password">Turn off the duress password to use fingerprint or device unlock.</string>
+    <string name="settings_lock_biometric">Biometric</string>
+    <string name="settings_lock_biometric_detail">Your fingerprint or face unlocks the vault, with your device credential as a fallback.</string>
+    <string name="settings_lock_biometric_unavailable">Needs a fingerprint or face enrolled on this device.</string>
+    <string name="settings_lock_device">Device PIN, pattern, or password</string>
+    <string name="settings_lock_device_no_screen_lock">Set a screen lock in Android settings to use this.</string>
+    <string name="settings_lock_device_legacy">Required at every unlock. On this Android version it gates access but does not add hardware-backed encryption; a vault password below does.</string>
+    <string name="settings_lock_device_detail">Your device PIN, pattern, or password is required at every unlock, checked against the key in hardware.</string>
+    <string name="settings_lock_off">No lock</string>
+    <string name="settings_lock_off_detail_pin">No fingerprint or device check. Your PIN below is then the only way in.</string>
+    <string name="settings_lock_off_detail_password">No fingerprint or device check. Your password below is then the only way in.</string>
+    <string name="settings_lock_off_detail_open">The vault opens with nothing to confirm: anyone who opens the app is in. Set a password below to make it the only way in.</string>
+    <string name="settings_confirm_lock_off">Turn off fingerprint and device unlock</string>
+
+    <!-- Security: app password or PIN, duress -->
+    <string name="settings_set_secret_button">Set a password or PIN…</string>
+    <string name="settings_set_secret_hint">A password you can use to unlock even with no biometric enrolled, and the basis for a duress password.</string>
+    <string name="settings_secret_set_pin">Unlock PIN is set.</string>
+    <string name="settings_secret_set_password">Unlock password is set.</string>
+    <string name="settings_pin_too_short">Your PIN is shorter than the %1$d digits AgePony now asks for. It still works, but a longer one is much harder to guess. Change it below.</string>
+    <string name="settings_password_too_short">Your password is shorter than the %1$d characters AgePony now asks for. It still works, but a longer one is much harder to guess. Change it below.</string>
+    <string name="settings_confirm_change_pin">Change your PIN</string>
+    <string name="settings_confirm_change_password">Change your password</string>
+    <string name="settings_set_duress_button_pin">Set a duress PIN…</string>
+    <string name="settings_set_duress_button_password">Set a duress password…</string>
+    <string name="settings_duress_hint_pin">A second, different PIN that silently wipes the vault instead of opening it. Entered under coercion, it leaves an empty app with nothing to reveal. There is no confirmation and no undo. While one is set, fingerprint and device unlock are turned off, so the lock screen always asks for your PIN.</string>
+    <string name="settings_duress_hint_password">A second, different password that silently wipes the vault instead of opening it. Entered under coercion, it leaves an empty app with nothing to reveal. There is no confirmation and no undo. While one is set, fingerprint and device unlock are turned off, so the lock screen always asks for your password.</string>
+    <string name="settings_duress_set_pin">Duress PIN is set. Entering it wipes the vault. Fingerprint and device unlock stay off while it is set.</string>
+    <string name="settings_duress_set_password">Duress password is set. Entering it wipes the vault. Fingerprint and device unlock stay off while it is set.</string>
+    <string name="settings_confirm_remove_duress_pin">Remove the duress PIN</string>
+    <string name="settings_confirm_remove_duress_password">Remove the duress password</string>
+    <plurals name="settings_erase_title">
+        <item quantity="one">Erase the vault after %1$d wrong attempt</item>
+        <item quantity="other">Erase the vault after %1$d wrong attempts</item>
+    </plurals>
+    <plurals name="settings_erase_detail_pin">
+        <item quantity="one">After %1$d wrong PIN, AgePony erases the vault at the lock screen the same way the duress PIN does. From %2$d wrong tries on, each new try also has to wait longer.</item>
+        <item quantity="other">After %1$d wrong PINs in a row, AgePony erases the vault at the lock screen the same way the duress PIN does. From %2$d wrong tries on, each new try also has to wait longer.</item>
+    </plurals>
+    <plurals name="settings_erase_detail_password">
+        <item quantity="one">After %1$d wrong password, AgePony erases the vault at the lock screen the same way the duress password does. From %2$d wrong tries on, each new try also has to wait longer.</item>
+        <item quantity="other">After %1$d wrong passwords in a row, AgePony erases the vault at the lock screen the same way the duress password does. From %2$d wrong tries on, each new try also has to wait longer.</item>
+    </plurals>
+    <string name="settings_confirm_stop_erasing">Stop erasing after wrong attempts</string>
+    <string name="settings_screenshots">Allow screenshots</string>
+    <string name="settings_screenshots_detail">Off: AgePony\'s screens stay out of screenshots, screen recordings and the recent apps preview. Turn on only while you need to capture a screen.</string>
+
+    <!-- Set / change / remove secret dialogs -->
+    <string name="settings_set_secret_title">Set a password or PIN</string>
+    <string name="settings_set_duress_title_pin">Set a duress PIN</string>
+    <string name="settings_set_duress_title_password">Set a duress password</string>
+    <string name="settings_set_duress_confirm">Set duress</string>
+    <string name="settings_set_duress_body_pin">Enter a second PIN, different from your real one. Entering it at unlock wipes the vault silently. Choose something you can recall under pressure but would not use by habit. Fingerprint and device unlock are turned off while it is set, so confirm your current PIN first.</string>
+    <string name="settings_set_duress_body_password">Enter a second password, different from your real one. Entering it at unlock wipes the vault silently. Choose something you can recall under pressure but would not use by habit. Fingerprint and device unlock are turned off while it is set, so confirm your current password first.</string>
+    <string name="settings_current_pin">Current PIN</string>
+    <string name="settings_current_password">Current password</string>
+    <string name="settings_remove_title_pin">Remove your PIN?</string>
+    <string name="settings_remove_title_password">Remove your password?</string>
+    <string name="settings_remove_body_duress_pin">The vault will no longer ask for it, and your duress PIN is removed too.</string>
+    <string name="settings_remove_body_duress_password">The vault will no longer ask for it, and your duress password is removed too.</string>
+    <string name="settings_remove_body">The vault will no longer ask for it. It then opens with the lock mode above only.</string>
+    <string name="settings_confirm_remove_pin">Remove your PIN</string>
+    <string name="settings_confirm_remove_password">Remove your password</string>
+    <string name="settings_cant_remove_title">Can\'t remove it yet</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_kind_password">Password</string>
+    <string name="settings_kind_pin">PIN</string>
+    <string name="settings_pin_min">At least %1$d digits.</string>
+    <string name="settings_password_min">At least %1$d characters.</string>
+    <string name="settings_confirm_field">Confirm</string>
+    <string name="settings_mismatch">They don\'t match.</string>
+
+    <!-- Encryption -->
+    <string name="settings_encrypt_to_self">Encrypt to self by default</string>
+    <string name="settings_encrypt_to_self_detail">Pre-select your active identity when choosing recipients, so you can always decrypt your own files.</string>
+    <string name="settings_armor_default">Armor as text by default</string>
+    <string name="settings_armor_default_detail">Start the encrypt screen with ASCII armor on. Armored output pastes into a message; raw binary is about a third smaller. Changing the switch while encrypting updates this too.</string>
+    <string name="settings_passphrase_default">Passphrase-only by default</string>
+    <string name="settings_passphrase_default_detail">Open the recipient picker in passphrase (scrypt) mode instead of key selection, for when you mostly encrypt with a passphrase.</string>
+    <string name="settings_forget_passphrase">Forget the remembered passphrase</string>
+    <string name="settings_forget">Forget</string>
+    <string name="settings_forget_passphrase_detail">A passphrase is being held in memory so a run of files is only asked for it once. It is never written to disk and is dropped whenever the vault locks.</string>
+    <string name="settings_work_factor">Passphrase work factor</string>
+    <string name="settings_work_factor_detail_default">2^%1$d: scrypt holds about %2$d MB while it derives the key, whatever the file size. This is age\'s default. The value is stored in the file, so any age tool can still open it.</string>
+    <string name="settings_work_factor_detail_custom">2^%1$d: scrypt holds about %2$d MB while it derives the key, whatever the file size. age\'s default is 2^%3$d. The value is stored in the file, so any age tool can still open it.</string>
+    <string name="settings_work_factor_less">Less</string>
+    <string name="settings_work_factor_more">More</string>
+
+    <!-- Auto-lock -->
+    <string name="settings_section_autolock">Auto-lock</string>
+    <string name="settings_autolock_label">Lock after leaving the app</string>
+    <string name="settings_confirm_lock_less">Lock less often</string>
+    <string name="settings_autolock_detail">How long AgePony waits after you switch away before locking the vault. Shorter is safer; longer keeps your place during a quick app switch. Turning the screen off counts as switching away.</string>
+    <string name="settings_autolock_immediately">Immediately</string>
+    <plurals name="settings_autolock_seconds">
+        <item quantity="one">%1$d second</item>
+        <item quantity="other">%1$d seconds</item>
+    </plurals>
+    <plurals name="settings_autolock_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+
+    <!-- Network -->
+    <string name="settings_section_network">Network</string>
+    <string name="settings_network_intro">Route the one network call, the GitHub key fetch, through a proxy. Everything else in AgePony is already offline.</string>
+    <string name="settings_proxy_off">Off</string>
+    <string name="settings_proxy_off_detail">Direct connection (default).</string>
+    <string name="settings_proxy_orbot">Orbot (Tor)</string>
+    <string name="settings_proxy_orbot_detail">SOCKS5 to %1$s:%2$d.</string>
+    <string name="settings_proxy_custom">Custom</string>
+    <string name="settings_proxy_custom_detail">Your own SOCKS5 or HTTP proxy.</string>
+    <string name="settings_orbot_missing">Orbot does not appear to be installed. Install it from Google Play or F-Droid, or choose Custom to point at another Tor SOCKS port.</string>
+    <string name="settings_proxy_socks">SOCKS5 (Tor)</string>
+    <string name="settings_proxy_http" translatable="false">HTTP</string>
+    <string name="settings_proxy_host">Proxy host</string>
+    <string name="settings_proxy_port">Port</string>
+    <string name="settings_proxy_username">Proxy username (optional)</string>
+    <string name="settings_proxy_password">Proxy password (optional)</string>
+    <string name="settings_proxy_credentials_detail">For Tor/Orbot, a username and password put AgePony\'s traffic on its own circuit (stream isolation). For a real proxy they are ordinary credentials. Leave blank for none.</string>
+    <string name="settings_proxy_no_fallback">If the proxy is unreachable, the key fetch fails rather than falling back to a direct connection.</string>
+
+    <!-- Active identity -->
+    <string name="settings_section_active_identity">Active identity</string>
+    <string name="settings_no_identities">No identities yet. Add one from the Identities tab.</string>
+    <string name="settings_active_identity_detail">The active identity is the default \"encrypt to self\" recipient and the first tried when decrypting.</string>
+
+    <!-- Move and back up keys -->
+    <string name="settings_section_keys">Move and back up keys</string>
+    <string name="settings_send_keys">Send keys to another device</string>
+    <string name="settings_receive_keys">Receive keys from another device</string>
+    <string name="settings_paper_restore">Restore from a paper backup</string>
+    <string name="settings_keys_detail">To make a paper backup, open an identity on the Identities tab. Hardware keys stay on this device and can\'t be moved or backed up.</string>
+    <string name="settings_lock_now">Lock vault now</string>
+
+    <!-- About -->
+    <string name="settings_section_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_website">Website</string>
+    <string name="settings_source_code">Source code</string>
+    <string name="settings_age_spec">age spec</string>
+    <string name="settings_licenses">Open-source licenses</string>
+    <string name="settings_made_by">Made by</string>
+    <string name="settings_desktop">AgePony for Desktop</string>
+    <string name="settings_desktop_detail">age encryption for macOS, Linux and Windows</string>
+
+    <!-- More from NorseHorse (app names stay literal in code) -->
+    <string name="settings_section_more">More from NorseHorse</string>
+    <string name="settings_more_all">All Pony apps</string>
+    <string name="settings_more_all_detail">The whole family at pony.norsehor.se</string>
+    <string name="settings_more_pgpony_detail">OpenPGP encryption for messages and files</string>
+    <string name="settings_more_quorumpony_detail">Split a secret into cards that rebuild it together</string>
+    <string name="settings_more_carrierpony_detail">Private messaging and file transfer, sealed end to end</string>
+    <string name="settings_more_burnpony_detail">Self-destructing encrypted notes, encrypted on your phone</string>
+    <string name="settings_more_vaultpony_detail">VeraCrypt-compatible encrypted vaults, entirely on your device</string>
+    <string name="settings_more_passpony_detail">A client for pass and passage password stores</string>
+    <string name="settings_more_relaypony_detail">Encrypted file transfer, phone to phone</string>
+    <string name="settings_more_scrubpony_detail">Strip identifying metadata from images without changing a pixel</string>
+
+    <!-- Help and feedback -->
+    <string name="settings_section_help">Help &amp; feedback</string>
+    <string name="settings_help">Help &amp; FAQ</string>
+    <string name="settings_security_info">How AgePony protects your files</string>
+    <string name="settings_replay_intro">Replay the intro</string>
+    <string name="settings_replay_intro_detail">Walk through what AgePony does and how your keys stay private on this device.</string>
+    <string name="settings_rate">Rate AgePony</string>
+    <string name="settings_rate_detail">If AgePony has been useful, a rating helps other people find it.</string>
+    <string name="settings_send_feedback">Send feedback</string>
+    <string name="settings_send_feedback_detail">Found a bug or have an idea? This opens an email to NorseHorse with your app and device details filled in.</string>
+    <string name="settings_recently_deleted">Recently deleted</string>
+    <string name="settings_recently_deleted_detail">Restore an identity or recipient you deleted, for up to 30 days.</string>
+
+    <!-- Reset -->
+    <string name="settings_reset">Reset</string>
+    <string name="settings_reset_button">Reset AgePony</string>
+    <string name="settings_reset_detail">Erases all stored identities, recipients, and notes. Files you\'ve already saved outside AgePony are untouched. This cannot be undone.</string>
+    <string name="settings_reset_title">Reset AgePony?</string>
+    <string name="settings_reset_body">This deletes every identity, recipient, and encrypted note in the vault. Files already saved outside AgePony are unaffected. This cannot be undone.</string>
+
+    <!-- Recently deleted -->
+    <string name="settings_trash_intro">Deleted identities and recipients wait here for %1$d days before they are removed for good. Restoring an identity brings its private key back intact.</string>
+    <string name="settings_trash_empty">Nothing here. Deleted items will show up on this screen.</string>
+    <string name="settings_trash_identities">Identities</string>
+    <string name="settings_trash_recipients">Recipients</string>
+    <string name="settings_trash_empty_bin">Empty recycle bin</string>
+    <string name="settings_trash_empty_title">Empty recycle bin?</string>
+    <string name="settings_trash_empty_body">This permanently removes everything here. Any deleted identity\'s private key is gone for good. This cannot be undone.</string>
+    <string name="settings_trash_empty_confirm">Empty</string>
+    <string name="settings_trash_purge_title">Delete \"%1$s\" for good?</string>
+    <string name="settings_trash_purge_identity_body">This removes the identity and its private key permanently. Files encrypted to it can never be opened again. This cannot be undone.</string>
+    <string name="settings_trash_purge_recipient_body">This removes the recipient permanently. This cannot be undone.</string>
+    <string name="settings_trash_restore">Restore</string>
+    <string name="settings_trash_deleted_just_now">Deleted just now</string>
+    <plurals name="settings_trash_deleted_minutes">
+        <item quantity="one">Deleted %1$d minute ago</item>
+        <item quantity="other">Deleted %1$d minutes ago</item>
+    </plurals>
+    <plurals name="settings_trash_deleted_hours">
+        <item quantity="one">Deleted %1$d hour ago</item>
+        <item quantity="other">Deleted %1$d hours ago</item>
+    </plurals>
+    <plurals name="settings_trash_deleted_days">
+        <item quantity="one">Deleted %1$d day ago</item>
+        <item quantity="other">Deleted %1$d days ago</item>
+    </plurals>
+
+    <!-- How AgePony protects your files -->
+    <string name="settings_security_intro">What the app does for you, in plain terms, and what it deliberately does not do.</string>
+    <string name="settings_security_device_title">Everything happens on this device</string>
+    <string name="settings_security_device_body">AgePony has no account and talks to no server of ours. Encryption, decryption, and your keys all stay on this phone. The one exception is fetching a recipient\'s public key from GitHub, which only runs when you ask for it, and which you can route through a proxy.</string>
+    <string name="settings_security_format_title">The age format and its algorithms</string>
+    <string name="settings_security_format_body">Files use the age format: X25519 for public-key recipients, ChaCha20-Poly1305 for the payload, and scrypt when you encrypt to a passphrase. Post-quantum identities add ML-KEM to the key exchange. These are modern, well-reviewed choices, and the format is the same one the age command-line tool uses.</string>
+    <string name="settings_security_vault_title">Your vault at rest</string>
+    <string name="settings_security_vault_body">Identities, recipients, and notes live in an encrypted vault file. Its key is held by the Android Keystore, and you can gate unlock behind your device credential or a fingerprint. Locked, the vault is just ciphertext on disk.</string>
+    <string name="settings_security_passphrase_title">Passphrases in memory only</string>
+    <string name="settings_security_passphrase_body">A passphrase you type to encrypt a file is kept in memory to save you retyping across a run of files. It is never written to disk, never stored in the vault, and is dropped when the app goes to the background or the vault locks.</string>
+    <string name="settings_security_duress_title">A duress password, if you set one</string>
+    <string name="settings_security_duress_body">You can set a second password that, when entered at unlock, silently wipes the vault. It exists for the moment you are compelled to open the app and would rather it come up empty.</string>
+    <string name="settings_security_not_doing_title">What AgePony does not do</string>
+    <string name="settings_security_no_cloud">It does not back your keys up to any cloud. If you lose this device without an export, the keys are gone.</string>
+    <string name="settings_security_no_recovery">It cannot recover a private key you have deleted for good, and neither can we.</string>
+    <string name="settings_security_no_telemetry">It sends no analytics or telemetry. Nothing about your files or usage leaves the device.</string>
+    <string name="settings_security_no_outside">It cannot protect files after they leave AgePony, or defend against a phone that is already compromised at the system level.</string>
+    <string name="settings_security_footer">AgePony is open source. If you want to check any of this, the source link is in Settings under About.</string>
+
+    <!-- Help and FAQ -->
+    <string name="settings_help_intro">Short answers to the things people ask most.</string>
+    <string name="settings_help_what_q">What is age, and what is AgePony?</string>
+    <string name="settings_help_what_a">age is a modern, open file-encryption format: small, audited, and free of the legacy baggage of older tools. AgePony is a friendly age client for your phone. Files it writes are ordinary age files that any age tool can open.</string>
+    <string name="settings_help_recipient_q">What is a recipient?</string>
+    <string name="settings_help_recipient_a">A recipient is someone you encrypt to, identified by their public key (an age1... string or an SSH public key). Add a recipient once and you can encrypt files that only they can open. You never need their private key, only the public one they share.</string>
+    <string name="settings_help_choice_q">Passphrase or key: which should I use?</string>
+    <string name="settings_help_choice_a">A key (an identity) is best when you encrypt to yourself or to people you exchange keys with: nothing to remember, nothing to type. A passphrase is best for a one-off file you want to hand to someone who does not use AgePony. They only need the word, not a key.</string>
+    <string name="settings_help_armor_q">What does Armor as text mean?</string>
+    <string name="settings_help_armor_a">Armor writes the encrypted file as plain letters and numbers instead of raw bytes, so you can paste it into a chat or email. It is a little larger. Leave it off for files you send as attachments.</string>
+    <string name="settings_help_archive_q">I encrypted several files at once. Where did they go?</string>
+    <string name="settings_help_archive_a">Encrypting more than one file packs them into a single archive so it travels as one file. When you decrypt it, AgePony offers Extract files into a folder, which writes each original back out. A single file encrypts and decrypts on its own with no archive.</string>
+    <string name="settings_help_compat_q">Can someone open my file without AgePony?</string>
+    <string name="settings_help_compat_a">Yes. AgePony writes standard age files, so the age command-line tool and other age clients open them with the matching key or passphrase. You are not locked in.</string>
+    <string name="settings_help_lose_q">What happens if I delete or lose an identity?</string>
+    <string name="settings_help_lose_a">An identity holds a private key. Without it, files encrypted to that identity cannot be opened by anyone, including you. Deleting an identity now moves it to Recently deleted for a while so you can restore it, but once it is gone for good it cannot be recovered. Export a copy you keep somewhere safe if it matters.</string>
+    <string name="settings_help_pq_q">What is a post-quantum identity?</string>
+    <string name="settings_help_pq_a">It is a hybrid identity that combines classic X25519 with ML-KEM, a scheme designed to resist future quantum computers. Files encrypted to it stay protected even against an attacker who records them now to break later. It is fully compatible with age tools that support the hybrid recipient.</string>
+    <string name="settings_help_sign_q">Can I sign a file without encrypting it?</string>
+    <string name="settings_help_sign_a">Yes. Sign a file, on the Files tab, makes a detached signature so others can prove a file came from you, and Verify a signature checks signatures from people on your Trusted signers list. Signing and encrypting are separate: you can do either or both.</string>
+    <string name="settings_help_footer">Still stuck? Settings has a Send feedback button that opens an email to NorseHorse.</string>
+
+    <!-- Open-source licenses (license names stay literal in code) -->
+    <string name="settings_licenses_intro">AgePony is open source, and stands on these projects. Each remains under its own license, and full license texts are available from every project.</string>
+    <string name="settings_licenses_footer">AgePony implements the open age file format. Its own encryption code (agepony-core) is part of AgePony and released under the same license as the app. The source link is in Settings under About.</string>
+    <string name="settings_dep_jetpack">Android Jetpack (Core, Lifecycle, Activity, Fragment, Biometric)</string>
+    <string name="settings_dep_compose">Jetpack Compose (UI, Foundation, Material 3, Material Icons)</string>
+    <string name="settings_dep_camerax" translatable="false">CameraX</string>
+    <string name="settings_dep_kotlin">Kotlin standard library</string>
+    <string name="settings_dep_serialization" translatable="false">kotlinx.serialization</string>
+    <string name="settings_dep_zxing">ZXing core (QR encoding and decoding)</string>
+    <string name="settings_dep_desugar">Android core library desugaring (desugar_jdk_libs)</string>
+    <string name="settings_dep_play_review">Google Play In-App Review (Play build only, not in the F-Droid build)</string>
+</resources>

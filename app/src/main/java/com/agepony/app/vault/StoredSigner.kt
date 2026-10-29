@@ -1,5 +1,7 @@
 package com.agepony.app.vault
 
+import android.content.Context
+import com.agepony.app.R
 import com.agepony.core.archive.SignedBundle
 import com.agepony.core.signing.SSHSig
 import com.agepony.core.signing.SSHSigVerifier
@@ -78,17 +80,21 @@ data class StoredSigner(
     )
 
     /** The imported restrictions in plain words, for the signer's row (audit L-6). Empty without options. */
-    fun restrictions(zone: ZoneId = ZoneId.systemDefault()): List<String> = describeOptions(options, zone)
+    fun restrictions(context: Context, zone: ZoneId = ZoneId.systemDefault()): List<String> =
+        describeOptions(context, options, zone)
 
     /**
      * Why AgePony can't honor this signer's options (cert-authority, an option it doesn't know,
      * a malformed field), or null. Such a signer is shown but never imported (audit L-6).
      */
-    fun unenforceableReason(): String? = unenforceableReasonFor(options)
+    fun unenforceableReason(context: Context): String? = unenforceableReasonText(options)?.resolve(context)
+
+    /** True unless [unenforceableReason] would refuse this signer. */
+    fun isEnforceable(): Boolean = unenforceableReasonText(options) == null
 
     /** Why this signer shouldn't be trusted by default (expired, not for AgePony), or null (audit L-6). */
-    fun agePonyWarning(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String? =
-        agePonyWarningFor(options, now, zone)
+    fun agePonyWarning(context: Context, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String? =
+        agePonyWarningText(options, now, zone)?.resolve(context)
 
     /**
      * The imported restrictions applied to a verified signature from this signer's key (audit
@@ -106,53 +112,72 @@ data class StoredSigner(
             SignedBundle.NAMESPACE_V2,
         )
 
-        /** An allowed_signers options field in plain words, one restriction per item. */
-        fun describeOptions(raw: String?, zone: ZoneId = ZoneId.systemDefault()): List<String> {
+        /**
+         * An allowed_signers options field in plain words, one restriction per item. Namespaces the
+         * entry allows are one item and namespaces it excludes ("!name") another.
+         */
+        fun describeOptionsText(raw: String?, zone: ZoneId = ZoneId.systemDefault()): List<UiText> {
             if (raw.isNullOrBlank()) return emptyList()
             val o = AllowedSignerOptions.parse(raw, zone)
-            val out = mutableListOf<String>()
-            if (o.certAuthority) out += "certificate authority (signs certificates, not files)"
+            val out = mutableListOf<UiText>()
+            if (o.certAuthority) out += UiText.res(R.string.core_signer_opt_cert_authority)
             o.namespaces?.let { ns ->
-                val names = ns.split(',').joinToString(", ") { if (it.startsWith("!")) "not ${it.drop(1)}" else it }
-                out += "$names only"
+                val (excluded, allowed) = ns.split(',').partition { it.startsWith("!") }
+                if (allowed.isNotEmpty()) out += UiText.res(R.string.core_signer_opt_only_for, allowed.joinToString(", "))
+                if (excluded.isNotEmpty()) {
+                    out += UiText.res(R.string.core_signer_opt_not_for, excluded.joinToString(", ") { it.drop(1) })
+                }
             }
-            o.validAfter?.let { out += "valid from ${humanTime(it, zone)}" }
-            o.validBefore?.let { out += "valid until ${humanTime(it, zone)}" }
-            if (o.noTouchRequired) out += "security key touch not required"
-            if (o.verifyRequired) out += "security key PIN or fingerprint required"
-            o.unknown.forEach { out += "unknown option: $it" }
-            o.error?.let { out += "unreadable options: $it" }
+            o.validAfter?.let { out += UiText.res(R.string.core_signer_opt_valid_from, humanTime(it, zone)) }
+            o.validBefore?.let { out += UiText.res(R.string.core_signer_opt_valid_until, humanTime(it, zone)) }
+            if (o.noTouchRequired) out += UiText.res(R.string.core_signer_opt_no_touch)
+            if (o.verifyRequired) out += UiText.res(R.string.core_signer_opt_verify_required)
+            o.unknown.forEach { out += UiText.res(R.string.core_signer_opt_unknown, it) }
+            o.error?.let { out += UiText.res(R.string.core_signer_opt_unreadable, it) }
             return out
         }
 
+        /** [describeOptionsText] in the app's language. */
+        fun describeOptions(context: Context, raw: String?, zone: ZoneId = ZoneId.systemDefault()): List<String> =
+            describeOptionsText(raw, zone).map { it.resolve(context) }
+
         /** See [StoredSigner.unenforceableReason]. */
-        fun unenforceableReasonFor(raw: String?): String? {
+        fun unenforceableReasonText(raw: String?): UiText? {
             if (raw.isNullOrBlank()) return null
             val o = AllowedSignerOptions.parse(raw, ZoneOffset.UTC)
+            val error = o.error
             return when {
-                o.certAuthority ->
-                    "A certificate authority key. AgePony doesn't support SSH certificates, so it can't enforce this entry."
-                o.error != null ->
-                    "Its options can't be read (${o.error}), so AgePony can't enforce them."
-                o.unknown.isNotEmpty() ->
-                    "It has options AgePony doesn't understand (${o.unknown.joinToString(", ")}), so AgePony can't enforce them."
+                o.certAuthority -> UiText.res(R.string.core_signer_blocked_cert_authority)
+                error != null -> UiText.res(R.string.core_signer_blocked_unreadable, error)
+                o.unknown.isNotEmpty() -> UiText.res(R.string.core_signer_blocked_unknown, o.unknown.joinToString(", "))
                 else -> null
             }
         }
 
+        /** [unenforceableReasonText] in the app's language. */
+        fun unenforceableReasonFor(context: Context, raw: String?): String? = unenforceableReasonText(raw)?.resolve(context)
+
         /** See [StoredSigner.agePonyWarning]. Null for an entry [unenforceableReason] refuses. */
-        fun agePonyWarningFor(raw: String?, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String? {
-            if (raw.isNullOrBlank() || unenforceableReasonFor(raw) != null) return null
+        fun agePonyWarningText(raw: String?, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): UiText? {
+            if (raw.isNullOrBlank() || unenforceableReasonText(raw) != null) return null
             val o = AllowedSignerOptions.parse(raw, zone)
-            o.validBefore?.let { if (now.isAfter(it)) return "Expired on ${humanTime(it, zone)}." }
-            o.validAfter?.let { if (now.isBefore(it)) return "Not valid until ${humanTime(it, zone)}." }
+            o.validBefore?.let { if (now.isAfter(it)) return UiText.res(R.string.core_signer_warn_expired, humanTime(it, zone)) }
+            o.validAfter?.let { if (now.isBefore(it)) return UiText.res(R.string.core_signer_warn_not_yet_valid, humanTime(it, zone)) }
             // The namespace test on its own, at a moment inside the validity window.
             val probe = o.validAfter ?: o.validBefore ?: now
             if (AGEPONY_NAMESPACES.none { o.permits(it, probe, agePonyFamily = true) }) {
-                return "Not allowed to sign AgePony files (${o.namespaces} only)."
+                return UiText.res(R.string.core_signer_warn_not_agepony, o.namespaces.orEmpty())
             }
             return null
         }
+
+        /** [agePonyWarningText] in the app's language. */
+        fun agePonyWarningFor(
+            context: Context,
+            raw: String?,
+            now: Instant = Instant.now(),
+            zone: ZoneId = ZoneId.systemDefault(),
+        ): String? = agePonyWarningText(raw, now, zone)?.resolve(context)
 
         /** A date, with the time only when it isn't midnight. */
         private fun humanTime(at: Instant, zone: ZoneId): String {
@@ -208,12 +233,18 @@ class AllowedSignerReview(
     val signer: StoredSigner?,
     /** The key is already on the signers list (import would skip it). */
     val alreadyPresent: Boolean,
-    val blocked: String?,
-    val warning: String?,
+    val blockedText: UiText?,
+    val warningText: UiText?,
 ) {
-    val restrictions: List<String> get() = StoredSigner.describeOptions(entry.options)
-    val importable: Boolean get() = signer != null && !alreadyPresent && blocked == null
-    val checkedByDefault: Boolean get() = importable && warning == null
+    /** Why the entry can't be imported, in the app's language, or null. */
+    fun blocked(context: Context): String? = blockedText?.resolve(context)
+
+    /** Why the entry isn't ticked by default, in the app's language, or null. */
+    fun warning(context: Context): String? = warningText?.resolve(context)
+
+    fun restrictions(context: Context): List<String> = StoredSigner.describeOptions(context, entry.options)
+    val importable: Boolean get() = signer != null && !alreadyPresent && blockedText == null
+    val checkedByDefault: Boolean get() = importable && warningText == null
 
     companion object {
         fun of(
@@ -224,8 +255,12 @@ class AllowedSignerReview(
         ): AllowedSignerReview {
             val signer = StoredSigner.fromAllowedSigner(entry, source)
             val present = signer != null && known.any { it.publicKeyWireB64 == signer.publicKeyWireB64 }
-            val blocked = if (signer == null) "Its key can't be read." else StoredSigner.unenforceableReasonFor(entry.options)
-            return AllowedSignerReview(entry, signer, present, blocked, StoredSigner.agePonyWarningFor(entry.options, now))
+            val blocked = if (signer == null) {
+                UiText.res(R.string.core_signer_blocked_bad_key)
+            } else {
+                StoredSigner.unenforceableReasonText(entry.options)
+            }
+            return AllowedSignerReview(entry, signer, present, blocked, StoredSigner.agePonyWarningText(entry.options, now))
         }
     }
 }

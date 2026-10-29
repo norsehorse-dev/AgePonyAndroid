@@ -4,13 +4,10 @@ import android.text.format.DateUtils
 import android.util.Base64
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,12 +15,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,12 +27,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.vault.FileEncryptor
@@ -49,6 +41,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.EmptyState
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.QuietAction
+import com.agepony.app.ui.components.SwitchRow
 
 //
 // Notes tab (Phase 2d-1). Android counterpart of iOS's Notes feature. Each note
@@ -98,30 +105,22 @@ private fun NoteList(
     onCreate: () -> Unit,
     onOpen: (String) -> Unit,
 ) {
-    Column(modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Notes", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onCreate) { Text("New note") }
-        }
-
+    AgeScreen(
+        title = stringResource(R.string.app_tab_notes),
+        modifier = modifier,
+        actions = {
+            IconButton(onClick = onCreate) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.notes_new))
+            }
+        },
+    ) { padding ->
+    Column(Modifier.fillMaxSize().padding(padding)) {
         val notes = vault.notes.sortedByDescending { it.updatedAt }
         if (notes.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
-                    Text("No notes yet", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Tap New note to create one. Each note has its own passphrase.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
+            EmptyState(
+                title = stringResource(R.string.notes_empty_title),
+                body = stringResource(R.string.notes_empty_body),
+            )
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
                 items(notes, key = { it.id }) { note ->
@@ -129,24 +128,25 @@ private fun NoteList(
                         Modifier
                             .fillMaxWidth()
                             .clickable { onOpen(note.id) }
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                     ) {
                         Text(
-                            note.title.ifBlank { "Untitled" },
+                            note.title.ifBlank { stringResource(R.string.notes_untitled) },
                             style = MaterialTheme.typography.bodyLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            "Edited " + DateUtils.getRelativeTimeSpanString(note.updatedAt),
+                            stringResource(R.string.notes_edited, DateUtils.getRelativeTimeSpanString(note.updatedAt)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    HorizontalDivider()
+                    ListDivider()
                 }
             }
         }
+    }
     }
 }
 
@@ -169,26 +169,27 @@ private fun CreateNote(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     val mismatch = confirm.isNotEmpty() && passphrase != confirm
     val canSave = !busy && passphrase.isNotEmpty() && passphrase == confirm
 
+    AgeScreen(title = stringResource(R.string.notes_new), modifier = modifier, onBack = onCancel) { padding ->
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("New note", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         OutlinedTextField(
             value = title,
             onValueChange = { title = it },
-            label = { Text("Title (stored in the vault, searchable)") },
+            label = { Text(stringResource(R.string.notes_create_title_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = body,
             onValueChange = { body = it },
-            label = { Text("Body (encrypted with this note's passphrase)") },
+            label = { Text(stringResource(R.string.notes_create_body_label)) },
             minLines = 6,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -198,17 +199,17 @@ private fun CreateNote(
             show = show, onShow = { show = it }, mismatch = mismatch,
         )
         Text(
-            "scrypt work factor 2^18 makes brute force expensive, but a guessable passphrase is still guessable. There's no recovery if you forget it.",
+            stringResource(R.string.notes_passphrase_warning),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (error != null) ErrorLine(error!!)
+        if (error != null) ErrorText(error!!)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             Button(
                 onClick = {
                     if (!canSave) return@Button
                     busy = true; error = null
-                    val titleSnapshot = title.trim().ifBlank { "Untitled" }
+                    val titleSnapshot = title.trim().ifBlank { context.getString(R.string.notes_untitled) }
                     val bodyBytes = body.toByteArray(Charsets.UTF_8)
                     val pass = passphrase
                     scope.launch {
@@ -229,18 +230,19 @@ private fun CreateNote(
                             onDone()
                         } catch (e: OutOfMemoryError) {
                             busy = false
-                            error = "Not enough memory to encrypt this note on this device."
+                            error = context.getString(R.string.notes_oom_encrypt)
                         } catch (e: Exception) {
                             busy = false
-                            error = e.message ?: "Couldn't create the note."
+                            error = e.message ?: context.getString(R.string.notes_create_failed)
                         }
                     }
                 },
                 enabled = canSave,
                 modifier = Modifier.weight(1f),
-            ) { Text(if (busy) "Encrypting…" else "Create note") }
-            OutlinedButton(onClick = onCancel, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Cancel") }
+            ) { Text(stringResource(if (busy) R.string.notes_encrypting else R.string.notes_create)) }
+            OutlinedButton(onClick = onCancel, enabled = !busy, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_cancel)) }
         }
+    }
     }
 }
 
@@ -269,37 +271,59 @@ private fun NoteDetail(
     var origBody by remember { mutableStateOf("") }
 
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var confirmDelete by remember { mutableStateOf(false) }
 
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TextButton(onClick = onBack) { Text("‹ Back") }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.note_delete_title)) },
+            text = { Text(stringResource(R.string.note_delete_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    vault.deleteNote(noteId)
+                    onBack()
+                }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
 
+    AgeScreen(
+        title = note?.title?.ifBlank { stringResource(R.string.notes_untitled) } ?: stringResource(R.string.note_title),
+        modifier = modifier,
+        onBack = onBack,
+    ) { padding ->
+    Column(
+        Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         if (note == null) {
-            Text("Note not found.", style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.notes_not_found), style = MaterialTheme.typography.bodyLarge)
             return@Column
         }
 
         when (phase) {
             NotePhase.LOCKED -> {
-                Text(note.title.ifBlank { "Untitled" }, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
                 Text(
-                    "Edited " + DateUtils.getRelativeTimeSpanString(note.updatedAt),
+                    stringResource(R.string.notes_edited, DateUtils.getRelativeTimeSpanString(note.updatedAt)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
                     value = passInput,
                     onValueChange = { passInput = it; error = null },
-                    label = { Text("Passphrase") },
+                    label = { Text(stringResource(R.string.notes_passphrase)) },
                     singleLine = true,
                     visualTransformation = if (show) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = show, onCheckedChange = { show = it })
-                    Text("Show passphrase", modifier = Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodySmall)
-                }
-                if (error != null) ErrorLine(error!!)
+                SwitchRow(title = stringResource(R.string.notes_show_passphrase), checked = show, onCheckedChange = { show = it })
+                if (error != null) ErrorText(error!!)
                 Button(
                     onClick = {
                         if (passInput.isEmpty() || working) return@Button
@@ -319,21 +343,18 @@ private fun NoteDetail(
                                 working = false
                                 phase = NotePhase.UNLOCKED
                             } catch (e: WrongPassphraseException) {
-                                working = false; error = "Wrong passphrase."
+                                working = false; error = context.getString(R.string.notes_wrong_passphrase)
                             } catch (e: OutOfMemoryError) {
-                                working = false; error = "Not enough memory to decrypt this note."
+                                working = false; error = context.getString(R.string.notes_oom_decrypt)
                             } catch (e: Exception) {
-                                working = false; error = e.message ?: "Couldn't unlock the note."
+                                working = false; error = e.message ?: context.getString(R.string.notes_unlock_failed)
                             }
                         }
                     },
                     enabled = passInput.isNotEmpty() && !working,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text(if (working) "Decrypting…" else "Unlock") }
-                TextButton(onClick = {
-                    vault.deleteNote(noteId)
-                    onBack()
-                }) { Text("Delete note", color = MaterialTheme.colorScheme.error) }
+                ) { Text(stringResource(if (working) R.string.notes_decrypting else R.string.app_unlock)) }
+                QuietAction(text = stringResource(R.string.notes_delete), onClick = { confirmDelete = true }, destructive = true)
             }
 
             NotePhase.UNLOCKED -> {
@@ -341,24 +362,24 @@ private fun NoteDetail(
                 OutlinedTextField(
                     value = editTitle,
                     onValueChange = { editTitle = it },
-                    label = { Text("Title") },
+                    label = { Text(stringResource(R.string.notes_title_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = editBody,
                     onValueChange = { editBody = it },
-                    label = { Text("Body") },
+                    label = { Text(stringResource(R.string.notes_body_label)) },
                     minLines = 8,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (error != null) ErrorLine(error!!)
+                if (error != null) ErrorText(error!!)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = {
                             if (!dirty || working) return@Button
                             working = true; error = null
-                            val titleSnapshot = editTitle.trim().ifBlank { "Untitled" }
+                            val titleSnapshot = editTitle.trim().ifBlank { context.getString(R.string.notes_untitled) }
                             val bodyBytes = editBody.toByteArray(Charsets.UTF_8)
                             val pass = unlockedPass
                             scope.launch {
@@ -379,15 +400,15 @@ private fun NoteDetail(
                                     origBody = editBody
                                     working = false
                                 } catch (e: OutOfMemoryError) {
-                                    working = false; error = "Not enough memory to save this note."
+                                    working = false; error = context.getString(R.string.notes_oom_save)
                                 } catch (e: Exception) {
-                                    working = false; error = e.message ?: "Couldn't save the note."
+                                    working = false; error = e.message ?: context.getString(R.string.notes_save_failed)
                                 }
                             }
                         },
                         enabled = dirty && !working,
                         modifier = Modifier.weight(1f),
-                    ) { Text(if (working) "Encrypting…" else "Save") }
+                    ) { Text(stringResource(if (working) R.string.notes_encrypting else R.string.notes_save)) }
                     OutlinedButton(
                         onClick = {
                             unlockedPass = ""; editTitle = ""; editBody = ""; origTitle = ""; origBody = ""
@@ -396,13 +417,14 @@ private fun NoteDetail(
                         },
                         enabled = !working,
                         modifier = Modifier.weight(1f),
-                    ) { Text("Lock") }
+                    ) { Text(stringResource(R.string.notes_lock)) }
                 }
                 if (dirty) {
-                    Text("Unsaved changes — tap Save to re-encrypt.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.notes_unsaved), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
         }
+    }
     }
 }
 
@@ -418,28 +440,18 @@ private fun PassphraseFields(
     val transform = if (show) VisualTransformation.None else PasswordVisualTransformation()
     OutlinedTextField(
         value = passphrase, onValueChange = onPassphrase,
-        label = { Text("Passphrase") }, singleLine = true,
+        label = { Text(stringResource(R.string.notes_passphrase)) }, singleLine = true,
         visualTransformation = transform,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         modifier = Modifier.fillMaxWidth(),
     )
     OutlinedTextField(
         value = confirm, onValueChange = onConfirm,
-        label = { Text("Confirm passphrase") }, singleLine = true,
+        label = { Text(stringResource(R.string.notes_confirm_passphrase)) }, singleLine = true,
         visualTransformation = transform,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         modifier = Modifier.fillMaxWidth(),
     )
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Switch(checked = show, onCheckedChange = onShow)
-        Text("Show passphrase", modifier = Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodySmall)
-    }
-    if (mismatch) {
-        Text("Passphrases don't match.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-    }
-}
-
-@Composable
-private fun ErrorLine(message: String) {
-    Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+    SwitchRow(title = stringResource(R.string.notes_show_passphrase), checked = show, onCheckedChange = onShow)
+    if (mismatch) ErrorText(stringResource(R.string.notes_passphrase_mismatch))
 }

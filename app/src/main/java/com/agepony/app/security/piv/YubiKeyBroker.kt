@@ -6,7 +6,9 @@ import android.nfc.tech.IsoDep
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.StringRes
 import androidx.fragment.app.FragmentActivity
+import com.agepony.app.R
 import com.agepony.core.crypto.P256KeyAgreement
 import com.agepony.core.piv.Piv
 import com.agepony.core.recipients.YubiKeyStub
@@ -65,7 +67,7 @@ object YubiKeyBroker {
     fun keyAgreement(stub: YubiKeyStub): P256KeyAgreement = P256KeyAgreement { peer -> ecdh(stub, peer) }
 
     /** Tap once to read the public key behind [stub]; checks it matches the stub's tag. */
-    fun readPublicKey(stub: YubiKeyStub): ByteArray = withCard("Hold your YubiKey to the back of the phone to read its age key.", stub) { card ->
+    fun readPublicKey(stub: YubiKeyStub): ByteArray = withCard(R.string.core_yubikey_tap_read, stub) { card ->
         val pub = Piv.readPublicKey(card, stub.slot)
         if (!stub.matchesKey(pub)) throw Piv.PivException("The key in that slot doesn't match this identity.")
         pub
@@ -75,7 +77,7 @@ object YubiKeyBroker {
         var pin: String? = if (stub.serial in needsPin) askPin(null) else null
         while (true) {
             try {
-                return withCard("Hold your YubiKey to the back of the phone to decrypt.", stub) { card ->
+                return withCard(R.string.core_yubikey_tap_decrypt, stub) { card ->
                     pin?.let { Piv.verifyPin(card, it) }
                     Piv.ecdh(card, stub.slot, peer)
                 }
@@ -102,8 +104,11 @@ object YubiKeyBroker {
         return answer ?: throw YubiKeyCancelled()
     }
 
-    /** Wait for a tap, open PIV, check the serial, run [block], always tearing reader mode down. */
-    private fun <T> withCard(message: String, stub: YubiKeyStub, block: (Piv.Card) -> T): T {
+    /**
+     * Wait for a tap, open PIV, check the serial, run [block], always tearing reader mode down.
+     * [message] is the tap prompt's text, read from the foreground activity.
+     */
+    private fun <T> withCard(@StringRes message: Int, stub: YubiKeyStub, block: (Piv.Card) -> T): T {
         check(Looper.myLooper() != Looper.getMainLooper()) { "YubiKey I/O must run off the main thread" }
         val activity = current?.get() ?: throw Piv.PivException("AgePony needs to be open to use a YubiKey.")
         val nfc = NfcAdapter.getDefaultAdapter(activity) ?: throw Piv.PivException("This phone has no NFC.")
@@ -113,7 +118,7 @@ object YubiKeyBroker {
         var tag: Tag? = null
         var cancelled = false
         cancelTap = { cancelled = true; latch.countDown() }
-        _prompt.value = Prompt.Tap(message)
+        _prompt.value = Prompt.Tap(activity.getString(message))
         val main = Handler(Looper.getMainLooper())
         main.post {
             runCatching {

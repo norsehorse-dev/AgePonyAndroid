@@ -1,5 +1,8 @@
 package com.agepony.app.security
 
+import android.content.Context
+import com.agepony.app.R
+import com.agepony.app.vault.UiText
 import java.io.File
 
 /** Result of an in-app check of the app password (see Vault.verifyAppPassword). */
@@ -131,17 +134,20 @@ class UnlockAttempts(
         }
 
         /** "30 seconds", "4 minutes", "1 hour": a wait for display, rounded up. */
-        fun describeWait(millis: Long): String {
+        fun describeWaitText(millis: Long): UiText {
             val seconds = ((millis + 999L) / 1000L).coerceAtLeast(1L)
             return when {
-                seconds < 90L -> if (seconds == 1L) "1 second" else "$seconds seconds"
-                seconds < 3600L -> "${(seconds + 59L) / 60L} minutes"
-                else -> "1 hour"
+                seconds < 90L -> seconds.toInt().let { UiText.plural(R.plurals.core_wait_seconds, it, it) }
+                seconds < 3600L -> ((seconds + 59L) / 60L).toInt().let { UiText.plural(R.plurals.core_wait_minutes, it, it) }
+                else -> ((seconds + 3599L) / 3600L).toInt().let { UiText.plural(R.plurals.core_wait_hours, it, it) }
             }
         }
 
+        /** [describeWaitText] in the app's language. */
+        fun describeWait(context: Context, millis: Long): String = describeWaitText(millis).resolve(context)
+
         /** The message shown when an attempt is refused because of the backoff. */
-        fun lockoutMessage(millis: Long): String =
-            "Too many wrong attempts. Try again in ${describeWait(millis)}."
+        fun lockoutMessage(context: Context, millis: Long): String =
+            context.getString(R.string.app_lockout_wait, describeWait(context, millis))
     }
 }

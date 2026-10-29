@@ -5,23 +5,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
@@ -67,6 +61,25 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.EmptyState
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.SwitchRow
+import com.agepony.app.ui.components.VerdictPanel
+import com.agepony.app.ui.theme.AgeStatus
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
+import androidx.annotation.StringRes
 
 //
 // Identities tab (Phase 2c-2). A two-tab segmented control switches between the
@@ -75,9 +88,9 @@ import java.util.UUID
 // sub-navigation, held as plain state (no nav library).
 //
 
-private enum class IdSegment(val label: String) {
-    IDENTITIES("My Identities"),
-    RECIPIENTS("Recipients"),
+private enum class IdSegment(@StringRes val label: Int) {
+    IDENTITIES(R.string.identities_tab_mine),
+    RECIPIENTS(R.string.identities_tab_recipients),
 }
 
 private enum class PaneMode { LIST, ADD, DETAIL }
@@ -94,65 +107,92 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
         detailId = null
     }
 
-    Column(modifier) {
-        if (showTrash) {
-            RecentlyDeletedScreen(vault = vault, onBack = { showTrash = false })
-            return@Column
-        }
-        if (mode == PaneMode.LIST) {
-            PrimaryTabRow(selectedTabIndex = segment.ordinal) {
-                IdSegment.entries.forEach { s ->
-                    Tab(
-                        selected = segment == s,
-                        onClick = { if (s != segment) { segment = s; toList() } },
-                        text = { Text(s.label) },
+    if (showTrash) {
+        RecentlyDeletedScreen(vault = vault, onBack = { showTrash = false }, modifier = modifier)
+        return
+    }
+
+    when (mode) {
+        PaneMode.LIST -> AgeScreen(
+            title = stringResource(R.string.identities_title),
+            modifier = modifier,
+            actions = {
+                IconButton(onClick = { mode = PaneMode.ADD }) {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = stringResource(
+                            if (segment == IdSegment.IDENTITIES) R.string.action_add_identity else R.string.action_add_recipient
+                        ),
+                    )
+                }
+                var menuOpen by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more_options))
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.identities_recently_deleted)) },
+                            onClick = { menuOpen = false; showTrash = true },
+                        )
+                    }
+                }
+            },
+        ) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                PrimaryTabRow(
+                    selectedTabIndex = segment.ordinal,
+                    containerColor = MaterialTheme.colorScheme.background,
+                ) {
+                    IdSegment.entries.forEach { s ->
+                        Tab(
+                            selected = segment == s,
+                            onClick = { if (s != segment) { segment = s; toList() } },
+                            text = { Text(stringResource(s.label)) },
+                        )
+                    }
+                }
+                when (segment) {
+                    IdSegment.IDENTITIES -> IdentityList(
+                        vault = vault,
+                        onOpen = { detailId = it; mode = PaneMode.DETAIL },
+                    )
+                    IdSegment.RECIPIENTS -> RecipientList(
+                        vault = vault,
+                        onOpen = { detailId = it; mode = PaneMode.DETAIL },
                     )
                 }
             }
         }
 
-        when (segment) {
-            IdSegment.IDENTITIES -> when (mode) {
-                PaneMode.LIST -> IdentityList(
-                    vault = vault,
-                    onAdd = { mode = PaneMode.ADD },
-                    onOpen = { detailId = it; mode = PaneMode.DETAIL },
-                    onRecentlyDeleted = { showTrash = true },
-                )
+        PaneMode.ADD -> when (segment) {
+            IdSegment.IDENTITIES -> AddIdentityFlow(
+                vault = vault,
+                modifier = modifier,
+                onDone = { toList() },
+                onCancel = { toList() },
+            )
+            IdSegment.RECIPIENTS -> AddRecipientFlow(
+                vault = vault,
+                onDone = { toList() },
+                onCancel = { toList() },
+                modifier = modifier,
+            )
+        }
 
-                PaneMode.ADD -> AddIdentityFlow(
-                    vault = vault,
-                    onDone = { toList() },
-                    onCancel = { toList() },
-                )
-
-                PaneMode.DETAIL -> IdentityDetail(
-                    vault = vault,
-                    identityId = detailId.orEmpty(),
-                    onBack = { toList() },
-                )
-            }
-
-            IdSegment.RECIPIENTS -> when (mode) {
-                PaneMode.LIST -> RecipientList(
-                    vault = vault,
-                    onAdd = { mode = PaneMode.ADD },
-                    onOpen = { detailId = it; mode = PaneMode.DETAIL },
-                    onRecentlyDeleted = { showTrash = true },
-                )
-
-                PaneMode.ADD -> AddRecipientFlow(
-                    vault = vault,
-                    onDone = { toList() },
-                    onCancel = { toList() },
-                )
-
-                PaneMode.DETAIL -> RecipientDetail(
-                    vault = vault,
-                    recipientId = detailId.orEmpty(),
-                    onBack = { toList() },
-                )
-            }
+        PaneMode.DETAIL -> when (segment) {
+            IdSegment.IDENTITIES -> IdentityDetail(
+                vault = vault,
+                identityId = detailId.orEmpty(),
+                modifier = modifier,
+                onBack = { toList() },
+            )
+            IdSegment.RECIPIENTS -> RecipientDetail(
+                vault = vault,
+                recipientId = detailId.orEmpty(),
+                onBack = { toList() },
+                modifier = modifier,
+            )
         }
     }
 }
@@ -162,37 +202,23 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
 @Composable
 private fun IdentityList(
     vault: Vault,
-    onAdd: () -> Unit,
     onOpen: (String) -> Unit,
-    onRecentlyDeleted: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 12.dp, top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onRecentlyDeleted) { Text("Recently deleted") }
-            TextButton(onClick = onAdd) { Text("Add") }
-        }
-
-        if (vault.identities.isEmpty()) {
-            EmptyPane(
-                title = "No identities yet",
-                body = "Tap Add to generate or import an age identity.",
-            )
-        } else {
-            LazyColumn(Modifier.fillMaxSize()) {
-                items(vault.identities, key = { it.id }) { identity ->
-                    IdentityRow(
-                        identity = identity,
-                        isActive = identity.id == vault.activeIdentityId,
-                        onClick = { onOpen(identity.id) },
-                    )
-                    HorizontalDivider()
-                }
+    // Add and Recently deleted live in the app bar.
+    if (vault.identities.isEmpty()) {
+        EmptyState(
+            title = stringResource(R.string.identities_empty_title),
+            body = stringResource(R.string.identities_empty_body),
+        )
+    } else {
+        LazyColumn(Modifier.fillMaxSize()) {
+            items(vault.identities, key = { it.id }) { identity ->
+                IdentityRow(
+                    identity = identity,
+                    isActive = identity.id == vault.activeIdentityId,
+                    onClick = { onOpen(identity.id) },
+                )
+                ListDivider()
             }
         }
     }
@@ -204,7 +230,7 @@ private fun IdentityRow(identity: StoredIdentity, isActive: Boolean, onClick: ()
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -216,18 +242,12 @@ private fun IdentityRow(identity: StoredIdentity, isActive: Boolean, onClick: ()
                     PostQuantumBadge(modifier = Modifier.padding(start = 8.dp))
                 }
                 if (isActive) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(8.dp),
+                    Text(
+                        stringResource(R.string.identities_active),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 8.dp),
-                    ) {
-                        Text(
-                            "ACTIVE",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                    }
+                    )
                 }
             }
             Text(
@@ -249,118 +269,152 @@ private enum class AddIdentityStage { CHOICE, GENERATE, IMPORT }
 @Composable
 private fun AddIdentityFlow(
     vault: Vault,
+    modifier: Modifier,
     onDone: () -> Unit,
     onCancel: () -> Unit,
 ) {
     var stage by rememberSaveable { mutableStateOf(AddIdentityStage.CHOICE) }
+    var keyType by rememberSaveable { mutableStateOf<GenKeyType?>(null) }
 
+    // One app bar for the whole flow; its back arrow (and system back) steps up one level:
+    // key form -> type chooser -> add choice -> identity list.
+    fun back() {
+        when {
+            stage == AddIdentityStage.CHOICE -> onCancel()
+            stage == AddIdentityStage.GENERATE && keyType != null -> keyType = null
+            else -> stage = AddIdentityStage.CHOICE
+        }
+    }
+    val title = when (stage) {
+        AddIdentityStage.CHOICE -> stringResource(R.string.action_add_identity)
+        AddIdentityStage.IMPORT -> stringResource(R.string.identities_import_title)
+        AddIdentityStage.GENERATE -> stringResource(keyType?.title ?: R.string.identities_generate_title)
+    }
+
+    AgeScreen(title = title, modifier = modifier, onBack = { back() }) { padding ->
+    Box(Modifier.fillMaxSize().padding(padding)) {
     when (stage) {
         AddIdentityStage.CHOICE -> Column(
             Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Add identity",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                "Generate a fresh age identity, or import an existing age or OpenSSH key.",
+                stringResource(R.string.identities_add_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(
                 onClick = { stage = AddIdentityStage.GENERATE },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Generate new identity") }
+            ) { Text(stringResource(R.string.identities_generate_new)) }
             OutlinedButton(
                 onClick = { stage = AddIdentityStage.IMPORT },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Import existing identity") }
-            TextButton(onClick = onCancel) { Text("Cancel") }
+            ) { Text(stringResource(R.string.identities_import_existing)) }
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
         }
 
-        AddIdentityStage.GENERATE -> GenerateIdentity(vault, onDone = onDone, onCancel = onCancel)
+        AddIdentityStage.GENERATE -> GenerateIdentity(
+            vault,
+            keyType = keyType,
+            onPick = { keyType = it },
+            onDone = onDone,
+            onCancel = onCancel,
+        )
         AddIdentityStage.IMPORT -> ImportIdentity(vault, onDone = onDone, onCancel = onCancel)
+    }
+    }
     }
 }
 
-private enum class GenKeyType { X25519, QUANTUM_SAFE, HARDWARE_DECRYPT, SSH_ED25519, HARDWARE, SECURITY }
+/** Kinds of key the Generate step can create; [title] is the app bar title for its form. */
+private enum class GenKeyType(@StringRes val title: Int) {
+    X25519(R.string.identities_gen_title_x25519),
+    QUANTUM_SAFE(R.string.identities_gen_title_quantum_safe),
+    HARDWARE_DECRYPT(R.string.identities_gen_title_hardware_decrypt),
+    SSH_ED25519(R.string.identities_gen_title_ssh),
+    HARDWARE(R.string.identities_gen_title_hardware),
+    SECURITY(R.string.identities_gen_title_security),
+}
 
 @Composable
-private fun GenerateIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
-    var keyType by rememberSaveable { mutableStateOf<GenKeyType?>(null) }
+private fun GenerateIdentity(
+    vault: Vault,
+    keyType: GenKeyType?,
+    onPick: (GenKeyType) -> Unit,
+    onDone: () -> Unit,
+    onCancel: () -> Unit,
+) {
     when (keyType) {
-        null -> GenerateTypeChooser(onPick = { keyType = it }, onCancel = onCancel)
-        GenKeyType.X25519 -> GenerateX25519(vault, onDone) { keyType = null }
-        GenKeyType.QUANTUM_SAFE -> GenerateHybrid(vault, onDone) { keyType = null }
-        GenKeyType.HARDWARE_DECRYPT -> GenerateHardwareDecryptKey(vault, onDone) { keyType = null }
-        GenKeyType.SSH_ED25519 -> GenerateEd25519(vault, onDone) { keyType = null }
-        GenKeyType.HARDWARE -> GenerateHardwareKey(vault, onDone) { keyType = null }
-        GenKeyType.SECURITY -> GenerateSecurityKey(vault, onDone) { keyType = null }
+        // Each key form's back step (to this chooser) is the app bar back arrow.
+        null -> GenerateTypeChooser(onPick = onPick, onCancel = onCancel)
+        GenKeyType.X25519 -> GenerateX25519(vault, onDone)
+        GenKeyType.QUANTUM_SAFE -> GenerateHybrid(vault, onDone)
+        GenKeyType.HARDWARE_DECRYPT -> GenerateHardwareDecryptKey(vault, onDone)
+        GenKeyType.SSH_ED25519 -> GenerateEd25519(vault, onDone)
+        GenKeyType.HARDWARE -> GenerateHardwareKey(vault, onDone)
+        GenKeyType.SECURITY -> GenerateSecurityKey(vault, onDone)
     }
 }
 
 @Composable
 private fun GenerateTypeChooser(onPick: (GenKeyType) -> Unit, onCancel: () -> Unit) {
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Generate identity", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Text(
-            "Pick the kind of key to create. age, quantum-safe and hardware decryption keys " +
-                "encrypt/decrypt; the SSH key signs (and can also receive files). Hardware signing and " +
-                "security keys sign only; they can't decrypt.",
+            stringResource(R.string.identities_gen_chooser_intro),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Button(onClick = { onPick(GenKeyType.X25519) }, modifier = Modifier.fillMaxWidth()) {
-            Text("age X25519 (software)")
+            Text(stringResource(R.string.identities_gen_option_x25519))
         }
         OutlinedButton(onClick = { onPick(GenKeyType.QUANTUM_SAFE) }, modifier = Modifier.fillMaxWidth()) {
-            Text("Quantum-safe (ML-KEM-768)")
+            Text(stringResource(R.string.identities_gen_option_quantum_safe))
         }
         if (HardwareTagKeyService.isSupported) {
             OutlinedButton(onClick = { onPick(GenKeyType.HARDWARE_DECRYPT) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Hardware decryption key (this device)")
+                Text(stringResource(R.string.identities_gen_option_hardware_decrypt))
             }
         }
         OutlinedButton(onClick = { onPick(GenKeyType.SSH_ED25519) }, modifier = Modifier.fillMaxWidth()) {
-            Text("SSH signing key (Ed25519)")
+            Text(stringResource(R.string.identities_gen_option_ssh))
         }
         OutlinedButton(onClick = { onPick(GenKeyType.HARDWARE) }, modifier = Modifier.fillMaxWidth()) {
-            Text("Hardware signing key (this device)")
+            Text(stringResource(R.string.identities_gen_option_hardware))
         }
         OutlinedButton(onClick = { onPick(GenKeyType.SECURITY) }, modifier = Modifier.fillMaxWidth()) {
-            Text("Security key (FIDO over NFC)")
+            Text(stringResource(R.string.identities_gen_option_security))
         }
-        TextButton(onClick = onCancel) { Text("Cancel") }
+        TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
     }
 }
 
 @Composable
-private fun GenerateX25519(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
+private fun GenerateX25519(vault: Vault, onDone: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
+    val defaultName = stringResource(R.string.identities_default_name_x25519)
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("age X25519", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Text(
-            "Creates a fresh age X25519 keypair, stored in your vault.",
+            stringResource(R.string.identities_gen_x25519_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text("Name") },
+            label = { Text(stringResource(R.string.identities_name_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -374,7 +428,7 @@ private fun GenerateX25519(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
                             val identity = X25519Identity.generate()
                             StoredIdentity(
                                 id = UUID.randomUUID().toString(),
-                                name = name.trim().ifBlank { "age identity" },
+                                name = name.trim().ifBlank { defaultName },
                                 type = StoredIdentityType.X25519,
                                 publicKeyB64 = b64e(identity.publicKey),
                                 privateKeyB64 = b64e(identity.privateKey),
@@ -387,34 +441,31 @@ private fun GenerateX25519(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
                     }
                 },
                 modifier = Modifier.weight(1f),
-            ) { Text(if (busy) "Generating…" else "Generate") }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Back") }
+            ) { Text(stringResource(if (busy) R.string.identities_generating else R.string.identities_generate)) }
         }
     }
 }
 
 @Composable
-private fun GenerateHybrid(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
+private fun GenerateHybrid(vault: Vault, onDone: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
+    val defaultName = stringResource(R.string.identities_default_name_quantum_safe)
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Quantum-safe identity", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Text(
-            "Creates a fresh MLKEM768-X25519 hybrid keypair — safe against future quantum computers " +
-                "and interoperable with age v1.3.0+. Files encrypted to it must use only quantum-safe " +
-                "recipients (it can't be mixed with a classical key).",
+            stringResource(R.string.identities_gen_hybrid_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text("Name") },
+            label = { Text(stringResource(R.string.identities_name_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -428,7 +479,7 @@ private fun GenerateHybrid(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
                             val identity = HybridIdentity.generate()
                             StoredIdentity(
                                 id = UUID.randomUUID().toString(),
-                                name = name.trim().ifBlank { "quantum-safe identity" },
+                                name = name.trim().ifBlank { defaultName },
                                 type = StoredIdentityType.MLKEM768X25519,
                                 publicKeyB64 = b64e(identity.publicKey),
                                 privateKeyB64 = b64e(identity.seed),
@@ -441,33 +492,31 @@ private fun GenerateHybrid(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
                     }
                 },
                 modifier = Modifier.weight(1f),
-            ) { Text(if (busy) "Generating…" else "Generate") }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Back") }
+            ) { Text(stringResource(if (busy) R.string.identities_generating else R.string.identities_generate)) }
         }
     }
 }
 
 @Composable
-private fun GenerateEd25519(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
+private fun GenerateEd25519(vault: Vault, onDone: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
+    val defaultName = stringResource(R.string.identities_default_name_ssh)
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("SSH signing key", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Text(
-            "Creates a fresh SSH Ed25519 keypair, stored in your vault. Use it to sign files " +
-                "(including encrypt-and-sign); it can also receive files as an ssh-ed25519 recipient.",
+            stringResource(R.string.identities_gen_ssh_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text("Name") },
+            label = { Text(stringResource(R.string.identities_name_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -481,7 +530,7 @@ private fun GenerateEd25519(vault: Vault, onDone: () -> Unit, onCancel: () -> Un
                             val identity = SSHEd25519Identity.generate()
                             StoredIdentity(
                                 id = UUID.randomUUID().toString(),
-                                name = name.trim().ifBlank { "SSH Ed25519" },
+                                name = name.trim().ifBlank { defaultName },
                                 type = StoredIdentityType.SSH_ED25519,
                                 publicKeyB64 = b64e(identity.edPublicKey),
                                 privateKeyB64 = b64e(identity.edSeed),
@@ -494,45 +543,43 @@ private fun GenerateEd25519(vault: Vault, onDone: () -> Unit, onCancel: () -> Un
                     }
                 },
                 modifier = Modifier.weight(1f),
-            ) { Text(if (busy) "Generating…" else "Generate") }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Back") }
+            ) { Text(stringResource(if (busy) R.string.identities_generating else R.string.identities_generate)) }
         }
     }
 }
 
 @Composable
-private fun GenerateHardwareKey(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
+private fun GenerateHardwareKey(vault: Vault, onDone: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
+    val defaultName = stringResource(R.string.identities_default_name_hardware)
+    val createFailed = stringResource(R.string.identities_error_hardware_create)
     var requireAuth by rememberSaveable { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Hardware key", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Text(
-            "Creates a non-exportable P-256 key in this device's secure hardware (StrongBox or TEE). " +
-                "It can sign but not decrypt.",
+            stringResource(R.string.identities_gen_hardware_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text("Name") },
+            label = { Text(stringResource(R.string.identities_name_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Switch(checked = requireAuth, onCheckedChange = { requireAuth = it })
-            Text("Require biometric or device unlock to sign", modifier = Modifier.padding(start = 12.dp))
-        }
-        if (error != null) {
-            Text(error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        }
+        SwitchRow(
+            title = stringResource(R.string.identities_require_unlock_sign),
+            checked = requireAuth,
+            onCheckedChange = { requireAuth = it },
+        )
+        if (error != null) ErrorText(error!!)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
                 onClick = {
@@ -543,20 +590,19 @@ private fun GenerateHardwareKey(vault: Vault, onDone: () -> Unit, onCancel: () -
                             val stored = withContext(Dispatchers.IO) {
                                 val alias = HardwareKeyService.newAlias()
                                 val generated = HardwareKeyService.generate(alias, requireAuth)
-                                HardwareKeyService.toStoredIdentity(name.trim().ifBlank { "hardware key" }, generated)
+                                HardwareKeyService.toStoredIdentity(name.trim().ifBlank { defaultName }, generated)
                             }
                             vault.addIdentity(stored)
                             busy = false
                             onDone()
                         } catch (e: Exception) {
-                            error = e.message ?: "Couldn't create the hardware key."
+                            error = e.message ?: createFailed
                             busy = false
                         }
                     }
                 },
                 modifier = Modifier.weight(1f),
-            ) { Text(if (busy) "Creating…" else "Create") }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Back") }
+            ) { Text(stringResource(if (busy) R.string.identities_creating else R.string.identities_create)) }
         }
     }
 }
@@ -567,73 +613,62 @@ private fun GenerateHardwareKey(vault: Vault, onDone: () -> Unit, onCancel: () -
  * exported, moved or backed up, so the screen says so plainly before creating one.
  */
 @Composable
-private fun GenerateHardwareDecryptKey(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
+private fun GenerateHardwareDecryptKey(vault: Vault, onDone: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     var postQuantum by rememberSaveable { mutableStateOf(true) }
     var requireAuth by rememberSaveable { mutableStateOf(false) }
+    val defaultName = stringResource(R.string.identities_default_name_hardware_decrypt)
+    val createFailed = stringResource(R.string.identities_error_hardware_create)
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Hardware decryption key", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Text(
-            "Creates a P-256 key inside this device's secure hardware (StrongBox or TEE). Files are " +
-                "encrypted to it as usual, including from the age command line (1.3 or later), and " +
-                "only this phone can open them.",
+            stringResource(R.string.identities_gen_hardware_decrypt_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Surface(
-            color = MaterialTheme.colorScheme.errorContainer,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                "This key can't be exported, moved to another device, or backed up. If this phone is " +
-                    "lost, reset, or broken, anything encrypted only to this key is gone. Encrypt " +
-                    "important files to a second recipient as well.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.padding(12.dp),
-            )
-        }
+        VerdictPanel(
+            title = stringResource(R.string.identity_no_backup_title),
+            detail = stringResource(R.string.identities_no_backup_detail),
+            color = AgeStatus.colors.warning,
+            icon = Icons.Filled.Warning,
+        )
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text("Name") },
+            label = { Text(stringResource(R.string.identities_name_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Switch(checked = postQuantum, onCheckedChange = { postQuantum = it })
-            Text("Quantum-safe (adds ML-KEM-768)", modifier = Modifier.padding(start = 12.dp))
-        }
+        SwitchRow(
+            title = stringResource(R.string.identities_hardware_decrypt_pq_switch),
+            checked = postQuantum,
+            onCheckedChange = { postQuantum = it },
+        )
         Text(
-            if (postQuantum) "age1tagpq1… recipient. The ML-KEM half is held in your vault, the P-256 half in " +
-                "hardware; both are needed to decrypt. Can only share a file with other quantum-safe recipients."
-            else "age1tag1… recipient. Works alongside any other recipient type.",
+            if (postQuantum) stringResource(R.string.identities_hardware_decrypt_pq_detail)
+            else stringResource(R.string.identities_hardware_decrypt_classic_detail),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Switch(checked = requireAuth, onCheckedChange = { requireAuth = it })
-            Text("Require biometric or device unlock to decrypt", modifier = Modifier.padding(start = 12.dp))
-        }
+        SwitchRow(
+            title = stringResource(R.string.identities_require_unlock_decrypt),
+            checked = requireAuth,
+            onCheckedChange = { requireAuth = it },
+        )
         if (requireAuth) {
             Text(
-                "Android deletes keys like this if you ever remove the device's screen lock. Only turn " +
-                    "this on if you'll keep a screen lock set.",
+                stringResource(R.string.identities_screen_lock_warning),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        if (error != null) {
-            Text(error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        }
+        if (error != null) ErrorText(error!!)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
                 onClick = {
@@ -641,7 +676,7 @@ private fun GenerateHardwareDecryptKey(vault: Vault, onDone: () -> Unit, onCance
                     busy = true; error = null
                     scope.launch {
                         try {
-                            val label = name.trim().ifBlank { "hardware decryption key" }
+                            val label = name.trim().ifBlank { defaultName }
                             // Not cancellable: leaving the screen mid-way must not strand a
                             // Keystore key with no vault record pointing at it.
                             withContext(NonCancellable) {
@@ -661,20 +696,19 @@ private fun GenerateHardwareDecryptKey(vault: Vault, onDone: () -> Unit, onCance
                             busy = false
                             onDone()
                         } catch (e: Exception) {
-                            error = e.message ?: "Couldn't create the hardware key."
+                            error = e.message ?: createFailed
                             busy = false
                         }
                     }
                 },
                 modifier = Modifier.weight(1f),
-            ) { Text(if (busy) "Creating…" else "Create") }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Back") }
+            ) { Text(stringResource(if (busy) R.string.identities_creating else R.string.identities_create)) }
         }
     }
 }
 
 @Composable
-private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit, onCancel: () -> Unit) {
+private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit) {
     val activity = LocalContext.current as? FragmentActivity
     var name by rememberSaveable { mutableStateOf("") }
     var useP256 by rememberSaveable { mutableStateOf(false) }
@@ -683,34 +717,34 @@ private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit, onCancel: () -
     val scope = rememberCoroutineScope()
     var pin by remember { mutableStateOf("") } // not saveable (audit L-23)
     var needsPin by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Security key", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Text(
-            "Enrolls a FIDO security key (YubiKey, Token2) as a signing identity over NFC. " +
-                "The private key never leaves the key.",
+            stringResource(R.string.identities_gen_security_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text("Name") },
+            label = { Text(stringResource(R.string.identities_name_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Switch(checked = useP256, onCheckedChange = { useP256 = it })
-            Text("Use NIST P-256 (default is Ed25519)", modifier = Modifier.padding(start = 12.dp))
-        }
+        SwitchRow(
+            title = stringResource(R.string.identities_security_p256_switch),
+            checked = useP256,
+            onCheckedChange = { useP256 = it },
+        )
         if (needsPin) {
             OutlinedTextField(
                 value = pin,
                 onValueChange = { pin = it },
-                label = { Text("Security key PIN") },
+                label = { Text(stringResource(R.string.identities_security_pin_label)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
@@ -718,18 +752,15 @@ private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit, onCancel: () -
             )
         }
         Text(
-            "When you tap Enroll, hold your security key to the back of the phone until it finishes. " +
-                "If the key has a PIN, you'll be asked for it first.",
+            stringResource(R.string.identities_security_tap_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (error != null) {
-            Text(error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        }
+        if (error != null) ErrorText(error!!)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
                 onClick = {
-                    val act = activity ?: run { error = "Couldn't access the screen for NFC."; return@Button }
+                    val act = activity ?: run { error = context.getString(R.string.identities_error_nfc_screen); return@Button }
                     if (busy) return@Button
                     busy = true; error = null
                     scope.launch {
@@ -738,28 +769,27 @@ private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit, onCancel: () -
                                 val service = SecurityKeyService(act)
                                 val algo = if (useP256) SecurityKeyService.Algorithm.ECDSA_P256
                                 else SecurityKeyService.Algorithm.ED25519
-                                service.enroll(name.trim().ifBlank { "security key" }, algo, pin = pin.ifBlank { null })
+                                service.enroll(name.trim().ifBlank { context.getString(R.string.identities_default_name_security) }, algo, pin = pin.ifBlank { null })
                             }
                             vault.addIdentity(stored)
                             busy = false
                             onDone()
                         } catch (e: SecurityKeyService.PinRequiredException) {
                             needsPin = true
-                            error = "This key needs a PIN. Enter it above and tap Enroll again."
+                            error = context.getString(R.string.identities_error_pin_required)
                             busy = false
                         } catch (e: SecurityKeyService.WrongPinException) {
-                            error = "Incorrect PIN. Try again."
+                            error = context.getString(R.string.identities_error_pin_wrong)
                             busy = false
                         } catch (e: Exception) {
-                            error = e.message ?: "Enrollment failed. Make sure NFC is on and hold the key steady."
+                            error = e.message ?: context.getString(R.string.identities_error_enroll_failed)
                             busy = false
                         }
                     }
                 },
                 enabled = activity != null,
                 modifier = Modifier.weight(1f),
-            ) { Text(if (busy) "Tap your key…" else "Enroll") }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Back") }
+            ) { Text(stringResource(if (busy) R.string.identities_enroll_busy else R.string.identities_enroll)) }
         }
     }
 }
@@ -773,58 +803,51 @@ private fun ImportIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     Column(
         Modifier
             .fillMaxSize()
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            "Import identity",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            "Paste an AGE-SECRET-KEY-1… string, a quantum-safe AGE-SECRET-KEY-PQ-1… string, a full " +
-                "OpenSSH private key (-----BEGIN OPENSSH PRIVATE KEY-----), or a YubiKey identity from " +
-                "age-plugin-yubikey (AGE-PLUGIN-YUBIKEY-1…). A YubiKey identity asks for one tap to read its key.",
+            stringResource(R.string.identities_import_intro),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text("Name") },
+            label = { Text(stringResource(R.string.identities_name_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = keyText,
             onValueChange = { keyText = it; error = null },
-            label = { Text("Key") },
+            label = { Text(stringResource(R.string.identities_import_key_label)) },
             minLines = 4,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = passphrase,
             onValueChange = { passphrase = it; error = null },
-            label = { Text("Passphrase (only if the OpenSSH key is encrypted)") },
+            label = { Text(stringResource(R.string.identities_import_passphrase_label)) },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth(),
         )
-        if (error != null) {
-            Text(error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        }
+        if (error != null) ErrorText(error!!)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
                 onClick = {
                     if (busy) return@Button
                     val txt = keyText.trim()
-                    if (txt.isEmpty()) { error = "Paste a key first."; return@Button }
+                    if (txt.isEmpty()) { error = context.getString(R.string.identities_error_paste_key); return@Button }
                     busy = true
                     error = null
                     scope.launch {
@@ -837,7 +860,7 @@ private fun ImportIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
                                     val pub = YubiKeyBroker.readPublicKey(stub)
                                     StoredIdentity(
                                         id = java.util.UUID.randomUUID().toString(),
-                                        name = name.trim().ifBlank { "YubiKey ${stub.serial}" },
+                                        name = name.trim().ifBlank { context.getString(R.string.identities_default_name_yubikey, stub.serial.toString()) },
                                         type = StoredIdentityType.YUBIKEY_PIV,
                                         publicKeyB64 = b64e(pub),
                                         privateKeyB64 = b64e(stub.toBytes()),
@@ -857,30 +880,14 @@ private fun ImportIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
                             error = e.message
                         } catch (e: Exception) {
                             busy = false
-                            error = e.message ?: "Import failed."
+                            error = e.message ?: context.getString(R.string.identities_error_import_failed)
                         }
                     }
                 },
                 modifier = Modifier.weight(1f),
-            ) { Text(if (busy) "Importing…" else "Import") }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel") }
+            ) { Text(stringResource(if (busy) R.string.identities_importing else R.string.identities_import)) }
+            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_cancel)) }
         }
     }
 }
 
-// MARK: - Shared
-
-@Composable
-internal fun EmptyPane(title: String, body: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                body,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}

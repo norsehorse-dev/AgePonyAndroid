@@ -1,5 +1,7 @@
 package com.agepony.app.vault
 
+import android.content.Context
+import com.agepony.app.R
 import com.agepony.core.recipients.HybridRecipient
 import com.agepony.core.recipients.MIN_RSA_RECIPIENT_BITS
 import com.agepony.core.recipients.P256Recipient
@@ -187,9 +189,12 @@ object RecipientImport {
     }
 
     /** One-line warning for a small RSA key, shared by the add, transfer and list screens. */
-    fun rsaTooSmallMessage(bits: Int?): String =
-        "Too small to encrypt to" + (bits?.let { " ($it bits)" } ?: "") +
-            ", $MIN_RSA_RECIPIENT_BITS bits minimum."
+    fun rsaTooSmallMessage(context: Context, bits: Int?): String =
+        if (bits != null) {
+            context.getString(R.string.identities_rsa_too_small_bits, bits, MIN_RSA_RECIPIENT_BITS)
+        } else {
+            context.getString(R.string.identities_rsa_too_small, MIN_RSA_RECIPIENT_BITS)
+        }
 
     // MARK: - Helpers
 

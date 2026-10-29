@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
 import com.agepony.app.security.SecurityKeyService
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,18 +78,18 @@ fun SecurityKeyPinDialog(
     var pin by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text("Security key PIN") },
+        title = { Text(stringResource(R.string.sign_sk_pin_label)) },
         text = {
             Column {
                 Text(
-                    if (wrongAttempt) "Incorrect PIN. Try again."
-                    else "Enter your security key PIN to authorize signing."
+                    if (wrongAttempt) stringResource(R.string.sign_sk_pin_wrong)
+                    else stringResource(R.string.security_sk_pin_body)
                 )
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { pin = it },
                     singleLine = true,
-                    label = { Text("PIN") },
+                    label = { Text(stringResource(R.string.app_pin)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     modifier = Modifier.padding(top = 12.dp),
@@ -96,9 +98,9 @@ fun SecurityKeyPinDialog(
         },
         confirmButton = {
             TextButton(onClick = { if (pin.isNotEmpty()) onSubmit(pin) }, enabled = pin.isNotEmpty()) {
-                Text("Unlock")
+                Text(stringResource(R.string.app_unlock))
             }
         },
-        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) } },
     )
 }

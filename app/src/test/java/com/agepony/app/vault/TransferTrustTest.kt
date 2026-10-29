@@ -1,5 +1,6 @@
 package com.agepony.app.vault
 
+import com.agepony.app.R
 import com.agepony.core.crypto.P256Curve
 import com.agepony.core.recipients.SSHEd25519Identity
 import com.agepony.core.recipients.YubiKeyStub
@@ -93,19 +94,26 @@ class TransferTrustTest {
         }
         assertEquals(listOf(true, true, false, false, true, true), rows.map { it.importable })
         assertEquals(listOf(false, false, false, false, true, true), rows.map { it.checkedByDefault })
-        assertNotNull(rows[0].warning)
-        assertNotNull(rows[1].warning)
-        assertNotNull(rows[2].blocked)
-        assertNotNull(rows[3].blocked)
-        assertNull(rows[4].warning)
+        assertNotNull(rows[0].warningText)
+        assertNotNull(rows[1].warningText)
+        assertNotNull(rows[2].blockedText)
+        assertNotNull(rows[3].blockedText)
+        assertNull(rows[4].warningText)
         // Imported options are exported unchanged.
         assertEquals("namespaces=\"agepony\",no-touch-required", rows[4].signer!!.toAllowedSigner().options)
     }
 
     @Test
     fun describesOptionsInPlainWords() {
-        val words = StoredSigner.describeOptions("namespaces=\"git\",valid-before=\"20250101Z\"", ZoneOffset.UTC)
-        assertEquals(listOf("git only", "valid until 2025-01-01"), words)
+        // The words are resources (no Context in host tests): check each one and its argument.
+        val words = StoredSigner.describeOptionsText("namespaces=\"git\",valid-before=\"20250101Z\"", ZoneOffset.UTC)
+        assertEquals(
+            listOf(
+                UiText.res(R.string.core_signer_opt_only_for, "git"),
+                UiText.res(R.string.core_signer_opt_valid_until, "2025-01-01"),
+            ),
+            words,
+        )
     }
 
     @Test

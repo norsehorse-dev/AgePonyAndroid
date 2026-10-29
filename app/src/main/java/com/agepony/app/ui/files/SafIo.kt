@@ -156,7 +156,8 @@ object SafIo {
     }
 
     fun humanSize(bytes: Long): String {
-        if (bytes <= 0) return "—"
+        // Callers leave the size out when a provider reports none; 0 here is a real zero.
+        if (bytes <= 0) return "0 B"
         val units = arrayOf("B", "KB", "MB", "GB")
         var b = bytes.toDouble()
         var i = 0

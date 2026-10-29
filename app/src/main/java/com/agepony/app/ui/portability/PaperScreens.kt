@@ -1,5 +1,6 @@
 package com.agepony.app.ui.portability
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Rect
@@ -11,7 +12,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,7 +23,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,6 +55,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import com.agepony.app.R
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.RadioRow
+import com.agepony.app.ui.components.SectionHeader
+import com.agepony.app.ui.components.VerdictPanel
+import com.agepony.app.ui.components.pluralResource
+import com.agepony.app.ui.theme.AgeStatus
+import androidx.compose.ui.res.stringResource
 
 // ---- Create ----
 
@@ -100,7 +111,7 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
                 withContext(Dispatchers.IO) { SafIo.openOutput(context, uri).use { it.write(bytes) } }
                 done = true
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't save the PDF."
+                error = e.message ?: context.getString(R.string.identities_paper_error_save)
             } finally {
                 bytes.fill(0)
                 busy = false
@@ -108,44 +119,52 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
         }
     }
 
+    AgeScreen(title = stringResource(R.string.identities_paper_title), modifier = modifier, onBack = onBack) { padding ->
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        TextButton(onClick = onBack) { Text("‹ Back") }
-        Text("Paper backup", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-        Text(identity.name, style = MaterialTheme.typography.titleSmall)
+        SectionHeader(identity.name)
 
         if (done) {
-            Text("PDF saved ✓", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-            Text(
-                "Print it on a printer you trust, then delete the PDF. Store the page somewhere safe" +
-                    if (protect) ", and keep the passphrase somewhere else." else ". Anyone who sees it has the key.",
+            VerdictPanel(
+                title = stringResource(R.string.identities_paper_saved),
+                detail = null,
+                color = AgeStatus.colors.success,
+                icon = Icons.Filled.CheckCircle,
             )
-            Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+            Text(
+                stringResource(
+                    if (protect) R.string.identities_paper_saved_body_protected
+                    else R.string.identities_paper_saved_body_plain
+                ),
+            )
+            Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.identities_transfer_done)) }
             return@Column
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(selected = protect, onClick = { protect = true })
-            Text("Protect with a passphrase (recommended)")
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(selected = !protect, onClick = { protect = false })
-            Text("Plain key: whoever reads the page has the key")
-        }
+        RadioRow(
+            title = stringResource(R.string.identities_paper_protect),
+            selected = protect,
+            onClick = { protect = true },
+        )
+        RadioRow(
+            title = stringResource(R.string.identities_paper_plain),
+            selected = !protect,
+            onClick = { protect = false },
+        )
 
         if (protect) {
             OutlinedTextField(
                 value = passphrase, onValueChange = { passphrase = it; suggested = null; error = null; acceptedWeak = false },
-                label = { Text("Passphrase") }, singleLine = true,
+                label = { Text(stringResource(R.string.identities_paper_passphrase)) }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = confirm, onValueChange = { confirm = it; suggested = null; error = null },
-                label = { Text("Confirm passphrase") }, singleLine = true,
+                label = { Text(stringResource(R.string.identities_paper_confirm_passphrase)) }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
@@ -154,19 +173,19 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
                 TextButton(onClick = {
                     val p = Diceware.generate(wordlist, Diceware.DEFAULT_WORD_COUNT)
                     passphrase = p; confirm = p; suggested = p; acceptedWeak = false
-                }) { Text("Suggest a ${Diceware.DEFAULT_WORD_COUNT}-word passphrase") }
+                }) { Text(stringResource(R.string.identities_paper_suggest, Diceware.DEFAULT_WORD_COUNT)) }
                 suggested?.let {
-                    Text("Write this down now, apart from the page: $it", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.identities_paper_write_down, it), style = MaterialTheme.typography.bodyMedium)
                 }
             }
             Text(
-                "The page is an ordinary age file: restore it in AgePony, or with `age -d` on a computer.",
+                stringResource(R.string.identities_paper_ordinary_file),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
             Text(
-                "Only choose this for a page that will live somewhere locked, like a safe.",
+                stringResource(R.string.identities_paper_plain_warning),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -175,43 +194,42 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
         // A paper page can be photographed or found, and then the passphrase is all that stands
         // between it and the key, offline and at the attacker's leisure. Warn on a weak one and
         // make the user say so explicitly before building the page.
-        val weakness = if (protect && passphrase.isNotEmpty()) paperPassphraseWeakness(passphrase) else null
+        val weakness = if (protect && passphrase.isNotEmpty()) paperPassphraseWeakness(context, passphrase) else null
         val ready = !busy && (!protect || (passphrase.isNotEmpty() && passphrase == confirm && (weakness == null || acceptedWeak)))
         if (protect && confirm.isNotEmpty() && passphrase != confirm) {
-            Text("The passphrases don't match.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.identities_paper_mismatch), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
         if (weakness != null) {
             Text(
-                "This passphrase is weak: $weakness. Anyone who finds the page can try guesses offline " +
-                    "for as long as they like. Use the suggested passphrase, or a longer one of your own.",
+                weakness,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
             )
             if (acceptedWeak) {
                 Text(
-                    "Using the weak passphrase anyway.",
+                    stringResource(R.string.identities_paper_using_weak),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
                 OutlinedButton(onClick = { acceptedWeak = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Use it anyway")
+                    Text(stringResource(R.string.identities_paper_use_anyway))
                 }
             }
         }
         Button(
             onClick = {
-                confirmIdentity("Create paper backup") {
+                confirmIdentity(context.getString(R.string.identities_paper_confirm_title)) {
                     busy = true
                     error = null
                     val pass = if (protect) passphrase else null
                     scope.launch {
                         try {
-                            pdf = withContext(Dispatchers.Default) { buildPaperPdf(identity, pass) }
+                            pdf = withContext(Dispatchers.Default) { buildPaperPdf(context, identity, pass) }
                             vault.autoLockSuppressed = true
                             save.launch("agepony-backup-${safeFileName(identity.name)}-${LocalDate.now()}.pdf")
                         } catch (e: Exception) {
-                            error = e.message ?: "Couldn't build the backup."
+                            error = e.message ?: context.getString(R.string.identities_paper_error_build)
                             busy = false
                         }
                     }
@@ -219,9 +237,10 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
             },
             enabled = ready,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (busy) "Preparing…" else "Create PDF…") }
+        ) { Text(stringResource(if (busy) R.string.identities_paper_preparing else R.string.identities_paper_create_pdf)) }
         if (busy) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        error?.let { ErrorText(it) }
+    }
     }
 }
 
@@ -230,12 +249,14 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
  * characters is weak; so is a passphrase made of words (diceware style) with fewer than
  * [Diceware.MIN_WORD_COUNT] of them, whatever its length.
  */
-private fun paperPassphraseWeakness(passphrase: String): String? {
-    if (passphrase.length < 12) return "it is shorter than 12 characters"
+private fun paperPassphraseWeakness(context: Context, passphrase: String): String? {
+    if (passphrase.length < 12) return context.getString(R.string.identities_paper_weak_short, 12)
     val words = passphrase.trim().split(Regex("[\\s._-]+")).filter { it.isNotEmpty() }
     val looksLikeWords = words.size >= 2 && words.all { w -> w.all { it.isLetter() } }
     if (looksLikeWords && words.size < Diceware.MIN_WORD_COUNT) {
-        return "it has only ${words.size} words, and at least ${Diceware.MIN_WORD_COUNT} are needed"
+        return context.resources.getQuantityString(
+            R.plurals.identities_paper_weak_few_words, words.size, words.size, Diceware.MIN_WORD_COUNT,
+        )
     }
     return null
 }
@@ -244,9 +265,9 @@ private fun safeFileName(name: String): String =
     name.replace(Regex("[^A-Za-z0-9._-]"), "-").trim('-').take(40).ifEmpty { "key" }
 
 /** Lay out the A4 page: what it is, which key, the QR, the text, how to restore. */
-private fun buildPaperPdf(identity: StoredIdentity, passphrase: String?): ByteArray {
+private fun buildPaperPdf(context: Context, identity: StoredIdentity, passphrase: String?): ByteArray {
     val line = KeyPortability.identityLine(identity)
-        ?: throw IllegalArgumentException("Only age identities can be backed up on paper.")
+        ?: throw IllegalArgumentException(context.getString(R.string.identities_paper_error_not_age))
     val identityFile = KeyTransfer.identityFile(listOf(line), includePublicKey = false)
     val payload = if (passphrase != null) PaperBackup.seal(identityFile, passphrase) else line.secretKey
 
@@ -259,11 +280,16 @@ private fun buildPaperPdf(identity: StoredIdentity, passphrase: String?): ByteAr
     var y = 56f
     fun text(s: String, p: Paint, gap: Float = 14f) { c.drawText(s, 48f, y, p); y += gap }
 
-    text("AgePony paper backup", title, 26f)
-    text("Name: ${identity.name}", body)
-    text("Created: ${LocalDate.now()}", body)
-    text(if (passphrase != null) "Protected with a passphrase (age scrypt). The passphrase is not on this page." else "UNPROTECTED: this page is the private key.", body)
-    text("Public key (to check which key this is):", body)
+    text(context.getString(R.string.identities_paper_pdf_title), title, 26f)
+    text(context.getString(R.string.identities_paper_pdf_name, identity.name), body)
+    text(context.getString(R.string.identities_paper_pdf_created, LocalDate.now().toString()), body)
+    text(
+        context.getString(
+            if (passphrase != null) R.string.identities_paper_pdf_protected else R.string.identities_paper_pdf_unprotected
+        ),
+        body,
+    )
+    text(context.getString(R.string.identities_paper_pdf_public_key), body)
     val pub = line.publicKey
     text(if (pub.length <= 88) pub else pub.take(40) + " … " + pub.takeLast(24), mono, 11f)
     y += 8f
@@ -276,12 +302,19 @@ private fun buildPaperPdf(identity: StoredIdentity, passphrase: String?): ByteAr
     }
     y += qrSize + 18f
 
-    text(if (passphrase != null) "Backup text (an armored age file):" else "Secret key:", body)
+    text(
+        context.getString(
+            if (passphrase != null) R.string.identities_paper_pdf_backup_text else R.string.identities_paper_pdf_secret_key
+        ),
+        body,
+    )
     val textLines = if (passphrase != null) payload.lines() else PaperBackup.transcriptionGroups(payload, 12)
     textLines.forEach { text(it, mono, 10.5f) }
     y += 10f
-    text("To restore: AgePony › Settings › Restore from paper backup, then scan the code.", body)
-    if (passphrase != null) text("Or on a computer: save the text as backup.age and run  age -d -o key.txt backup.age", body)
+    text(context.getString(R.string.identities_paper_pdf_restore), body)
+    if (passphrase != null) {
+        text(context.getString(R.string.identities_paper_pdf_restore_cli, "backup.age", "age -d -o key.txt backup.age"), body)
+    }
     doc.finishPage(page)
 
     val out = java.io.ByteArrayOutputStream()
@@ -321,7 +354,7 @@ fun PaperRestoreScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mo
             stage = RestoreStage.PASSPHRASE
         } else {
             found = KeyPortability.identitiesFromText(text)
-            if (found.isEmpty()) { error = "No age secret key found in that."; stage = RestoreStage.INPUT }
+            if (found.isEmpty()) { error = activity.getString(R.string.identities_paper_error_no_key); stage = RestoreStage.INPUT }
             else stage = RestoreStage.PREVIEW
         }
     }
@@ -331,29 +364,28 @@ fun PaperRestoreScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mo
         return
     }
 
+    AgeScreen(title = stringResource(R.string.identities_paper_restore_title), modifier = modifier, onBack = onBack) { padding ->
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        TextButton(onClick = onBack) { Text("‹ Back") }
-        Text("Restore from paper backup", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         when (stage) {
             RestoreStage.INPUT -> {
-                Button(onClick = { stage = RestoreStage.SCAN }, modifier = Modifier.fillMaxWidth()) { Text("Scan the page") }
+                Button(onClick = { stage = RestoreStage.SCAN }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.identities_paper_scan_page)) }
                 OutlinedTextField(
                     value = scanned, onValueChange = { scanned = it },
-                    label = { Text("…or type or paste the text") }, minLines = 4,
+                    label = { Text(stringResource(R.string.identities_paper_type_label)) }, minLines = 4,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedButton(onClick = { take(scanned) }, enabled = scanned.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-                    Text("Continue")
+                    Text(stringResource(R.string.identities_paper_continue))
                 }
             }
             RestoreStage.PASSPHRASE -> {
-                Text("This page is passphrase-protected.")
+                Text(stringResource(R.string.identities_paper_is_protected))
                 OutlinedTextField(
                     value = passphrase, onValueChange = { passphrase = it; error = null },
-                    label = { Text("Passphrase") }, singleLine = true,
+                    label = { Text(stringResource(R.string.identities_paper_passphrase)) }, singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth(),
@@ -367,38 +399,44 @@ fun PaperRestoreScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mo
                             val identityFile = withContext(Dispatchers.Default) { PaperBackup.open(text, pass) }
                             found = KeyPortability.identitiesFromText(identityFile)
                             stage = if (found.isEmpty()) RestoreStage.INPUT else RestoreStage.PREVIEW
-                            if (found.isEmpty()) error = "The backup opened but held no age key."
+                            if (found.isEmpty()) error = activity.getString(R.string.identities_paper_error_empty)
                         } catch (e: OutOfMemoryError) {
-                            error = "Not enough memory to derive the key on this device."
+                            error = activity.getString(R.string.identities_paper_error_memory)
                         } catch (e: Exception) {
-                            error = e.message ?: "Couldn't open the backup."
+                            error = e.message ?: activity.getString(R.string.identities_paper_error_open)
                         } finally {
                             busy = false
                         }
                     }
                 }, enabled = passphrase.isNotEmpty() && !busy, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (busy) "Opening…" else "Open backup")
+                    Text(stringResource(if (busy) R.string.identities_paper_opening else R.string.identities_paper_open_backup))
                 }
             }
             RestoreStage.PREVIEW -> {
-                Text("Found:", style = MaterialTheme.typography.titleSmall)
-                found.forEach { Text("• ${it.name}") }
+                SectionHeader(stringResource(R.string.identities_paper_found))
+                found.forEach { Text(it.name, style = MaterialTheme.typography.bodyLarge) }
                 Button(onClick = {
                     summary = KeyPortability.import(vault, KeyPortability.Incoming(found, emptyList(), emptyList()))
                     stage = RestoreStage.DONE
-                }, modifier = Modifier.fillMaxWidth()) { Text("Add to vault") }
+                }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.identities_paper_add_to_vault)) }
             }
             RestoreStage.DONE -> {
                 val s = summary!!
-                Text(
-                    if (s.identitiesAdded > 0) "Restored ${s.identitiesAdded} identity ✓" else "That key is already in your vault.",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+                if (s.identitiesAdded > 0) {
+                    VerdictPanel(
+                        title = pluralResource(R.plurals.paper_restored, s.identitiesAdded, s.identitiesAdded),
+                        detail = null,
+                        color = AgeStatus.colors.success,
+                        icon = Icons.Filled.CheckCircle,
+                    )
+                } else {
+                    Text(stringResource(R.string.identities_paper_already_in_vault), style = MaterialTheme.typography.bodyLarge)
+                }
+                Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.identities_transfer_done)) }
             }
             RestoreStage.SCAN -> Unit
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        error?.let { ErrorText(it) }
+    }
     }
 }

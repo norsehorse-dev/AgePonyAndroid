@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,11 +28,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.agepony.app.R
 import com.agepony.app.ui.components.KeyAvatar
 import com.agepony.app.vault.Vault
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.QuietAction
+import com.agepony.app.ui.components.SectionHeader
 
 @Composable
 fun RecentlyDeletedScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Modifier) {
@@ -45,16 +51,16 @@ fun RecentlyDeletedScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier =
     val recips = vault.trashedRecipients
     val isEmpty = ids.isEmpty() && recips.isEmpty()
 
+    AgeScreen(title = stringResource(R.string.settings_recently_deleted), modifier = modifier, onBack = onBack) { padding ->
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
+            .padding(padding)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        TextButton(onClick = onBack, modifier = Modifier.padding(top = 8.dp)) { Text("‹ Back") }
-        Text("Recently deleted", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 4.dp))
         Text(
-            "Deleted identities and recipients wait here for $DAYS days before they are removed for good. Restoring an identity brings its private key back intact.",
+            stringResource(R.string.settings_trash_intro, DAYS),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 16.dp),
@@ -62,7 +68,7 @@ fun RecentlyDeletedScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier =
 
         if (isEmpty) {
             Text(
-                "Nothing here. Deleted items will show up on this screen.",
+                stringResource(R.string.settings_trash_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 24.dp),
@@ -71,7 +77,7 @@ fun RecentlyDeletedScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier =
         }
 
         if (ids.isNotEmpty()) {
-            Text("Identities", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+            SectionHeader(stringResource(R.string.settings_trash_identities), Modifier.padding(bottom = 4.dp))
             ids.forEach { t ->
                 TrashRow(
                     seed = t.identity.publicKeyB64,
@@ -80,12 +86,12 @@ fun RecentlyDeletedScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier =
                     onRestore = { vault.restoreIdentity(t.identity.id) },
                     onPurge = { confirmPurge = Triple("identity", t.identity.id, t.identity.name) },
                 )
-                HorizontalDivider()
+                ListDivider()
             }
         }
 
         if (recips.isNotEmpty()) {
-            Text("Recipients", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+            SectionHeader(stringResource(R.string.settings_trash_recipients), Modifier.padding(top = 8.dp, bottom = 4.dp))
             recips.forEach { t ->
                 TrashRow(
                     seed = t.recipient.publicKeyB64,
@@ -94,48 +100,52 @@ fun RecentlyDeletedScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier =
                     onRestore = { vault.restoreRecipient(t.recipient.id) },
                     onPurge = { confirmPurge = Triple("recipient", t.recipient.id, t.recipient.name) },
                 )
-                HorizontalDivider()
+                ListDivider()
             }
         }
 
-        TextButton(onClick = { confirmEmpty = true }, modifier = Modifier.padding(top = 16.dp, bottom = 24.dp)) {
-            Text("Empty recycle bin", color = MaterialTheme.colorScheme.error)
-        }
+        QuietAction(
+            text = stringResource(R.string.settings_trash_empty_bin),
+            onClick = { confirmEmpty = true },
+            destructive = true,
+            modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
+        )
+    }
     }
 
     if (confirmEmpty) {
         AlertDialog(
             onDismissRequest = { confirmEmpty = false },
-            title = { Text("Empty recycle bin?") },
-            text = { Text("This permanently removes everything here. Any deleted identity's private key is gone for good. This cannot be undone.") },
+            title = { Text(stringResource(R.string.settings_trash_empty_title)) },
+            text = { Text(stringResource(R.string.settings_trash_empty_body)) },
             confirmButton = {
                 TextButton(onClick = { confirmEmpty = false; vault.emptyTrash() }) {
-                    Text("Empty", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.settings_trash_empty_confirm), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmEmpty = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmEmpty = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 
     confirmPurge?.let { (kind, id, name) ->
         AlertDialog(
             onDismissRequest = { confirmPurge = null },
-            title = { Text("Delete \"$name\" for good?") },
+            title = { Text(stringResource(R.string.settings_trash_purge_title, name)) },
             text = {
                 Text(
-                    if (kind == "identity")
-                        "This removes the identity and its private key permanently. Files encrypted to it can never be opened again. This cannot be undone."
-                    else
-                        "This removes the recipient permanently. This cannot be undone."
+                    stringResource(
+                        if (kind == "identity") R.string.settings_trash_purge_identity_body
+                        else R.string.settings_trash_purge_recipient_body
+                    )
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     confirmPurge = null
                     if (kind == "identity") vault.purgeIdentity(id) else vault.purgeRecipient(id)
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmPurge = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmPurge = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -149,7 +159,7 @@ private fun TrashRow(
     onPurge: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -157,29 +167,30 @@ private fun TrashRow(
         Column(Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "deleted ${relativeAge(deletedAt)}",
+                relativeAge(deletedAt),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontFamily = FontFamily.Default,
             )
         }
-        TextButton(onClick = onRestore) { Text("Restore") }
-        TextButton(onClick = onPurge) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+        TextButton(onClick = onRestore) { Text(stringResource(R.string.settings_trash_restore)) }
+        TextButton(onClick = onPurge) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
     }
 }
 
 private const val DAYS = 30
 
+/** "Deleted 3 hours ago": the whole line, so translations can order it freely. */
+@Composable
 private fun relativeAge(deletedAt: Long): String {
     val ms = System.currentTimeMillis() - deletedAt
-    val minutes = ms / 60000L
-    val hours = minutes / 60L
-    val days = hours / 24L
+    val minutes = (ms / 60000L).toInt()
+    val hours = minutes / 60
+    val days = hours / 24
     return when {
-        minutes < 1 -> "just now"
-        minutes < 60 -> "$minutes min ago"
-        hours < 24 -> if (hours == 1L) "1 hour ago" else "$hours hours ago"
-        days == 1L -> "1 day ago"
-        else -> "$days days ago"
+        minutes < 1 -> stringResource(R.string.settings_trash_deleted_just_now)
+        minutes < 60 -> pluralStringResource(R.plurals.settings_trash_deleted_minutes, minutes, minutes)
+        hours < 24 -> pluralStringResource(R.plurals.settings_trash_deleted_hours, hours, hours)
+        else -> pluralStringResource(R.plurals.settings_trash_deleted_days, days, days)
     }
 }

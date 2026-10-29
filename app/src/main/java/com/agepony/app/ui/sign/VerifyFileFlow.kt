@@ -13,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -43,6 +42,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.StatusText
+import com.agepony.app.ui.components.VerdictPanel
+import com.agepony.app.ui.theme.AgeStatus
+import com.agepony.app.ui.theme.mono
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
 
 //
 // Detached verification: pick the file, pick its .sig, get a verdict. Android
@@ -87,7 +99,7 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                 }
                 stage = VerifyStage.RESULT
             } catch (e: Exception) {
-                error = e.message ?: "That doesn't look like an SSH signature."
+                error = e.message ?: context.getString(R.string.sign_verify_not_ssh_signature)
                 stage = VerifyStage.PICK
             }
         }
@@ -105,23 +117,27 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
         }
     }
 
+    if (stage == VerifyStage.WORKING) BackHandler {}
+
+    AgeScreen(
+        title = stringResource(R.string.files_verify),
+        modifier = modifier,
+        onBack = if (stage == VerifyStage.WORKING) null else onClose,
+    ) { padding ->
     when (stage) {
         VerifyStage.PICK -> Column(
-            modifier
+            Modifier
                 .fillMaxSize()
+                .padding(padding)
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Verify a file", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
             Text(
-                "Pick the file first, then its signature (the .sig that came with it). " +
-                    "The file is only read, never changed.",
+                stringResource(R.string.sign_verify_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (error != null) {
-                Text(error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            }
+            if (error != null) ErrorText(error!!)
             Button(
                 onClick = {
                     error = null
@@ -129,20 +145,21 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                     openFile.launch(arrayOf("*/*"))
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Pick the file…") }
-            TextButton(onClick = onClose) { Text("Cancel") }
+            ) { Text(stringResource(R.string.sign_verify_pick_file)) }
+            TextButton(onClick = onClose) { Text(stringResource(R.string.action_cancel)) }
         }
 
         VerifyStage.WORKING -> Column(
-            modifier
+            Modifier
                 .fillMaxSize()
+                .padding(padding)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             Text(
-                "Checking the signature…",
+                stringResource(R.string.sign_verify_working),
                 modifier = Modifier.padding(top = 16.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -154,69 +171,55 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                 stage = VerifyStage.PICK
             } else {
                 Column(
-                    modifier
+                    Modifier
                         .fillMaxSize()
+                        .padding(padding)
                         .verticalScroll(rememberScrollState())
                         .padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
                         file?.name ?: "",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.mono,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    HorizontalDivider()
 
                     when (r.trust) {
-                        FileVerifier.Trust.TRUSTED -> {
-                            Text(
-                                "Signed by ${r.signerName ?: "a known key"} ✓",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
+                        FileVerifier.Trust.TRUSTED -> VerdictPanel(
+                            title = r.signerName?.let { stringResource(R.string.sign_verify_signed_by, it) }
+                                ?: stringResource(R.string.sign_verify_signed_by_known_key),
+                            detail = null,
+                            color = AgeStatus.colors.success,
+                            icon = Icons.Filled.CheckCircle,
+                        )
+                        // The key is on the trusted-signers list, but that entry's imported
+                        // options (expiry, namespaces, touch, ...) reject this signature.
                         FileVerifier.Trust.VALID_UNKNOWN -> if (r.untrustedSignerName != null) {
-                            // The key is on the trusted-signers list, but that entry's imported
-                            // options (expiry, namespaces, touch, ...) reject this signature.
-                            Text(
-                                "⚠ Valid signature, but not trusted",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            Text(
-                                "The key belongs to \"${r.untrustedSignerName}\" on your trusted signers " +
-                                    "list, but ${r.untrustedReason ?: "that entry does not allow this signature"}.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            VerdictPanel(
+                                title = stringResource(R.string.sign_verify_untrusted_title),
+                                detail = stringResource(
+                                    R.string.sign_verify_untrusted_detail,
+                                    r.untrustedSignerName ?: "",
+                                    r.untrustedReason ?: stringResource(R.string.sign_verify_untrusted_default_reason),
+                                ),
+                                color = AgeStatus.colors.warning,
+                                icon = Icons.Filled.Warning,
                             )
                         } else {
-                            Text(
-                                "Valid signature — signer not in your vault",
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                "The math checks out, but this key isn't one of yours and isn't " +
-                                    "on your trusted signers list. If you know whose it is, add it " +
-                                    "so future signatures carry their name.",
-                                style = MaterialTheme.typography.bodyMedium,
+                            VerdictPanel(
+                                title = stringResource(R.string.sign_verify_unknown_title),
+                                detail = stringResource(R.string.sign_verify_unknown_detail),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                icon = Icons.Filled.Info,
                             )
                         }
-                        FileVerifier.Trust.INVALID -> {
-                            Text(
-                                "⚠ Signature invalid",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            Text(
-                                r.reason ?: "Verification failed.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        FileVerifier.Trust.INVALID -> VerdictPanel(
+                            title = stringResource(R.string.sign_verify_invalid_title),
+                            detail = r.reason ?: stringResource(R.string.sign_verify_failed),
+                            color = AgeStatus.colors.failure,
+                            icon = Icons.Filled.Warning,
+                        )
                     }
 
                     Text(
@@ -235,10 +238,10 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                     }
 
                     if (addedName != null) {
-                        Text(
-                            "Added to trusted signers as \"$addedName\".",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                        StatusText(
+                            text = stringResource(R.string.sign_verify_added_signer, addedName ?: ""),
+                            color = AgeStatus.colors.success,
+                            icon = Icons.Filled.CheckCircle,
                         )
                     } else if (r.trust == FileVerifier.Trust.VALID_UNKNOWN && r.signerPublicWire != null &&
                         r.untrustedSignerName == null
@@ -246,7 +249,7 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                         OutlinedButton(
                             onClick = { showAddSigner = true },
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Add this signer…") }
+                        ) { Text(stringResource(R.string.sign_verify_add_signer)) }
                     }
 
                     Button(
@@ -258,8 +261,8 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                             stage = VerifyStage.PICK
                         },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Verify another") }
-                    OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+                    ) { Text(stringResource(R.string.sign_verify_another)) }
+                    OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.app_done)) }
                 }
 
                 if (showAddSigner && r.signerPublicWire != null) {
@@ -286,6 +289,7 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
             }
         }
     }
+    }
 }
 
 @Composable
@@ -297,10 +301,10 @@ private fun AddSignerNameDialog(
     var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add trusted signer") },
+        title = { Text(stringResource(R.string.sign_verify_add_signer_title)) },
         text = {
             Column {
-                Text("Name the person or system this key belongs to.")
+                Text(stringResource(R.string.sign_verify_add_signer_body))
                 Text(
                     fingerprint,
                     style = MaterialTheme.typography.bodySmall,
@@ -312,7 +316,7 @@ private fun AddSignerNameDialog(
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.sign_signers_name_label)) },
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
@@ -321,8 +325,8 @@ private fun AddSignerNameDialog(
             TextButton(
                 onClick = { onConfirm(name.trim()) },
                 enabled = name.trim().isNotEmpty(),
-            ) { Text("Add") }
+            ) { Text(stringResource(R.string.sign_signers_add)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }

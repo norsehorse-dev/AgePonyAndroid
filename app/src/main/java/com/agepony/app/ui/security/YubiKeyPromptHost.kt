@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
 import com.agepony.app.security.piv.YubiKeyBroker
 
 /**
@@ -33,7 +35,7 @@ fun YubiKeyPromptHost() {
     when (val p = prompt) {
         is YubiKeyBroker.Prompt.Tap -> AlertDialog(
             onDismissRequest = {},
-            title = { Text("YubiKey") },
+            title = { Text(stringResource(R.string.security_yubikey_title)) },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     CircularProgressIndicator(Modifier.padding(bottom = 16.dp))
@@ -41,22 +43,22 @@ fun YubiKeyPromptHost() {
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { YubiKeyBroker.cancel() }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { YubiKeyBroker.cancel() }) { Text(stringResource(R.string.action_cancel)) } },
         )
         is YubiKeyBroker.Prompt.Pin -> {
             var pin by remember(p) { mutableStateOf("") }
             AlertDialog(
                 onDismissRequest = {},
-                title = { Text("YubiKey PIN") },
+                title = { Text(stringResource(R.string.security_yubikey_pin_title)) },
                 text = {
                     Column {
-                        Text("This key needs its PIV PIN. You'll tap the YubiKey right after.")
+                        Text(stringResource(R.string.security_yubikey_pin_body))
                         p.message?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
                         OutlinedTextField(
                             value = pin,
                             onValueChange = { if (it.length <= 8) pin = it },
                             singleLine = true,
-                            label = { Text("PIN") },
+                            label = { Text(stringResource(R.string.app_pin)) },
                             visualTransformation = PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
@@ -64,9 +66,9 @@ fun YubiKeyPromptHost() {
                     }
                 },
                 confirmButton = {
-                    TextButton(enabled = pin.length >= 6, onClick = { YubiKeyBroker.submitPin(pin) }) { Text("Continue") }
+                    TextButton(enabled = pin.length >= 6, onClick = { YubiKeyBroker.submitPin(pin) }) { Text(stringResource(R.string.security_continue)) }
                 },
-                dismissButton = { TextButton(onClick = { YubiKeyBroker.cancel() }) { Text("Cancel") } },
+                dismissButton = { TextButton(onClick = { YubiKeyBroker.cancel() }) { Text(stringResource(R.string.action_cancel)) } },
             )
         }
         null -> Unit

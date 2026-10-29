@@ -5,7 +5,6 @@ import android.net.Uri
 import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,14 +14,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,6 +45,21 @@ import com.agepony.app.vault.VaultViewModel
 import com.agepony.app.ui.portability.PaperRestoreScreen
 import com.agepony.app.ui.portability.ReceiveKeysScreen
 import com.agepony.app.ui.portability.SendKeysScreen
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
+import androidx.compose.ui.semantics.Role
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ChoiceField
+import com.agepony.app.ui.components.QuietAction
+import com.agepony.app.ui.components.RadioRow
+import com.agepony.app.ui.components.SectionHeader
+import com.agepony.app.ui.components.SwitchRow
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
 
 //
 // Settings tab (expanded in Phase 2d-3a). Android counterpart of iOS's
@@ -77,7 +87,6 @@ fun SettingsScreen(
 
     var encryptToSelf by remember { mutableStateOf(vault.encryptToSelfDefault) }
     var activeId by remember { mutableStateOf(vault.activeIdentityId) }
-    var identityMenuOpen by remember { mutableStateOf(false) }
     var pendingReset by remember { mutableStateOf(false) }
     var showSetPassword by remember { mutableStateOf(false) }
     var showSetDuress by remember { mutableStateOf(false) }
@@ -89,16 +98,31 @@ fun SettingsScreen(
     // user has to show they still know it.
     val confirmIdentity = rememberSensitiveConfirm(vault)
     val confirmWithPassword = rememberSensitiveConfirm(vault, requireAppPassword = true)
-    val secretNoun = if (vm.unlockSecretKind == "pin") "PIN" else "password"
+    val isPin = vm.unlockSecretKind == "pin"
+    // Resolved here so the onClick lambdas below can pass them to the confirm prompt.
+    val confirmLockOffTitle = stringResource(R.string.settings_confirm_lock_off)
+    val confirmChangeTitle = stringResource(
+        if (isPin) R.string.settings_confirm_change_pin else R.string.settings_confirm_change_password
+    )
+    val confirmRemoveDuressTitle = stringResource(
+        if (isPin) R.string.settings_confirm_remove_duress_pin else R.string.settings_confirm_remove_duress_password
+    )
+    val confirmRemoveSecretTitle = stringResource(
+        if (isPin) R.string.settings_confirm_remove_pin else R.string.settings_confirm_remove_password
+    )
+    val confirmStopErasingTitle = stringResource(R.string.settings_confirm_stop_erasing)
+    val allowScreenshotsTitle = stringResource(R.string.settings_screenshots)
+    val confirmLockLessTitle = stringResource(R.string.settings_confirm_lock_less)
 
     fun openUrl(url: String) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
     }
 
+    // From the installed package (the build's versionName), never a hard-coded fallback.
     val versionName = remember {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull() ?: "1.0"
+        }.getOrNull().orEmpty()
     }
 
     // In-app feedback: a mailto to the public address, prefilled with version and
@@ -130,17 +154,19 @@ fun SettingsScreen(
         null -> {}
     }
 
+    AgeScreen(title = stringResource(R.string.settings_title), modifier = modifier) { padding ->
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
+            .padding(padding)
+            .imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Settings", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
 
         // Security
-        SectionLabel("Security")
+        SectionHeader(stringResource(R.string.settings_section_security))
         val activity = context as FragmentActivity
         val hasBiometric = remember(vm.isBusy) { BiometricGate.hasBiometric(context) }
         val deviceSecure = remember(vm.isBusy) { BiometricGate.isDeviceSecure(context) }
@@ -149,58 +175,57 @@ fun SettingsScreen(
         // the phone's passcode skip the PIN field where the duress secret fires (audit H-1).
         val pinOnly = vm.duressEnrolled
         Text(
-            "How AgePony's vault is locked. A password or PIN set below is a second way in " +
-                "next to Biometric or Device PIN, not an extra step. With No lock, the password " +
-                "is the only way in.",
+            stringResource(R.string.settings_lock_intro),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
         )
         if (pinOnly) {
             Text(
-                "Turn off the duress $secretNoun to use fingerprint or device unlock.",
+                stringResource(
+                    if (isPin) R.string.settings_pin_only_note_pin else R.string.settings_pin_only_note_password
+                ),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         LockModeRow(
             selected = vm.lockMode == LockMode.BIOMETRIC,
-            title = "Biometric",
+            title = stringResource(R.string.settings_lock_biometric),
             subtitle = if (hasBiometric) {
-                "Your fingerprint or face unlocks the vault, with your device credential as a fallback."
+                stringResource(R.string.settings_lock_biometric_detail)
             } else {
-                "Needs a fingerprint or face enrolled on this device."
+                stringResource(R.string.settings_lock_biometric_unavailable)
             },
             enabled = !vm.isBusy && hasBiometric && !pinOnly,
             onClick = { vm.applyLockMode(activity, LockMode.BIOMETRIC) },
         )
         LockModeRow(
             selected = vm.lockMode == LockMode.DEVICE_CREDENTIAL,
-            title = "Device PIN, pattern, or password",
+            title = stringResource(R.string.settings_lock_device),
             subtitle = when {
-                !deviceSecure -> "Set a screen lock in Android settings to use this."
-                legacy -> "Required at every unlock. On this Android version it gates access but " +
-                    "does not add hardware-backed encryption; a vault password below does."
-                else -> "Your device PIN, pattern, or password is required at every unlock, " +
-                    "checked against the key in hardware."
+                !deviceSecure -> stringResource(R.string.settings_lock_device_no_screen_lock)
+                legacy -> stringResource(R.string.settings_lock_device_legacy)
+                else -> stringResource(R.string.settings_lock_device_detail)
             },
             enabled = !vm.isBusy && deviceSecure && !pinOnly,
             onClick = { vm.applyLockMode(activity, LockMode.DEVICE_CREDENTIAL) },
         )
         LockModeRow(
             selected = vm.lockMode == LockMode.OFF,
-            title = "No lock",
+            title = stringResource(R.string.settings_lock_off),
             subtitle = if (vm.passwordEnrolled) {
-                "No fingerprint or device check. Your $secretNoun below is then the only way in."
+                stringResource(
+                    if (isPin) R.string.settings_lock_off_detail_pin else R.string.settings_lock_off_detail_password
+                )
             } else {
-                "The vault opens with nothing to confirm: anyone who opens the app is in. Set a " +
-                    "password below to make it the only way in."
+                stringResource(R.string.settings_lock_off_detail_open)
             },
             enabled = !vm.isBusy && !pinOnly,
             onClick = {
                 if (vm.lockMode != LockMode.OFF) {
                     val confirm = if (vm.passwordEnrolled) confirmWithPassword else confirmIdentity
-                    confirm("Turn off fingerprint and device unlock") { vm.applyLockMode(activity, LockMode.OFF) }
+                    confirm(confirmLockOffTitle) { vm.applyLockMode(activity, LockMode.OFF) }
                 }
             },
         )
@@ -212,29 +237,24 @@ fun SettingsScreen(
                 onClick = { showSetPassword = true },
                 enabled = vm.vault.isUnlocked && !vm.isBusy,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            ) { Text("Set a password or PIN…") }
+            ) { Text(stringResource(R.string.settings_set_secret_button)) }
             Text(
-                "A password you can use to unlock even with no biometric enrolled, and the " +
-                    "basis for a duress password.",
+                stringResource(R.string.settings_set_secret_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            val noun = secretNoun
             Text(
-                "Unlock $noun is set.",
+                stringResource(if (isPin) R.string.settings_secret_set_pin else R.string.settings_secret_set_password),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(top = 8.dp),
             )
             if (vm.secretBelowMinimum) {
                 Text(
-                    if (noun == "PIN") {
-                        "Your PIN is shorter than the ${PasswordVault.MIN_PIN_LENGTH} digits AgePony now " +
-                            "asks for. It still works, but a longer one is much harder to guess. Change it below."
+                    if (isPin) {
+                        stringResource(R.string.settings_pin_too_short, PasswordVault.MIN_PIN_LENGTH)
                     } else {
-                        "Your password is shorter than the ${PasswordVault.MIN_PASSWORD_LENGTH} characters " +
-                            "AgePony now asks for. It still works, but a longer one is much harder to guess. " +
-                            "Change it below."
+                        stringResource(R.string.settings_password_too_short, PasswordVault.MIN_PASSWORD_LENGTH)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
@@ -242,10 +262,10 @@ fun SettingsScreen(
             }
             Row {
                 TextButton(
-                    onClick = { confirmIdentity("Change your $noun") { showSetPassword = true } },
+                    onClick = { confirmIdentity(confirmChangeTitle) { showSetPassword = true } },
                     enabled = vm.vault.isUnlocked && !vm.isBusy,
                 ) {
-                    Text("Change")
+                    Text(stringResource(R.string.settings_action_change))
                 }
                 TextButton(
                     onClick = {
@@ -258,7 +278,7 @@ fun SettingsScreen(
                     },
                     enabled = !vm.isBusy,
                 ) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.settings_action_remove), color = MaterialTheme.colorScheme.error)
                 }
             }
 
@@ -267,20 +287,21 @@ fun SettingsScreen(
                     onClick = { showSetDuress = true },
                     enabled = vm.vault.isUnlocked && !vm.isBusy,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                ) { Text("Set a duress $noun…") }
+                ) {
+                    Text(
+                        stringResource(
+                            if (isPin) R.string.settings_set_duress_button_pin else R.string.settings_set_duress_button_password
+                        )
+                    )
+                }
                 Text(
-                    "A second, different $noun that silently wipes the vault instead of " +
-                        "opening it. Entered under coercion, it leaves an empty app with nothing " +
-                        "to reveal. There is no confirmation and no undo. While one is set, " +
-                        "fingerprint and device unlock are turned off, so the lock screen always " +
-                        "asks for your $noun.",
+                    stringResource(if (isPin) R.string.settings_duress_hint_pin else R.string.settings_duress_hint_password),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
                 Text(
-                    "Duress $noun is set. Entering it wipes the vault. Fingerprint and device " +
-                        "unlock stay off while it is set.",
+                    stringResource(if (isPin) R.string.settings_duress_set_pin else R.string.settings_duress_set_password),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
@@ -289,28 +310,35 @@ fun SettingsScreen(
                     TextButton(
                         onClick = { showSetDuress = true },
                         enabled = vm.vault.isUnlocked && !vm.isBusy,
-                    ) { Text("Change") }
+                    ) { Text(stringResource(R.string.settings_action_change)) }
                     TextButton(
-                        onClick = { confirmIdentity("Remove the duress $noun") { vm.removeDuress() } },
+                        onClick = { confirmIdentity(confirmRemoveDuressTitle) { vm.removeDuress() } },
                         enabled = !vm.isBusy,
                     ) {
-                        Text("Remove", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.settings_action_remove), color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
 
             SettingRow(
-                title = "Erase the vault after ${UnlockAttempts.ERASE_AFTER} wrong attempts",
-                subtitle = "After ${UnlockAttempts.ERASE_AFTER} wrong ${noun}s in a row, AgePony " +
-                    "erases the vault at the lock screen the same way the duress $noun does. From " +
-                    "${UnlockAttempts.BACKOFF_AFTER} wrong tries on, each new try also has to wait longer.",
+                title = pluralStringResource(
+                    R.plurals.settings_erase_title,
+                    UnlockAttempts.ERASE_AFTER,
+                    UnlockAttempts.ERASE_AFTER,
+                ),
+                subtitle = pluralStringResource(
+                    if (isPin) R.plurals.settings_erase_detail_pin else R.plurals.settings_erase_detail_password,
+                    UnlockAttempts.ERASE_AFTER,
+                    UnlockAttempts.ERASE_AFTER,
+                    UnlockAttempts.BACKOFF_AFTER,
+                ),
                 checked = vault.eraseAfterFailedAttempts,
                 enabled = !vm.isBusy,
                 onCheckedChange = { on ->
                     if (on) {
                         vault.eraseAfterFailedAttempts = true
                     } else {
-                        confirmIdentity("Stop erasing after wrong attempts") { vault.eraseAfterFailedAttempts = false }
+                        confirmIdentity(confirmStopErasingTitle) { vault.eraseAfterFailedAttempts = false }
                     }
                 },
             )
@@ -318,14 +346,13 @@ fun SettingsScreen(
 
         // Screenshots (5.0.1). FLAG_SECURE is applied from this setting by the activities.
         SettingRow(
-            title = "Allow screenshots",
-            subtitle = "Off: AgePony's screens stay out of screenshots, screen recordings and the " +
-                "recent apps preview. Turn on only while you need to capture a screen.",
+            title = allowScreenshotsTitle,
+            subtitle = stringResource(R.string.settings_screenshots_detail),
             checked = vault.allowScreenshots,
             enabled = true,
             onCheckedChange = { on ->
                 if (on) {
-                    confirmIdentity("Allow screenshots") { vault.allowScreenshots = true }
+                    confirmIdentity(allowScreenshotsTitle) { vault.allowScreenshots = true }
                 } else {
                     vault.allowScreenshots = false
                 }
@@ -344,29 +371,26 @@ fun SettingsScreen(
         HorizontalDivider()
 
         // Encryption
-        SectionLabel("Encryption")
+        SectionHeader(stringResource(R.string.files_section_encryption))
         SettingRow(
-            title = "Encrypt to self by default",
-            subtitle = "Pre-select your active identity when choosing recipients, so you can always decrypt your own files.",
+            title = stringResource(R.string.settings_encrypt_to_self),
+            subtitle = stringResource(R.string.settings_encrypt_to_self_detail),
             checked = encryptToSelf,
             enabled = true,
             onCheckedChange = { encryptToSelf = it; vault.encryptToSelfDefault = it },
         )
 
         SettingRow(
-            title = "Armor as text by default",
-            subtitle = "Start the encrypt screen with ASCII armor on. Armored output pastes into a " +
-                "message; raw binary is about a third smaller. Changing the switch while encrypting " +
-                "updates this too.",
+            title = stringResource(R.string.settings_armor_default),
+            subtitle = stringResource(R.string.settings_armor_default_detail),
             checked = vault.armorDefault,
             enabled = true,
             onCheckedChange = { vault.armorDefault = it },
         )
 
         SettingRow(
-            title = "Passphrase-only by default",
-            subtitle = "Open the recipient picker in passphrase (scrypt) mode instead of key " +
-                "selection, for when you mostly encrypt with a passphrase.",
+            title = stringResource(R.string.settings_passphrase_default),
+            subtitle = stringResource(R.string.settings_passphrase_default_detail),
             checked = vault.passphraseModeDefault,
             enabled = true,
             onCheckedChange = { vault.passphraseModeDefault = it },
@@ -374,32 +398,36 @@ fun SettingsScreen(
 
         if (vault.sessionPassphrase != null) {
             ActionRow(
-                label = "Forget the remembered passphrase",
-                trailing = "Forget",
+                label = stringResource(R.string.settings_forget_passphrase),
+                trailing = stringResource(R.string.settings_forget),
                 onClick = { vault.forgetSessionPassphrase() },
             )
             Text(
-                "A passphrase is being held in memory so a run of files is only asked for it once. " +
-                    "It is never written to disk and is dropped whenever the vault locks.",
+                stringResource(R.string.settings_forget_passphrase_detail),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
         var workFactor by remember { mutableStateOf(vault.scryptWorkFactor) }
-        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Passphrase work factor", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.settings_work_factor), style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "2^" + workFactor + " — scrypt holds about " +
-                        (FileEncryptor.scryptMemoryBytes(workFactor) shr 20) +
-                        " MB while it derives the key, whatever the file size. " +
-                        (if (workFactor == FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR) {
-                            "This is age's default."
-                        } else {
-                            "age's default is 2^" + FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR + "."
-                        }) +
-                        " The value is stored in the file, so any age tool can still open it.",
+                    if (workFactor == FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR) {
+                        stringResource(
+                            R.string.settings_work_factor_detail_default,
+                            workFactor,
+                            FileEncryptor.scryptMemoryBytes(workFactor) shr 20,
+                        )
+                    } else {
+                        stringResource(
+                            R.string.settings_work_factor_detail_custom,
+                            workFactor,
+                            FileEncryptor.scryptMemoryBytes(workFactor) shr 20,
+                            FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR,
+                        )
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -407,56 +435,41 @@ fun SettingsScreen(
             TextButton(
                 onClick = { workFactor -= 1; vault.scryptWorkFactor = workFactor },
                 enabled = workFactor > FileEncryptor.MIN_SCRYPT_WORK_FACTOR,
-            ) { Text("Less") }
+            ) { Text(stringResource(R.string.settings_work_factor_less)) }
             TextButton(
                 onClick = { workFactor += 1; vault.scryptWorkFactor = workFactor },
                 enabled = workFactor < FileEncryptor.MAX_SCRYPT_WORK_FACTOR,
-            ) { Text("More") }
+            ) { Text(stringResource(R.string.settings_work_factor_more)) }
         }
 
         HorizontalDivider()
 
         // Auto-lock
-        SectionLabel("Auto-lock")
-        var graceMenuOpen by remember { mutableStateOf(false) }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                Text("Lock after leaving the app", style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    "How long AgePony waits after you switch away before locking the vault. Shorter is safer; longer keeps your place during a quick app switch. Turning the screen off counts as switching away.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Box {
-                TextButton(onClick = { graceMenuOpen = true }) {
-                    Text(autoLockLabel(vault.autoLockGraceSeconds))
+        SectionHeader(stringResource(R.string.settings_section_autolock))
+        ChoiceField(
+            label = stringResource(R.string.settings_autolock_label),
+            selected = vault.autoLockGraceSeconds,
+            options = listOf(0, 15, 30, 60, 300),
+            optionLabel = { autoLockLabel(it) },
+            onSelect = { seconds ->
+                // A longer delay loosens the lock: confirm it's you (audit L-15).
+                if (seconds > vault.autoLockGraceSeconds) {
+                    confirmIdentity(confirmLockLessTitle) { vault.autoLockGraceSeconds = seconds }
+                } else {
+                    vault.autoLockGraceSeconds = seconds
                 }
-                DropdownMenu(expanded = graceMenuOpen, onDismissRequest = { graceMenuOpen = false }) {
-                    listOf(0, 15, 30, 60, 300).forEach { seconds ->
-                        DropdownMenuItem(
-                            text = { Text(autoLockLabel(seconds)) },
-                            onClick = {
-                                graceMenuOpen = false
-                                // A longer delay loosens the lock: confirm it's you (audit L-15).
-                                if (seconds > vault.autoLockGraceSeconds) {
-                                    confirmIdentity("Lock less often") { vault.autoLockGraceSeconds = seconds }
-                                } else {
-                                    vault.autoLockGraceSeconds = seconds
-                                }
-                            },
-                        )
-                    }
-                }
-            }
-        }
+            },
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        )
+        Text(
+            stringResource(R.string.settings_autolock_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         HorizontalDivider()
 
         // Network
-        SectionLabel("Network")
+        SectionHeader(stringResource(R.string.settings_section_network))
         val proxyCtx = LocalContext.current
         val orbotInstalled = remember { ProxyConfig.isOrbotInstalled(proxyCtx) }
 
@@ -480,15 +493,15 @@ fun SettingsScreen(
         var proxyPassField by remember { mutableStateOf(vault.proxyPassword) }
 
         Text(
-            "Route the one network call, the GitHub key fetch, through a proxy. Everything else in AgePony is already offline.",
+            stringResource(R.string.settings_network_intro),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         LockModeRow(
             selected = proxyMode == ProxyMode.OFF,
-            title = "Off",
-            subtitle = "Direct connection (default).",
+            title = stringResource(R.string.settings_proxy_off),
+            subtitle = stringResource(R.string.settings_proxy_off_detail),
             enabled = true,
         ) {
             proxyMode = ProxyMode.OFF
@@ -496,8 +509,8 @@ fun SettingsScreen(
         }
         LockModeRow(
             selected = proxyMode == ProxyMode.ORBOT,
-            title = "Orbot (Tor)",
-            subtitle = "SOCKS5 to 127.0.0.1:9050.",
+            title = stringResource(R.string.settings_proxy_orbot),
+            subtitle = stringResource(R.string.settings_proxy_orbot_detail, ProxyConfig.ORBOT_HOST, ProxyConfig.ORBOT_PORT),
             enabled = true,
         ) {
             proxyMode = ProxyMode.ORBOT
@@ -509,8 +522,8 @@ fun SettingsScreen(
         }
         LockModeRow(
             selected = proxyMode == ProxyMode.CUSTOM,
-            title = "Custom",
-            subtitle = "Your own SOCKS5 or HTTP proxy.",
+            title = stringResource(R.string.settings_proxy_custom),
+            subtitle = stringResource(R.string.settings_proxy_custom_detail),
             enabled = true,
         ) {
             proxyMode = ProxyMode.CUSTOM
@@ -521,31 +534,27 @@ fun SettingsScreen(
 
         if (proxyMode == ProxyMode.ORBOT && !orbotInstalled) {
             Text(
-                "Orbot does not appear to be installed. Install it from Google Play or F-Droid, or choose Custom to point at another Tor SOCKS port.",
+                stringResource(R.string.settings_orbot_missing),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
         }
 
         if (proxyMode == ProxyMode.CUSTOM) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(
-                    selected = customIsSocks,
-                    onClick = { customIsSocks = true; vault.proxyType = ProxyType.SOCKS },
-                )
-                Text("SOCKS5 (Tor)")
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(
-                    selected = !customIsSocks,
-                    onClick = { customIsSocks = false; vault.proxyType = ProxyType.HTTP },
-                )
-                Text("HTTP")
-            }
+            RadioRow(
+                title = stringResource(R.string.settings_proxy_socks),
+                selected = customIsSocks,
+                onClick = { customIsSocks = true; vault.proxyType = ProxyType.SOCKS },
+            )
+            RadioRow(
+                title = stringResource(R.string.settings_proxy_http),
+                selected = !customIsSocks,
+                onClick = { customIsSocks = false; vault.proxyType = ProxyType.HTTP },
+            )
             OutlinedTextField(
                 value = proxyHostField,
                 onValueChange = { proxyHostField = it; vault.proxyHost = it },
-                label = { Text("Proxy host") },
+                label = { Text(stringResource(R.string.settings_proxy_host)) },
                 placeholder = { Text("127.0.0.1") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -557,7 +566,7 @@ fun SettingsScreen(
                     proxyPortField = f
                     vault.proxyPort = f.toIntOrNull() ?: 0
                 },
-                label = { Text("Port") },
+                label = { Text(stringResource(R.string.settings_proxy_port)) },
                 placeholder = { Text("9050") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -569,26 +578,26 @@ fun SettingsScreen(
             OutlinedTextField(
                 value = proxyUserField,
                 onValueChange = { proxyUserField = it; vault.proxyUsername = it },
-                label = { Text("Proxy username (optional)") },
+                label = { Text(stringResource(R.string.settings_proxy_username)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = proxyPassField,
                 onValueChange = { proxyPassField = it; vault.proxyPassword = it },
-                label = { Text("Proxy password (optional)") },
+                label = { Text(stringResource(R.string.settings_proxy_password)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                "For Tor/Orbot, a username and password put AgePony's traffic on its own circuit (stream isolation). For a real proxy they are ordinary credentials. Leave blank for none.",
+                stringResource(R.string.settings_proxy_credentials_detail),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "If the proxy is unreachable, the key fetch fails rather than falling back to a direct connection.",
+                stringResource(R.string.settings_proxy_no_fallback),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -597,42 +606,28 @@ fun SettingsScreen(
         HorizontalDivider()
 
         // Active identity
-        SectionLabel("Active identity")
+        SectionHeader(stringResource(R.string.settings_section_active_identity))
         if (vault.identities.isEmpty()) {
             Text(
-                "No identities yet. Add one from the Identities tab.",
+                stringResource(R.string.settings_no_identities),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            val activeName = vault.identities.firstOrNull { it.id == activeId }?.name
-                ?: vault.identities.first().name
-            Box {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { identityMenuOpen = true }
-                        .padding(vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(activeName, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    Text("Change", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                }
-                DropdownMenu(expanded = identityMenuOpen, onDismissRequest = { identityMenuOpen = false }) {
-                    vault.identities.forEach { identity ->
-                        DropdownMenuItem(
-                            text = { Text(identity.name) },
-                            onClick = {
-                                activeId = identity.id
-                                vault.activeIdentityId = identity.id
-                                identityMenuOpen = false
-                            },
-                        )
-                    }
-                }
-            }
+            val active = vault.identities.firstOrNull { it.id == activeId } ?: vault.identities.first()
+            ChoiceField(
+                label = stringResource(R.string.settings_identity_label),
+                selected = active,
+                options = vault.identities.toList(),
+                optionLabel = { it.name },
+                onSelect = { identity ->
+                    activeId = identity.id
+                    vault.activeIdentityId = identity.id
+                },
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            )
             Text(
-                "The active identity is the default \"encrypt to self\" recipient and the first tried when decrypting.",
+                stringResource(R.string.settings_active_identity_detail),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -641,26 +636,25 @@ fun SettingsScreen(
         HorizontalDivider()
 
         // Keys on other devices (5.0.0)
-        SectionLabel("Move and back up keys")
+        SectionHeader(stringResource(R.string.settings_section_keys))
         OutlinedButton(onClick = { subScreen = SettingsSub.SEND_KEYS }, modifier = Modifier.fillMaxWidth()) {
-            Text("Send keys to another device")
+            Text(stringResource(R.string.settings_send_keys))
         }
         OutlinedButton(onClick = { subScreen = SettingsSub.RECEIVE_KEYS }, modifier = Modifier.fillMaxWidth()) {
-            Text("Receive keys from another device")
+            Text(stringResource(R.string.settings_receive_keys))
         }
         OutlinedButton(onClick = { subScreen = SettingsSub.PAPER_RESTORE }, modifier = Modifier.fillMaxWidth()) {
-            Text("Restore from a paper backup")
+            Text(stringResource(R.string.settings_paper_restore))
         }
         Text(
-            "To make a paper backup, open an identity on the Identities tab. Hardware keys stay on this " +
-                "device and can't be moved or backed up.",
+            stringResource(R.string.settings_keys_detail),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         HorizontalDivider()
 
-        OutlinedButton(onClick = { vm.lock() }, modifier = Modifier.fillMaxWidth()) { Text("Lock vault now") }
+        OutlinedButton(onClick = { vm.lock() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.settings_lock_now)) }
 
         if (vm.error != null) {
             Text(vm.error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -669,19 +663,19 @@ fun SettingsScreen(
         HorizontalDivider()
 
         // About
-        SectionLabel("About")
-        AboutRow("Version", versionName)
-        LinkRow("Website") { openUrl("https://agepony.com") }
-        LinkRow("Source code") { openUrl("https://github.com/norsehorse-dev/AgePonyAndroid") }
-        LinkRow("age spec") { openUrl("https://age-encryption.org/v1") }
-        LinkRow("Open-source licenses") { subScreen = SettingsSub.LICENSES }
-        AboutRow("Made by", "NorseHorse")
+        SectionHeader(stringResource(R.string.settings_section_about))
+        AboutRow(stringResource(R.string.settings_version), versionName)
+        LinkRow(stringResource(R.string.settings_website)) { openUrl("https://agepony.com") }
+        LinkRow(stringResource(R.string.settings_source_code)) { openUrl("https://github.com/norsehorse-dev/AgePonyAndroid") }
+        LinkRow(stringResource(R.string.settings_age_spec)) { openUrl("https://age-encryption.org/v1") }
+        ActionRow(label = stringResource(R.string.settings_licenses), onClick = { subScreen = SettingsSub.LICENSES })
+        AboutRow(stringResource(R.string.settings_made_by), "NorseHorse")
 
         HorizontalDivider()
 
         // AgePony for Desktop — the same product on the desktop, not a sibling
         // app, so it sits above the More-from list. Mirrors PGPony's desktop promo.
-        MoreRow("AgePony for Desktop", "age encryption for macOS, Linux and Windows") { openUrl("https://agepony.com/desktop") }
+        MoreRow(stringResource(R.string.settings_desktop), stringResource(R.string.settings_desktop_detail)) { openUrl("https://agepony.com/desktop") }
 
         HorizontalDivider()
 
@@ -689,107 +683,86 @@ fun SettingsScreen(
         // site. AgePony itself is omitted since this is it. Mirrors PGPony's
         // section; kept to product sites only (no store links) so it's identical
         // in the foss and play flavors.
-        SectionLabel("More from NorseHorse")
-        MoreRow("All Pony apps", "The whole family at pony.norsehor.se") { openUrl("https://pony.norsehor.se") }
-        MoreRow("PGPony", "OpenPGP encryption for messages and files") { openUrl("https://pgpony.app") }
-        MoreRow("QuorumPony", "Split a secret into cards. Any few rebuild it.") { openUrl("https://quorumpony.com") }
-        MoreRow("CarrierPony", "Private messaging and file transfer, sealed end to end") { openUrl("https://carrierpony.com") }
-        MoreRow("BurnPony", "Send a secret. Encrypted on your phone, burned after reading") { openUrl("https://burnpony.app") }
-        MoreRow("VaultPony", "VeraCrypt-compatible encrypted vaults, entirely on your device") { openUrl("https://vaultpony.app") }
-        MoreRow("PassPony", "Your pass and passage store, in your pocket") { openUrl("https://passpony.app") }
-        MoreRow("RelayPony", "Encrypted file transfer, phone to phone") { openUrl("https://relaypony.app") }
-        MoreRow("ScrubPony", "Strip identifying metadata from images. No pixel moves.") { openUrl("https://scrubpony.app") }
+        SectionHeader(stringResource(R.string.settings_section_more))
+        MoreRow(stringResource(R.string.settings_more_all), stringResource(R.string.settings_more_all_detail)) { openUrl("https://pony.norsehor.se") }
+        MoreRow("PGPony", stringResource(R.string.settings_more_pgpony_detail)) { openUrl("https://pgpony.app") }
+        MoreRow("QuorumPony", stringResource(R.string.settings_more_quorumpony_detail)) { openUrl("https://quorumpony.com") }
+        MoreRow("CarrierPony", stringResource(R.string.settings_more_carrierpony_detail)) { openUrl("https://carrierpony.com") }
+        MoreRow("BurnPony", stringResource(R.string.settings_more_burnpony_detail)) { openUrl("https://burnpony.app") }
+        MoreRow("VaultPony", stringResource(R.string.settings_more_vaultpony_detail)) { openUrl("https://vaultpony.app") }
+        MoreRow("PassPony", stringResource(R.string.settings_more_passpony_detail)) { openUrl("https://passpony.app") }
+        MoreRow("RelayPony", stringResource(R.string.settings_more_relaypony_detail)) { openUrl("https://relaypony.app") }
+        MoreRow("ScrubPony", stringResource(R.string.settings_more_scrubpony_detail)) { openUrl("https://scrubpony.app") }
 
         HorizontalDivider()
 
         // Help & feedback
-        SectionLabel("Help & feedback")
-        ActionRow(label = "Help & FAQ", trailing = "Open ↗", onClick = { subScreen = SettingsSub.HELP })
-        ActionRow(label = "How AgePony protects your files", trailing = "Open ↗", onClick = { subScreen = SettingsSub.SECURITY })
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onReplayOnboarding() }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "Replay the intro",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                "Show ↗",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
+        SectionHeader(stringResource(R.string.settings_section_help))
+        ActionRow(label = stringResource(R.string.settings_help), onClick = { subScreen = SettingsSub.HELP })
+        ActionRow(label = stringResource(R.string.settings_security_info), onClick = { subScreen = SettingsSub.SECURITY })
+        ActionRow(label = stringResource(R.string.settings_replay_intro), onClick = { onReplayOnboarding() })
         Text(
-            "Walk through what AgePony does and how your keys stay private on this device.",
+            stringResource(R.string.settings_replay_intro_detail),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        ActionRow(label = "Rate AgePony", trailing = "Open ↗", onClick = { ReviewPrompt.openRating(context) })
+        ActionRow(label = stringResource(R.string.settings_rate), onClick = { ReviewPrompt.openRating(context) })
         Text(
-            "If AgePony has been useful, a rating helps other people find it.",
+            stringResource(R.string.settings_rate_detail),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        ActionRow(label = "Send feedback", trailing = "Email ↗", onClick = { sendFeedback() })
+        ActionRow(label = stringResource(R.string.settings_send_feedback), onClick = { sendFeedback() })
         Text(
-            "Found a bug or have an idea? This opens an email to NorseHorse with your app and device details filled in.",
+            stringResource(R.string.settings_send_feedback_detail),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        ActionRow(label = "Recently deleted", trailing = "Open ↗", onClick = { subScreen = SettingsSub.TRASH })
+        ActionRow(label = stringResource(R.string.settings_recently_deleted), onClick = { subScreen = SettingsSub.TRASH })
         Text(
-            "Restore an identity or recipient you deleted, for up to 30 days.",
+            stringResource(R.string.settings_recently_deleted_detail),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         HorizontalDivider()
 
-        // Danger zone
-        SectionLabel("Danger zone")
-        TextButton(onClick = { pendingReset = true }) {
-            Text("Reset AgePony", color = MaterialTheme.colorScheme.error)
-        }
+        // Reset
+        SectionHeader(stringResource(R.string.settings_reset))
+        QuietAction(text = stringResource(R.string.settings_reset_button), onClick = { pendingReset = true }, destructive = true)
         Text(
-            "Erases all stored identities, recipients, and notes. Files you've already saved outside AgePony are untouched. This cannot be undone.",
+            stringResource(R.string.settings_reset_detail),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 24.dp),
         )
     }
+    }
 
     if (pendingReset) {
         AlertDialog(
             onDismissRequest = { pendingReset = false },
-            title = { Text("Reset AgePony?") },
+            title = { Text(stringResource(R.string.settings_reset_title)) },
             text = {
-                Text(
-                    "This deletes every identity, recipient, and encrypted note in the vault. " +
-                        "Files already saved outside AgePony are unaffected. This cannot be undone."
-                )
+                Text(stringResource(R.string.settings_reset_body))
             },
             confirmButton = {
                 TextButton(onClick = { pendingReset = false; vm.reset() }) {
-                    Text("Reset", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.settings_reset), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingReset = false }) { Text("Cancel") }
+                TextButton(onClick = { pendingReset = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
 
     if (showSetPassword) {
         SetSecretDialog(
-            title = "Set a password or PIN",
+            title = stringResource(R.string.settings_set_secret_title),
             allowKindChoice = true,
             initialKind = vm.unlockSecretKind,
             onConfirm = { secret, kind, _ ->
@@ -802,16 +775,19 @@ fun SettingsScreen(
 
     if (showSetDuress) {
         SetSecretDialog(
-            title = "Set a duress $secretNoun",
+            title = stringResource(
+                if (isPin) R.string.settings_set_duress_title_pin else R.string.settings_set_duress_title_password
+            ),
             allowKindChoice = false,
             // The duress secret is typed into the same lock screen field, so same keyboard.
             initialKind = vm.unlockSecretKind,
-            confirmLabel = "Set duress",
-            body = "Enter a second $secretNoun, different from your real one. Entering it at " +
-                "unlock wipes the vault silently. Choose something you can recall under " +
-                "pressure but would not use by habit. Fingerprint and device unlock are turned " +
-                "off while it is set, so confirm your current $secretNoun first.",
-            currentLabel = "Current $secretNoun",
+            confirmLabel = stringResource(R.string.settings_set_duress_confirm),
+            body = stringResource(
+                if (isPin) R.string.settings_set_duress_body_pin else R.string.settings_set_duress_body_password
+            ),
+            currentLabel = stringResource(
+                if (isPin) R.string.settings_current_pin else R.string.settings_current_password
+            ),
             onConfirm = { secret, _, current ->
                 vm.setDuressSecret(secret, current)
                 showSetDuress = false
@@ -823,26 +799,34 @@ fun SettingsScreen(
     if (confirmRemovePassword) {
         AlertDialog(
             onDismissRequest = { confirmRemovePassword = false },
-            title = { Text("Remove your $secretNoun?") },
+            title = {
+                Text(
+                    stringResource(
+                        if (isPin) R.string.settings_remove_title_pin else R.string.settings_remove_title_password
+                    )
+                )
+            },
             text = {
                 Text(
                     if (vm.duressEnrolled) {
-                        "The vault will no longer ask for it, and your duress $secretNoun is removed too."
+                        stringResource(
+                            if (isPin) R.string.settings_remove_body_duress_pin else R.string.settings_remove_body_duress_password
+                        )
                     } else {
-                        "The vault will no longer ask for it. It then opens with the lock mode above only."
+                        stringResource(R.string.settings_remove_body)
                     }
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     confirmRemovePassword = false
-                    confirmIdentity("Remove your $secretNoun") { vm.removePassword() }
+                    confirmIdentity(confirmRemoveSecretTitle) { vm.removePassword() }
                 }) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.settings_action_remove), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmRemovePassword = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmRemovePassword = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -850,9 +834,9 @@ fun SettingsScreen(
     passwordOnlyNotice?.let { notice ->
         AlertDialog(
             onDismissRequest = { passwordOnlyNotice = null },
-            title = { Text("Can't remove it yet") },
+            title = { Text(stringResource(R.string.settings_cant_remove_title)) },
             text = { Text(notice) },
-            confirmButton = { TextButton(onClick = { passwordOnlyNotice = null }) { Text("OK") } },
+            confirmButton = { TextButton(onClick = { passwordOnlyNotice = null }) { Text(stringResource(R.string.settings_ok)) } },
         )
     }
 }
@@ -868,7 +852,7 @@ private fun SetSecretDialog(
     title: String,
     allowKindChoice: Boolean,
     initialKind: String = "password",
-    confirmLabel: String = "Save",
+    confirmLabel: String = stringResource(R.string.settings_save),
     body: String? = null,
     currentLabel: String? = null,
     onConfirm: (CharArray, String, CharArray?) -> Unit,
@@ -880,7 +864,7 @@ private fun SetSecretDialog(
     var again by remember { mutableStateOf("") }
     val isPin = kind == "pin"
     val mismatch = again.isNotEmpty() && value != again
-    val policyError = if (value.isEmpty()) null else PasswordVault.secretPolicyError(value, kind)
+    val policyError = if (value.isEmpty()) null else PasswordVault.secretPolicyError(LocalContext.current, value, kind)
     val valid = value.isNotEmpty() && policyError == null && value == again &&
         (currentLabel == null || current.isNotEmpty())
 
@@ -895,10 +879,10 @@ private fun SetSecretDialog(
                 if (allowKindChoice) {
                     Row(modifier = Modifier.padding(top = 8.dp)) {
                         TextButton(onClick = { kind = "password" }) {
-                            Text("Password", color = if (!isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.settings_kind_password), color = if (!isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         TextButton(onClick = { kind = "pin" }) {
-                            Text("PIN", color = if (isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.settings_kind_pin), color = if (isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -918,16 +902,16 @@ private fun SetSecretDialog(
                     value = value,
                     onValueChange = { value = it },
                     singleLine = true,
-                    label = { Text(if (isPin) "PIN" else "Password") },
+                    label = { Text(stringResource(if (isPin) R.string.settings_kind_pin else R.string.settings_kind_password)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = kb,
                     isError = policyError != null,
                     supportingText = {
                         Text(
                             policyError ?: if (isPin) {
-                                "At least ${PasswordVault.MIN_PIN_LENGTH} digits."
+                                stringResource(R.string.settings_pin_min, PasswordVault.MIN_PIN_LENGTH)
                             } else {
-                                "At least ${PasswordVault.MIN_PASSWORD_LENGTH} characters."
+                                stringResource(R.string.settings_password_min, PasswordVault.MIN_PASSWORD_LENGTH)
                             }
                         )
                     },
@@ -937,14 +921,14 @@ private fun SetSecretDialog(
                     value = again,
                     onValueChange = { again = it },
                     singleLine = true,
-                    label = { Text("Confirm") },
+                    label = { Text(stringResource(R.string.settings_confirm_field)) },
                     isError = mismatch,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = kb,
                     modifier = Modifier.padding(top = 8.dp),
                 )
                 if (mismatch) {
-                    Text("They don't match.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.settings_mismatch), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
         },
@@ -958,27 +942,18 @@ private fun SetSecretDialog(
                 Text(confirmLabel)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
-}
-
-private fun autoLockLabel(seconds: Int): String = when (seconds) {
-    0 -> "Immediately"
-    60 -> "1 minute"
-    300 -> "5 minutes"
-    else -> "$seconds seconds"
 }
 
 @Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 4.dp),
-    )
+private fun autoLockLabel(seconds: Int): String = when {
+    seconds == 0 -> stringResource(R.string.settings_autolock_immediately)
+    seconds % 60 == 0 -> pluralStringResource(R.plurals.settings_autolock_minutes, seconds / 60, seconds / 60)
+    else -> pluralStringResource(R.plurals.settings_autolock_seconds, seconds, seconds)
 }
 
+/** Settings switch row: the whole row toggles (shared SwitchRow). */
 @Composable
 private fun SettingRow(
     title: String,
@@ -987,18 +962,16 @@ private fun SettingRow(
     enabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
-    }
+    SwitchRow(
+        title = title,
+        subtitle = subtitle,
+        checked = checked,
+        enabled = enabled,
+        onCheckedChange = onCheckedChange,
+    )
 }
 
+/** One choice of a radio group: the whole row selects (shared RadioRow). */
 @Composable
 private fun LockModeRow(
     selected: Boolean,
@@ -1007,63 +980,79 @@ private fun LockModeRow(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = onClick, enabled = enabled)
-        Column(Modifier.weight(1f).padding(start = 4.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+    RadioRow(
+        title = title,
+        subtitle = subtitle,
+        selected = selected,
+        enabled = enabled,
+        onClick = onClick,
+    )
 }
 
 @Composable
 private fun AboutRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
+/** A link that leaves the app (website, source). Link text in the accent color, 48dp target. */
 @Composable
 private fun LinkRow(label: String, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text("Open ↗", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
     }
 }
 
+/** A sibling app: name in the accent color (it is a link), one plain line under it. */
 @Composable
 private fun MoreRow(title: String, subtitle: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp)
+            .padding(vertical = 8.dp),
     ) {
-        Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Text("Open ↗", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
+/**
+ * A row that opens something (a sub-screen, the store, an email). The whole row is the target,
+ * 48dp tall; a chevron marks it, or a short [trailing] action word when the row acts in place.
+ */
 @Composable
-private fun ActionRow(label: String, trailing: String, onClick: () -> Unit) {
+private fun ActionRow(label: String, onClick: () -> Unit, trailing: String? = null) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .heightIn(min = 48.dp)
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text(trailing, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        if (trailing != null) {
+            Text(trailing, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        } else {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

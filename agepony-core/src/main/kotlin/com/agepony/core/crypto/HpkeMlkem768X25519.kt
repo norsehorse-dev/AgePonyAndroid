@@ -36,6 +36,16 @@ object HpkeMlkem768X25519 {
     private val SUITE_ID = "HPKE".toByteArray(Charsets.US_ASCII) + be16(KEM_ID) + be16(KDF_ID) + be16(AEAD_ID)
     private val HPKE_V1 = "HPKE-v1".toByteArray(Charsets.US_ASCII)
 
+    /**
+     * The X25519 half produced the all-zero shared secret: the peer share is the identity or a
+     * low-order point (RFC 7748 section 6.1), so the secret is known to anyone. Thrown on
+     * encapsulation (a hostile `age1pq1` recipient) and on decapsulation (a hostile `enc`), as
+     * iOS `HybridKEMError.lowOrderPoint` is. It is an [IllegalArgumentException], so callers that
+     * treat a bad recipient that way keep working; [HybridIdentity.unwrap][com.agepony.core.recipients.HybridIdentity.unwrap]
+     * still answers null ("not for me") for it.
+     */
+    class LowOrderPointException(message: String) : IllegalArgumentException(message)
+
     // ---- Key derivation ----
 
     /**
@@ -67,6 +77,26 @@ object HpkeMlkem768X25519 {
         return ekPQ to ekT
     }
 
+    /**
+     * X25519 for the hybrid KEM: the 32-byte shared secret, or null when it is all zeros.
+     *
+     * Bouncy Castle already refuses the all-zero secret by throwing [IllegalStateException]
+     * ([X25519Crypto.keyExchangeOrNull] turns that into null). The explicit check after it keeps
+     * the rule here instead of depending on the provider, matching iOS, where
+     * `x25519Exchange` checks the bytes itself.
+     */
+    private fun x25519Exchange(privateKey: ByteArray, peerPublicKey: ByteArray): ByteArray? {
+        val shared = X25519Crypto.keyExchangeOrNull(privateKey, peerPublicKey) ?: return null
+        return if (isAllZero(shared)) null else shared
+    }
+
+    /** Constant-time all-zero test: ORs every byte, with no early exit. */
+    internal fun isAllZero(bytes: ByteArray): Boolean {
+        var acc = 0
+        for (b in bytes) acc = acc or (b.toInt() and 0xff)
+        return acc == 0
+    }
+
     private fun combine(ssPQ: ByteArray, ssT: ByteArray, ctT: ByteArray, ekT: ByteArray): ByteArray =
         Sha3.sha3_256(ssPQ + ssT + ctT + ekT + LABEL)
 
@@ -85,8 +115,8 @@ object HpkeMlkem768X25519 {
 
         val ephPriv = testRandom?.copyOfRange(32, 64) ?: X25519Crypto.generatePrivateKey()
         val ctT = X25519Crypto.publicKey(ephPriv)
-        val ssT = X25519Crypto.keyExchangeOrNull(ephPriv, ekT)
-            ?: throw IllegalArgumentException("hybrid recipient X25519 key is a low-order point; refusing to encrypt to it")
+        val ssT = x25519Exchange(ephPriv, ekT)
+            ?: throw LowOrderPointException("hybrid recipient X25519 key is a low-order point; refusing to encrypt to it")
 
         val ss = combine(ssPQ, ssT, ctT, ekT)
         return ss to (ctPQ + ctT)
@@ -99,7 +129,8 @@ object HpkeMlkem768X25519 {
         val ctT = enc.copyOfRange(MLKEM768.CIPHERTEXT_SIZE, ENC_SIZE)
         val ssPQ = MLKEM768.decapsulate(priv.mlkem.privateParams, ctPQ)
         val ekT = X25519Crypto.publicKey(priv.x25519Priv)
-        val ssT = X25519Crypto.keyExchange(priv.x25519Priv, ctT)
+        val ssT = x25519Exchange(priv.x25519Priv, ctT)
+            ?: throw LowOrderPointException("hybrid enc X25519 share is a low-order point")
         return combine(ssPQ, ssT, ctT, ekT)
     }
 

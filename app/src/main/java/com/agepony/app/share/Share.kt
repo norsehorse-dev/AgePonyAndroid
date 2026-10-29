@@ -1,5 +1,6 @@
 package com.agepony.app.share
 
+import com.agepony.app.R
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -142,7 +143,7 @@ object ShareSniff {
 
 /** Sending results back out. Only ciphertext goes out without a confirmation step. */
 object ShareOut {
-    fun text(context: Context, text: String, title: String = "Share") {
+    fun text(context: Context, text: String, title: String = context.getString(R.string.core_share_chooser_text)) {
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, text)
@@ -151,7 +152,7 @@ object ShareOut {
     }
 
     /** Share a document AgePony wrote (an encrypted output), granting read access to the target. */
-    fun file(context: Context, uri: Uri, name: String, title: String = "Share encrypted file") {
+    fun file(context: Context, uri: Uri, name: String, title: String = context.getString(R.string.core_share_chooser_file)) {
         val send = Intent(Intent.ACTION_SEND).apply {
             type = SafIo.MIME_OCTET
             putExtra(Intent.EXTRA_STREAM, uri)

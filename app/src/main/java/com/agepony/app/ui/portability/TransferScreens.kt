@@ -21,7 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -40,9 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.agepony.app.net.LocalNetwork
 import com.agepony.app.security.ClipboardGuard
 import com.agepony.app.share.ShareOut
@@ -69,6 +66,24 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.thread
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.ui.semantics.Role
+import com.agepony.app.R
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.CheckRow
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.SectionHeader
+import com.agepony.app.ui.components.VerdictPanel
+import com.agepony.app.ui.components.pluralResource
+import com.agepony.app.ui.identities.rsaTooSmallText
+import com.agepony.app.ui.theme.AgeStatus
+import com.agepony.app.ui.theme.code
+import androidx.compose.ui.res.stringResource
 
 // ---- Receive ----
 
@@ -175,7 +190,7 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
                 }
                 showPreview(inc, received)
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't open that transfer."
+                error = e.message ?: context.getString(R.string.identities_transfer_error_open)
                 stage = ReceiveStage.WAITING
             }
         }
@@ -221,7 +236,12 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
                             true
                         } catch (e: Throwable) {
                             Log.w(XFER_TAG, "couldn't open transfer: ${e.javaClass.simpleName}: ${e.message}")
-                            main.post { error = "A transfer arrived but couldn't be opened: " + (e.message ?: e.javaClass.simpleName) }
+                            main.post {
+                                error = context.getString(
+                                    R.string.identities_transfer_error_arrived,
+                                    e.message ?: e.javaClass.simpleName,
+                                )
+                            }
                             false
                         }
                     }
@@ -251,32 +271,32 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
                     else SafIo.openInput(context, uri).use { it.readBytes() }
                 }.getOrNull()
             }
-            if (bytes == null) error = "Couldn't read that file." else openBytes(bytes)
+            if (bytes == null) error = context.getString(R.string.identities_transfer_error_read_file) else openBytes(bytes)
         }
     }
 
+    // Leaving a transfer under review retires the receive key too, same as Cancel.
+    fun leave() {
+        if (stage == ReceiveStage.PREVIEW) ReceiveSession.end()
+        onBack()
+    }
+
+    AgeScreen(title = stringResource(R.string.identities_transfer_receive_title), modifier = modifier, onBack = { leave() }) { padding ->
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Leaving a transfer under review retires the receive key too, same as Cancel.
-        TextButton(onClick = { if (stage == ReceiveStage.PREVIEW) ReceiveSession.end(); onBack() }) { Text("‹ Back") }
-        Text("Receive keys", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+        error?.let { ErrorText(it) }
 
         when (stage) {
             ReceiveStage.WAITING, ReceiveStage.OPENING -> {
                 Text(
-                    "On the other phone, open AgePony › Settings › Send keys to another device, and scan " +
-                        "this code. Keep this screen open: with both phones on the same Wi-Fi, the keys " +
-                        "arrive here directly in a few seconds.",
+                    stringResource(R.string.identities_transfer_receive_intro),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 if (hosts.isEmpty() || server == null) {
                     Text(
-                        "This phone isn't on a Wi-Fi network, so the keys can't come across directly. " +
-                            "Join the same Wi-Fi as the other phone (or its hotspot) and reopen this screen, " +
-                            "or use a file below.",
+                        stringResource(R.string.identities_transfer_no_wifi),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -285,34 +305,37 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
                     content = qrContent,
                     size = 320.dp,
                     lowErrorCorrection = true,
-                    contentDescription = "One-time key for receiving a transfer",
+                    contentDescription = stringResource(R.string.identities_transfer_qr_description),
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
-                Text("Check the sender shows this code:", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.identities_transfer_check_sender_code), style = MaterialTheme.typography.bodyMedium)
                 Text(
                     code,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
+                    style = MaterialTheme.typography.code,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
                 if (stage == ReceiveStage.OPENING) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
-                HorizontalDivider()
+                ListDivider()
                 TextButton(onClick = { showFileRoute = !showFileRoute }) {
-                    Text(if (showFileRoute) "Hide the file option" else "No shared Wi-Fi? Use a file instead")
+                    Text(
+                        stringResource(
+                            if (showFileRoute) R.string.identities_transfer_hide_file_option
+                            else R.string.identities_transfer_show_file_option
+                        )
+                    )
                 }
                 if (showFileRoute) {
                 TextButton(onClick = { ClipboardGuard.copySensitive(context, recipient) }) {
-                    Text("Copy the key as text")
+                    Text(stringResource(R.string.identities_transfer_copy_key))
                 }
-                Text("Then open what the sender made:", style = MaterialTheme.typography.titleSmall)
+                SectionHeader(stringResource(R.string.identities_transfer_open_header))
                 Button(onClick = { vault.autoLockSuppressed = true; pickFile.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Open the transfer file…")
+                    Text(stringResource(R.string.identities_transfer_open_file))
                 }
                 OutlinedTextField(
                     value = pasted,
                     onValueChange = { pasted = it },
-                    label = { Text("…or paste the transfer text") },
+                    label = { Text(stringResource(R.string.identities_transfer_paste_label)) },
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -320,7 +343,7 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
                     onClick = { openBytes(pasted.trim().toByteArray(Charsets.UTF_8)) },
                     enabled = pasted.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Open pasted text") }
+                ) { Text(stringResource(R.string.identities_transfer_open_pasted)) }
                 }
             }
 
@@ -328,67 +351,72 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
                 val inc = incoming!!
                 // Audit M-6: anyone who saw the QR code can send a transfer here. Only the code
                 // over what actually arrived tells the user it's the one their other phone sent.
-                Text("Transfer code", style = MaterialTheme.typography.titleSmall)
+                SectionHeader(stringResource(R.string.identities_transfer_code_header))
                 Text(
                     transferCode.orEmpty(),
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 26.sp,
+                    style = MaterialTheme.typography.code,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
                 Text(
-                    "The sending phone (AgePony 5.0.1 or later) shows a transfer code too. If the two " +
-                        "codes differ, someone else sent this transfer: tap Cancel and import nothing.",
+                    stringResource(R.string.identities_transfer_code_warning),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
-                CheckLine("The code matches the other phone", codeConfirmed) { codeConfirmed = !codeConfirmed }
-                HorizontalDivider()
+                CheckLine(stringResource(R.string.identities_transfer_code_matches), codeConfirmed) { codeConfirmed = !codeConfirmed }
+                ListDivider()
 
                 if (inc.identities.isEmpty() && inc.recipients.isEmpty() && inc.signers.isEmpty()) {
-                    Text("Nothing this phone can import.", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.identities_transfer_nothing), color = MaterialTheme.colorScheme.error)
                 }
                 if (inc.identities.isNotEmpty()) {
-                    Text("Identities (${inc.identities.size})", style = MaterialTheme.typography.titleSmall)
+                    SectionHeader(stringResource(R.string.identities_transfer_section_identities, inc.identities.size))
                     inc.identities.forEachIndexed { i, identity ->
                         val known = KeyPortability.isKnown(vault, identity)
                         val notes = buildList {
-                            if (known) add(PreviewNote("Already on this phone, skipped.", false))
+                            if (known) add(PreviewNote(stringResource(R.string.identities_transfer_already_here), false))
                             KeyPortability.nameClash(vault, identity)?.let {
-                                add(PreviewNote("You already have an identity named \"${it.name}\" with a different key.", true))
+                                add(PreviewNote(stringResource(R.string.identities_transfer_identity_name_clash, it.name), true))
                             }
-                            KeyPortability.unverifiableNote(identity)?.let { add(PreviewNote(it, false)) }
+                            KeyPortability.unverifiableNote(LocalContext.current, identity)?.let { add(PreviewNote(it, false)) }
                         }
                         PreviewRow(
                             title = identity.name,
-                            detail = "${KeyPortability.typeLabel(identity.type)} · ${KeyPortability.keySummary(identity)}",
+                            detail = stringResource(
+                                R.string.identities_transfer_type_key,
+                                KeyPortability.typeLabel(LocalContext.current, identity.type),
+                                KeyPortability.keySummary(LocalContext.current, identity),
+                            ),
                             notes = notes,
                             checked = i in pickedIdentities,
                             enabled = !known,
                         ) { if (i in pickedIdentities) pickedIdentities.remove(i) else pickedIdentities.add(i) }
                     }
                     Text(
-                        "Imported identities are not made your active identity. Choose one in Settings if you want it.",
+                        stringResource(R.string.identities_transfer_not_active_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 if (inc.recipients.isNotEmpty()) {
-                    Text("Saved recipients (${inc.recipients.size})", style = MaterialTheme.typography.titleSmall)
+                    SectionHeader(stringResource(R.string.identities_transfer_section_recipients, inc.recipients.size))
                     inc.recipients.forEachIndexed { i, r ->
                         val known = KeyPortability.isKnown(vault, r)
                         val notes = buildList {
-                            if (known) add(PreviewNote("Already on this phone, skipped.", false))
+                            if (known) add(PreviewNote(stringResource(R.string.identities_transfer_already_here), false))
                             if (RecipientImport.isRsaBelowMinimum(r.type, r.publicKeyB64)) {
-                                add(PreviewNote(RecipientImport.rsaTooSmallMessage(RecipientImport.rsaBits(r.type, r.publicKeyB64)), true))
+                                add(PreviewNote(rsaTooSmallText(context, RecipientImport.rsaBits(r.type, r.publicKeyB64)), true))
                             }
                             KeyPortability.nameClash(vault, r)?.let {
-                                add(PreviewNote("You already have a recipient named \"${it.name}\" with a different key.", true))
+                                add(PreviewNote(stringResource(R.string.identities_transfer_recipient_name_clash, it.name), true))
                             }
                         }
                         PreviewRow(
                             title = r.name,
-                            detail = "${KeyPortability.typeLabel(r.type)} · ${KeyPortability.keySummary(r)}",
+                            detail = stringResource(
+                                R.string.identities_transfer_type_key,
+                                KeyPortability.typeLabel(LocalContext.current, r.type),
+                                KeyPortability.keySummary(LocalContext.current, r),
+                            ),
                             notes = notes,
                             checked = i in pickedRecipients,
                             enabled = !known,
@@ -396,28 +424,32 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
                     }
                 }
                 if (inc.signers.isNotEmpty()) {
-                    Text("Trusted signers (${inc.signers.size})", style = MaterialTheme.typography.titleSmall)
+                    SectionHeader(stringResource(R.string.identities_transfer_section_signers, inc.signers.size))
                     Text(
-                        "Files signed by a trusted signer show as signed by that name. None are trusted " +
-                            "unless you tick them.",
+                        stringResource(R.string.identities_transfer_signers_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     inc.signers.forEachIndexed { i, signer ->
                         val known = KeyPortability.isKnown(vault, signer)
-                        val refused = signer.unenforceableReason()
+                        val refused = signer.unenforceableReason(LocalContext.current)
                         val notes = buildList {
-                            if (known) add(PreviewNote("Already trusted on this phone, skipped.", false))
-                            signer.restrictions().forEach { add(PreviewNote(it, false)) }
-                            refused?.let { add(PreviewNote("$it Not imported.", true)) }
-                            signer.agePonyWarning()?.let { add(PreviewNote(it, true)) }
+                            if (known) add(PreviewNote(stringResource(R.string.identities_transfer_already_trusted), false))
+                            signer.restrictions(LocalContext.current).forEach { add(PreviewNote(it, false)) }
+                            refused?.let { add(PreviewNote(stringResource(R.string.identities_transfer_not_imported, it), true)) }
+                            signer.agePonyWarning(LocalContext.current)?.let { add(PreviewNote(it, true)) }
                             KeyPortability.nameClash(vault, signer)?.let {
-                                add(PreviewNote("Same name as $it, with a different key.", true))
+                                add(PreviewNote(stringResource(R.string.identities_transfer_signer_name_clash, it), true))
                             }
                         }
                         PreviewRow(
                             title = signer.name,
-                            detail = "${signer.keyType} · ${runCatching { signer.fingerprint() }.getOrDefault("(unreadable key)")}",
+                            detail = stringResource(
+                                R.string.identities_transfer_type_key,
+                                signer.keyType,
+                                runCatching { signer.fingerprint() }.getOrNull()
+                                    ?: stringResource(R.string.identities_transfer_unreadable_key),
+                            ),
                             notes = notes,
                             checked = i in pickedSigners,
                             enabled = !known && refused == null,
@@ -440,42 +472,71 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
                     },
                     enabled = codeConfirmed && anyPicked,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Import") }
+                ) { Text(stringResource(R.string.identities_import)) }
                 if (!codeConfirmed) {
                     Text(
-                        "Tick \"The code matches the other phone\" above to import.",
+                        stringResource(
+                            R.string.identities_transfer_tick_to_import,
+                            stringResource(R.string.identities_transfer_code_matches),
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 // Cancelling also retires this receive key: whoever photographed its QR code
                 // can't try again with it.
-                OutlinedButton(onClick = { ReceiveSession.end(); onBack() }, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+                OutlinedButton(onClick = { ReceiveSession.end(); onBack() }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             }
 
             ReceiveStage.DONE -> {
                 val s = summary!!
-                Text("Imported ✓", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                VerdictPanel(
+                    title = stringResource(R.string.identities_transfer_imported),
+                    detail = null,
+                    color = AgeStatus.colors.success,
+                    icon = Icons.Filled.CheckCircle,
+                )
+                val identitiesPart = pluralResource(R.plurals.transfer_identities, s.identitiesAdded, s.identitiesAdded)
+                val recipientsPart = pluralResource(R.plurals.transfer_recipients, s.recipientsAdded, s.recipientsAdded)
+                val signersPart = pluralResource(R.plurals.transfer_signers, s.signersAdded, s.signersAdded)
                 Text(
-                    "${s.identitiesAdded} identities, ${s.recipientsAdded} recipients, ${s.signersAdded} signers" +
-                        (if (s.skipped > 0) " (${s.skipped} already here, skipped)" else "") +
-                        (if (leftOut > 0) ", $leftOut left out." else "."),
+                    when {
+                        s.skipped > 0 && leftOut > 0 -> stringResource(
+                            R.string.identities_transfer_summary_skipped_left_out,
+                            identitiesPart, recipientsPart, signersPart, s.skipped, leftOut,
+                        )
+                        s.skipped > 0 -> stringResource(
+                            R.string.identities_transfer_summary_skipped,
+                            identitiesPart, recipientsPart, signersPart, s.skipped,
+                        )
+                        leftOut > 0 -> stringResource(
+                            R.string.identities_transfer_summary_left_out,
+                            identitiesPart, recipientsPart, signersPart, leftOut,
+                        )
+                        else -> stringResource(
+                            R.string.identities_transfer_summary,
+                            identitiesPart, recipientsPart, signersPart,
+                        )
+                    },
                 )
                 Text(
-                    "If you moved it with a file, delete that file from wherever it went through.",
+                    stringResource(R.string.identities_transfer_delete_file_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+                Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.identities_transfer_done)) }
             }
 
             ReceiveStage.EXPIRED -> {
-                Text("This receive session timed out and its one-time key is gone.")
+                Text(stringResource(R.string.identities_transfer_expired))
                 Button(onClick = { session = ReceiveSession.fresh(); stage = ReceiveStage.WAITING }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Start a new session")
+                    Text(stringResource(R.string.identities_transfer_new_session))
                 }
             }
         }
+    }
     }
 }
 
@@ -518,7 +579,7 @@ fun SendKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Modifi
             recipientText = key.trim().lowercase()
             stage = SendStage.CONFIRM
         } catch (e: Exception) {
-            error = e.message ?: "That isn't a receiving key."
+            error = e.message ?: context.getString(R.string.identities_transfer_error_not_receiving_key)
             stage = SendStage.PICK
         }
     }
@@ -531,7 +592,7 @@ fun SendKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Modifi
                 withContext(Dispatchers.IO) { SafIo.openOutput(context, uri).use { it.write(bytes) } }
                 savedUri = uri
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't save the file."
+                error = e.message ?: context.getString(R.string.identities_transfer_error_save)
             }
         }
     }
@@ -541,67 +602,77 @@ fun SendKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Modifi
         return
     }
 
+    // The app bar back arrow and system back step back one stage; while the transfer is being
+    // built or sent, back waits for it.
+    if (stage == SendStage.WORKING) BackHandler {}
+    fun back() {
+        when (stage) {
+            SendStage.CONFIRM -> { stage = SendStage.PICK; target = null }
+            else -> onBack()
+        }
+    }
+
+    AgeScreen(
+        title = stringResource(R.string.send_keys_title),
+        modifier = modifier,
+        onBack = if (stage == SendStage.WORKING) null else ({ back() }),
+    ) { padding ->
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        TextButton(onClick = onBack) { Text("‹ Back") }
-        Text("Send keys to another device", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
 
         when (stage) {
             SendStage.PICK -> {
                 Text(
-                    "Your keys are encrypted to a one-time key shown by the receiving device, so the file " +
-                        "you move is useless to anyone else. Start Receive keys on the other device first.",
+                    stringResource(R.string.identities_transfer_send_intro),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Text("Identities", style = MaterialTheme.typography.titleSmall)
-                if (movable.isEmpty()) Text("No identities that can be moved.", style = MaterialTheme.typography.bodySmall)
+                SectionHeader(stringResource(R.string.identities_title))
+                if (movable.isEmpty()) Text(stringResource(R.string.identities_transfer_none_movable), style = MaterialTheme.typography.bodySmall)
                 movable.forEach { id -> CheckLine(id.name, id.id in chosen) { if (id.id in chosen) chosen.remove(id.id) else chosen.add(id.id) } }
                 bound.forEach { id ->
                     Text(
-                        "${id.name}: stays on this device (hardware key)",
+                        stringResource(R.string.identities_transfer_stays_on_device, id.name),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                CheckLine("Saved recipients (${vault.recipients.size})", includeRecipients) { includeRecipients = !includeRecipients }
-                CheckLine("Trusted signers (${vault.signers.size})", includeSigners) { includeSigners = !includeSigners }
+                CheckLine(stringResource(R.string.identities_transfer_section_recipients, vault.recipients.size), includeRecipients) { includeRecipients = !includeRecipients }
+                CheckLine(stringResource(R.string.identities_transfer_section_signers, vault.signers.size), includeSigners) { includeSigners = !includeSigners }
                 val anything = chosen.isNotEmpty() || (includeRecipients && vault.recipients.isNotEmpty()) ||
                     (includeSigners && vault.signers.isNotEmpty())
                 Button(onClick = { stage = SendStage.SCAN }, enabled = anything, modifier = Modifier.fillMaxWidth()) {
-                    Text("Scan the receiving device")
+                    Text(stringResource(R.string.identities_transfer_scan_receiver))
                 }
                 OutlinedTextField(
                     value = recipientText,
                     onValueChange = { recipientText = it },
-                    label = { Text("…or paste its key (age1pq1…)") },
+                    label = { Text(stringResource(R.string.identities_transfer_paste_key_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedButton(onClick = { useRecipient(recipientText) }, enabled = anything && recipientText.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-                    Text("Use pasted key")
+                    Text(stringResource(R.string.identities_transfer_use_pasted))
                 }
             }
 
             SendStage.CONFIRM -> {
-                Text("Does the receiving device show this code?", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.identities_transfer_confirm_question), style = MaterialTheme.typography.bodyMedium)
                 Text(
                     KeyTransfer.confirmationCode(recipientText),
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
+                    style = MaterialTheme.typography.code,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
                 if (!recipientText.startsWith("age1pq1")) {
                     Text(
-                        "This receiving key isn't quantum-safe. Quantum-safe identities sent to it lose that protection in transit.",
+                        stringResource(R.string.identities_transfer_not_quantum_safe),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
                 Button(onClick = {
-                    confirmIdentity("Send keys") {
+                    confirmIdentity(context.getString(R.string.send_keys_title)) {
                         stage = SendStage.WORKING
                         val ids: List<StoredIdentity> = movable.filter { it.id in chosen }
                         val recips = if (includeRecipients) vault.recipients.toList() else emptyList()
@@ -628,47 +699,51 @@ fun SendKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Modifi
                                         stage = SendStage.SENT
                                     } catch (e: Exception) {
                                         // Direct delivery failed: keep the sealed transfer and offer the file route.
-                                        error = e.message ?: "Couldn't reach the other phone."
+                                        error = e.message ?: context.getString(R.string.identities_transfer_error_reach)
                                         stage = SendStage.DONE
                                     }
                                 }
                             } catch (e: Exception) {
-                                error = e.message ?: "Couldn't build the transfer."
+                                error = e.message ?: context.getString(R.string.identities_transfer_error_build)
                                 stage = SendStage.CONFIRM
                             }
                         }
                     }
-                }, modifier = Modifier.fillMaxWidth()) { Text("It matches, send") }
+                }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.identities_transfer_matches_send)) }
                 OutlinedButton(onClick = { stage = SendStage.PICK; target = null }, modifier = Modifier.fillMaxWidth()) {
-                    Text("It doesn't match")
+                    Text(stringResource(R.string.identities_transfer_no_match))
                 }
             }
 
             SendStage.WORKING -> {
                 CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
-                if (invite != null) Text("Sending to the other phone…", modifier = Modifier.align(Alignment.CenterHorizontally))
+                if (invite != null) Text(stringResource(R.string.identities_transfer_sending), modifier = Modifier.align(Alignment.CenterHorizontally))
             }
 
             SendStage.SENT -> {
-                Text("Sent ✓", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                VerdictPanel(
+                    title = stringResource(R.string.identities_transfer_sent),
+                    detail = null,
+                    color = AgeStatus.colors.success,
+                    icon = Icons.Filled.CheckCircle,
+                )
                 Text(
-                    "The other phone has the keys. Check what it lists and tap Import there.",
+                    stringResource(R.string.identities_transfer_sent_body),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 sentCode?.let { SentTransferCode(it) }
-                Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+                Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.identities_transfer_done)) }
             }
 
             SendStage.DONE -> {
                 val bytes = sealed!!
-                Text(
-                    if (invite != null) "Couldn't send directly, so here's the file instead" else "Transfer ready",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                SectionHeader(
+                    stringResource(
+                        if (invite != null) R.string.identities_transfer_fallback_header else R.string.identities_transfer_ready
+                    ),
                 )
                 Text(
-                    "Move it to the other device any way you like: only that receive session can open it. " +
-                        "Delete it from the middle once it's imported.",
+                    stringResource(R.string.identities_transfer_move_note),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 // The same code for the saved file and the text version: it covers the transfer
@@ -677,46 +752,46 @@ fun SendKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Modifi
                 Button(onClick = {
                     vault.autoLockSuppressed = true
                     save.launch("agepony-keys-${LocalDate.now()}.age")
-                }, modifier = Modifier.fillMaxWidth()) { Text(if (savedUri == null) "Save file…" else "Saved ✓ Save again…") }
+                }, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(
+                            if (savedUri == null) R.string.identities_transfer_save_file else R.string.identities_transfer_save_again
+                        )
+                    )
+                }
                 savedUri?.let { uri ->
-                    OutlinedButton(onClick = { ShareOut.file(context, uri, "agepony-keys.age", "Send transfer") }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Share the saved file…")
+                    OutlinedButton(onClick = { ShareOut.file(context, uri, "agepony-keys.age", context.getString(R.string.identities_transfer_share_chooser)) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.identities_transfer_share_file))
                     }
                 }
                 if (bytes.size < 64 * 1024) {
-                    OutlinedButton(onClick = { ShareOut.text(context, Armor.encode(bytes), "Send transfer as text") }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Share as text…")
+                    OutlinedButton(onClick = { ShareOut.text(context, Armor.encode(bytes), context.getString(R.string.identities_transfer_share_text_chooser)) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.identities_transfer_share_text))
                     }
                 }
-                TextButton(onClick = onBack) { Text("Done") }
+                TextButton(onClick = onBack) { Text(stringResource(R.string.identities_transfer_done)) }
             }
 
             SendStage.SCAN -> Unit
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        error?.let { ErrorText(it) }
+    }
     }
 }
 
+/** A checkbox line; the whole row toggles (shared CheckRow). */
 @Composable
 internal fun CheckLine(label: String, checked: Boolean, onToggle: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = checked, onCheckedChange = { onToggle() })
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-    }
+    CheckRow(title = label, checked = checked, onCheckedChange = { onToggle() })
 }
 
 /** The sender's half of the audit M-6 check: the code the receiving phone must show before importing. */
 @Composable
 private fun SentTransferCode(code: String) {
+    SectionHeader(stringResource(R.string.identities_transfer_code_header))
+    Text(code, style = MaterialTheme.typography.code)
     Text(
-        "Transfer code: $code",
-        fontFamily = FontFamily.Monospace,
-        fontWeight = FontWeight.Bold,
-        fontSize = 20.sp,
-    )
-    Text(
-        "Check that it matches the code on the other phone before it imports. If it doesn't, " +
-            "tell the other phone to cancel.",
+        stringResource(R.string.identities_transfer_sent_code_note),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -735,10 +810,22 @@ private fun PreviewRow(
     enabled: Boolean,
     onToggle: () -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
-        Checkbox(checked = checked && enabled, onCheckedChange = { onToggle() }, enabled = enabled)
-        Column(Modifier.weight(1f).padding(top = 12.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+    // The whole row toggles; the Checkbox only draws the state.
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked && enabled,
+                enabled = enabled,
+                role = Role.Checkbox,
+                onValueChange = { onToggle() },
+            )
+            .padding(vertical = 8.dp),
+    ) {
+        Checkbox(checked = checked && enabled, onCheckedChange = null, enabled = enabled)
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(
                 detail,
                 style = MaterialTheme.typography.bodySmall,

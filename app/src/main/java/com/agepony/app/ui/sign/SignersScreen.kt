@@ -14,7 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -30,6 +29,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.agepony.app.ui.files.SafIo
@@ -47,6 +48,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import com.agepony.app.R
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ListDivider
 
 //
 // Trusted signers: the keys whose signatures verify with a name attached.
@@ -81,14 +87,14 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                 }
                 val entries = AllowedSigners.parse(text)
                 if (entries.isEmpty()) {
-                    status = "No allowed_signers entries found in that file."
+                    status = context.getString(R.string.sign_signers_none_in_file)
                 } else {
                     val known = vault.signers.toList()
                     val rows = entries.map { AllowedSignerReview.of(it, StoredSignerSource.IMPORT_ALLOWED_SIGNERS, known) }
                     review = ImportReview(rows, entryLines(text) - entries.size)
                 }
             } catch (e: Exception) {
-                status = "Import failed: ${e.message}"
+                status = context.getString(R.string.sign_signers_import_failed, e.message.orEmpty())
             }
         }
     }
@@ -103,9 +109,11 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                 withContext(Dispatchers.IO) {
                     SafIo.openOutput(context, uri).use { it.write(text.toByteArray(Charsets.UTF_8)) }
                 }
-                status = "Exported ${vault.signers.size} signer${if (vault.signers.size == 1) "" else "s"}."
+                status = context.resources.getQuantityString(
+                    R.plurals.signers_exported, vault.signers.size, vault.signers.size,
+                )
             } catch (e: Exception) {
-                status = "Export failed: ${e.message}"
+                status = context.getString(R.string.sign_signers_export_failed, e.message.orEmpty())
             }
         }
     }
@@ -121,38 +129,41 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                 var skipped = 0
                 chosen.forEach { signer -> if (vault.addSigner(signer)) added++ else skipped++ }
                 val left = r.rows.size - chosen.size
-                status = "Imported $added signer${if (added == 1) "" else "s"}" +
-                    (if (skipped > 0) ", $skipped already present" else "") +
-                    (if (left > 0) ", $left not imported." else ".")
+                val res = context.resources
+                status = listOfNotNull(
+                    res.getQuantityString(R.plurals.sign_signers_imported_sentence, added, added),
+                    if (skipped > 0) res.getQuantityString(R.plurals.sign_signers_already_present, skipped, skipped) else null,
+                    if (left > 0) res.getQuantityString(R.plurals.sign_signers_not_imported, left, left) else null,
+                ).joinToString(" ")
                 review = null
             },
-            onCancel = { review = null; status = "Nothing imported." },
+            onCancel = { review = null; status = context.getString(R.string.sign_signers_nothing_imported) },
         )
         return
     }
 
+    AgeScreen(title = stringResource(R.string.files_signers), modifier = modifier, onBack = onClose) { padding ->
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
+            .padding(padding)
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Trusted signers", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Text(
-            "Signatures from these keys verify with the name you gave them. " +
-                "The list imports from and exports to the OpenSSH allowed_signers format.",
+            stringResource(R.string.sign_signers_intro),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         if (status != null) {
-            Text(status!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Text(status!!, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         if (vault.signers.isEmpty()) {
             Text(
-                "No trusted signers yet. Add one below, or from a valid-but-unknown verify result.",
+                stringResource(R.string.sign_signers_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -170,7 +181,7 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                                 maxLines = 1,
                             )
                             // Imported restrictions (audit L-6), kept and exported as written.
-                            val restrictions = signer.restrictions()
+                            val restrictions = signer.restrictions(LocalContext.current)
                             if (restrictions.isNotEmpty()) {
                                 Text(
                                     restrictions.joinToString(" · "),
@@ -178,13 +189,13 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            signer.agePonyWarning()?.let {
+                            signer.agePonyWarning(LocalContext.current)?.let {
                                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                             }
                         }
-                        TextButton(onClick = { confirmDelete = signer }) { Text("Delete") }
+                        TextButton(onClick = { confirmDelete = signer }) { Text(stringResource(R.string.action_delete)) }
                     }
-                    HorizontalDivider()
+                    ListDivider()
                 }
             }
         }
@@ -192,7 +203,7 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
         Button(
             onClick = { status = null; showPaste = true },
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Paste a public key…") }
+        ) { Text(stringResource(R.string.sign_signers_paste)) }
         OutlinedButton(
             onClick = {
                 status = null
@@ -200,12 +211,12 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                 importFile.launch(arrayOf("*/*"))
             },
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Import allowed_signers…") }
+        ) { Text(stringResource(R.string.sign_signers_import)) }
         OutlinedButton(
             onClick = { status = null; showFromRecipient = true },
             enabled = vault.recipients.any { it.type == StoredRecipientType.SSH_ED25519 || it.type == StoredRecipientType.SSH_RSA },
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Promote a saved recipient…") }
+        ) { Text(stringResource(R.string.sign_signers_promote)) }
         OutlinedButton(
             onClick = {
                 status = null
@@ -214,8 +225,8 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
             },
             enabled = vault.signers.isNotEmpty(),
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Export allowed_signers…") }
-        TextButton(onClick = onClose) { Text("Back") }
+        ) { Text(stringResource(R.string.sign_signers_export)) }
+    }
     }
 
     if (showPaste) {
@@ -224,9 +235,9 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                 val entry = AllowedSigners.makeSigner(listOf(name), line)
                 val signer = entry?.let { StoredSigner.fromAllowedSigner(it, StoredSignerSource.PASTE_KEY) }
                 status = when {
-                    signer == null -> "That doesn't look like an SSH public key line."
-                    vault.addSigner(signer) -> "Added \"$name\"."
-                    else -> "That key is already on the list."
+                    signer == null -> context.getString(R.string.sign_signers_not_ssh_line)
+                    vault.addSigner(signer) -> context.getString(R.string.sign_signers_added, name)
+                    else -> context.getString(R.string.sign_signers_already_listed)
                 }
                 showPaste = false
             },
@@ -242,9 +253,9 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
             onPick = { recipient ->
                 val signer = signerFromRecipient(recipient)
                 status = when {
-                    signer == null -> "Couldn't read that recipient's key."
-                    vault.addSigner(signer) -> "Added \"${recipient.name}\"."
-                    else -> "That key is already on the list."
+                    signer == null -> context.getString(R.string.sign_signers_recipient_unreadable)
+                    vault.addSigner(signer) -> context.getString(R.string.sign_signers_added, recipient.name)
+                    else -> context.getString(R.string.sign_signers_already_listed)
                 }
                 showFromRecipient = false
             },
@@ -255,20 +266,17 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
     confirmDelete?.let { signer ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
-            title = { Text("Delete \"${signer.name}\"?") },
+            title = { Text(stringResource(R.string.recipient_delete_title, signer.name)) },
             text = {
-                Text(
-                    "Signatures from this key will verify as valid but unknown instead of " +
-                        "carrying this name."
-                )
+                Text(stringResource(R.string.sign_signer_delete_body))
             },
             confirmButton = {
                 TextButton(onClick = {
                     vault.deleteSigner(signer.id)
                     confirmDelete = null
-                }) { Text("Delete") }
+                }) { Text(stringResource(R.string.action_delete)) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -298,60 +306,74 @@ private fun ImportReviewPane(
     val picked = remember(review) {
         mutableStateListOf<Int>().apply { review.rows.forEachIndexed { i, r -> if (r.checkedByDefault) add(i) } }
     }
+    val resources = LocalContext.current.resources
+    AgeScreen(title = stringResource(R.string.sign_signers_import_title), modifier = modifier, onBack = onCancel) { padding ->
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
+            .padding(padding)
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Import allowed_signers", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         Text(
-            "Tick the signers to trust. Files signed by a trusted signer show as signed by that name.",
+            stringResource(R.string.sign_signers_review_intro),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (review.unreadable > 0) {
             Text(
-                "${review.unreadable} line${if (review.unreadable == 1) "" else "s"} couldn't be read and ${if (review.unreadable == 1) "was" else "were"} skipped.",
+                resources.getQuantityString(R.plurals.signers_unreadable_lines, review.unreadable, review.unreadable),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
         }
         review.rows.forEachIndexed { i, row ->
-            Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+            // The whole row toggles; the Checkbox only draws the state.
+            Row(
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = i in picked && row.importable,
+                        enabled = row.importable,
+                        role = Role.Checkbox,
+                        onValueChange = { if (i in picked) picked.remove(i) else picked.add(i) },
+                    )
+                    .padding(vertical = 8.dp),
+            ) {
                 Checkbox(
                     checked = i in picked && row.importable,
-                    onCheckedChange = { if (i in picked) picked.remove(i) else picked.add(i) },
+                    onCheckedChange = null,
                     enabled = row.importable,
                 )
-                Column(Modifier.weight(1f).padding(top = 12.dp)) {
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(row.entry.principals.joinToString(", "), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "${row.entry.keyType} · ${row.signer?.let { runCatching { it.fingerprint() }.getOrNull() } ?: "(unreadable key)"}",
+                        "${row.entry.keyType} · ${row.signer?.let { runCatching { it.fingerprint() }.getOrNull() } ?: stringResource(R.string.sign_signers_unreadable_key)}",
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    row.restrictions.forEach {
+                    row.restrictions(LocalContext.current).forEach {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (row.alreadyPresent) {
                         Text(
-                            "Already on your list.",
+                            stringResource(R.string.sign_signers_review_present),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    row.blocked?.let {
-                        Text("$it Not imported.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    row.blocked(LocalContext.current)?.let {
+                        Text(stringResource(R.string.sign_signers_review_blocked, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
-                    row.warning?.let {
+                    row.warning(LocalContext.current)?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
-            HorizontalDivider()
+            ListDivider()
         }
         val count = picked.count { review.rows.getOrNull(it)?.importable == true }
         Button(
@@ -360,8 +382,14 @@ private fun ImportReviewPane(
             },
             enabled = count > 0,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (count > 0) "Import $count" else "Import") }
-        OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+        ) {
+            Text(
+                if (count > 0) pluralStringResource(R.plurals.sign_signers_import_count, count, count)
+                else stringResource(R.string.sign_signers_import_action)
+            )
+        }
+        OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.action_cancel)) }
+    }
     }
 }
 
@@ -403,21 +431,21 @@ private fun PasteSignerDialog(
     var line by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Paste a public key") },
+        title = { Text(stringResource(R.string.sign_signers_paste_title)) },
         text = {
             Column {
-                Text("An SSH public key line, like the contents of an id_ed25519.pub.")
+                Text(stringResource(R.string.sign_signers_paste_body))
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.sign_signers_name_label)) },
                     modifier = Modifier.padding(top = 12.dp),
                 )
                 OutlinedTextField(
                     value = line,
                     onValueChange = { line = it },
-                    label = { Text("ssh-ed25519 AAAA… or ssh-rsa AAAA…") },
+                    label = { Text(stringResource(R.string.sign_signers_key_line_label)) },
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
@@ -426,9 +454,9 @@ private fun PasteSignerDialog(
             TextButton(
                 onClick = { onConfirm(name.trim(), line.trim()) },
                 enabled = name.trim().isNotEmpty() && line.trim().isNotEmpty(),
-            ) { Text("Add") }
+            ) { Text(stringResource(R.string.sign_signers_add)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -440,10 +468,10 @@ private fun FromRecipientDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Promote a saved recipient") },
+        title = { Text(stringResource(R.string.sign_signers_promote_title)) },
         text = {
             Column {
-                Text("Their key already being saved for encryption doesn't verify signatures; this adds it to the signers list too.")
+                Text(stringResource(R.string.sign_signers_promote_body))
                 recipients.forEach { r ->
                     TextButton(onClick = { onPick(r) }) {
                         Text("${r.name} (${if (r.type == StoredRecipientType.SSH_ED25519) "ssh-ed25519" else "ssh-rsa"})")
@@ -452,6 +480,6 @@ private fun FromRecipientDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }

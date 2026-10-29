@@ -5,20 +5,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,7 +26,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.annotation.StringRes
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -41,13 +40,24 @@ import com.agepony.app.security.SecurityKeyService
 import com.agepony.app.signing.FileSigner
 import com.agepony.app.ui.files.SafIo
 import com.agepony.app.ui.files.SourceRef
-import com.agepony.app.vault.StoredIdentity
 import com.agepony.app.vault.StoredIdentityType
 import com.agepony.app.vault.Vault
 import com.agepony.core.signing.SSHSig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.RadioRow
+import com.agepony.app.ui.components.SectionHeader
+import com.agepony.app.ui.components.VerdictPanel
+import com.agepony.app.ui.theme.AgeStatus
+import com.agepony.app.ui.theme.mono
 
 //
 // Detached signing: pick a key, pick a file, save `<name>.sig` next to wherever
@@ -100,13 +110,13 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
                 stage = SignStage.DONE
             } catch (e: SecurityKeyService.PinRequiredException) {
                 needsPin = true
-                error = "This security key needs a PIN. Enter it below and sign again."
+                error = context.getString(R.string.sign_sk_pin_needed)
                 stage = SignStage.CONFIGURE
             } catch (e: SecurityKeyService.WrongPinException) {
-                error = "Incorrect PIN. Try again."
+                error = context.getString(R.string.sign_sk_pin_wrong)
                 stage = SignStage.CONFIGURE
             } catch (e: Exception) {
-                error = e.message ?: "Signing failed."
+                error = e.message ?: context.getString(R.string.sign_failed)
                 stage = SignStage.CONFIGURE
             }
         }
@@ -125,38 +135,46 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
         }
     }
 
+    // A security key or hardware prompt is in flight while WORKING; back waits for it.
+    if (stage == SignStage.WORKING) BackHandler {}
+
+    AgeScreen(
+        title = stringResource(R.string.files_sign),
+        modifier = modifier,
+        onBack = if (stage == SignStage.WORKING) null else onClose,
+    ) { padding ->
     when (stage) {
         SignStage.CONFIGURE -> Column(
-            modifier
+            Modifier
                 .fillMaxSize()
+                .padding(padding)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Sign a file", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
             Text(
-                "Produces a detached signature saved as its own small file next to the original. " +
-                    "Send both; the file itself is not changed or encrypted.",
+                stringResource(R.string.sign_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             if (signingIdentities.isEmpty()) {
                 Text(
-                    "No signing keys in your vault yet. Add an SSH key, a hardware key, or a " +
-                        "security key under Identities first.",
+                    stringResource(R.string.sign_no_keys),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                 )
             } else {
-                Text("Sign with", style = MaterialTheme.typography.titleSmall)
+                SectionHeader(stringResource(R.string.sign_with))
                 signingIdentities.forEach { identity ->
-                    SigningKeyRow(
-                        identity = identity,
+                    RadioRow(
+                        title = identity.name,
+                        subtitle = signingTypeLabelRes(identity.type)?.let { stringResource(it) },
                         selected = identity.id == selectedId,
-                        onSelect = { selectedId = identity.id },
+                        onClick = { selectedId = identity.id },
                     )
-                    HorizontalDivider()
+                    ListDivider()
                 }
             }
 
@@ -165,16 +183,14 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
                     value = skPin,
                     onValueChange = { skPin = it },
                     singleLine = true,
-                    label = { Text("Security key PIN") },
+                    label = { Text(stringResource(R.string.sign_sk_pin_label)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
 
-            if (error != null) {
-                Text(error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            }
+            if (error != null) ErrorText(error!!)
 
             Button(
                 onClick = {
@@ -184,13 +200,14 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
                 },
                 enabled = selected != null,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Pick a file to sign…") }
-            TextButton(onClick = onClose) { Text("Cancel") }
+            ) { Text(stringResource(R.string.sign_pick_file)) }
+            TextButton(onClick = onClose) { Text(stringResource(R.string.action_cancel)) }
         }
 
         SignStage.WORKING -> Column(
-            modifier
+            Modifier
                 .fillMaxSize()
+                .padding(padding)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
@@ -199,9 +216,9 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
             Text(
                 when (selected?.type) {
                     StoredIdentityType.SK_ED25519, StoredIdentityType.SK_ECDSA_P256 ->
-                        "Hold your security key against the back of the phone…"
-                    StoredIdentityType.HARDWARE_KEY -> "Signing in the device's secure hardware…"
-                    else -> "Signing…"
+                        stringResource(R.string.sign_working_security_key)
+                    StoredIdentityType.HARDWARE_KEY -> stringResource(R.string.sign_working_hardware)
+                    else -> stringResource(R.string.sign_working)
                 },
                 modifier = Modifier.padding(top = 16.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -209,23 +226,27 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
         }
 
         SignStage.DONE -> Column(
-            modifier
+            Modifier
                 .fillMaxSize()
+                .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Signed ✓", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            VerdictPanel(
+                title = stringResource(R.string.sign_done_title),
+                detail = null,
+                color = AgeStatus.colors.success,
+                icon = Icons.Filled.CheckCircle,
+            )
             Text(
                 doneSigName,
-                style = MaterialTheme.typography.bodyLarge,
-                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.mono,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "Send the signature file along with the original. Signatures are scoped to " +
-                    "AgePony's namespace; to check one on the command line:",
+                stringResource(R.string.sign_done_body),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -245,38 +266,19 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
                     stage = SignStage.CONFIGURE
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Sign another") }
-            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+            ) { Text(stringResource(R.string.sign_another)) }
+            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.app_done)) }
         }
+    }
     }
 }
 
-@Composable
-private fun SigningKeyRow(identity: StoredIdentity, selected: Boolean, onSelect: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .selectable(selected = selected, onClick = onSelect)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = onSelect)
-        Column(Modifier.padding(start = 4.dp)) {
-            Text(identity.name, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                signingTypeLabel(identity.type),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-private fun signingTypeLabel(type: StoredIdentityType): String = when (type) {
-    StoredIdentityType.SSH_ED25519 -> "SSH Ed25519 · in-app key"
-    StoredIdentityType.SSH_RSA -> "SSH RSA · in-app key"
-    StoredIdentityType.HARDWARE_KEY -> "Hardware key · signs in the device keystore"
-    StoredIdentityType.SK_ED25519 -> "Security key · Ed25519 over NFC"
-    StoredIdentityType.SK_ECDSA_P256 -> "Security key · ECDSA P-256 over NFC"
-    else -> ""
+@StringRes
+private fun signingTypeLabelRes(type: StoredIdentityType): Int? = when (type) {
+    StoredIdentityType.SSH_ED25519 -> R.string.sign_type_ssh_ed25519
+    StoredIdentityType.SSH_RSA -> R.string.sign_type_ssh_rsa
+    StoredIdentityType.HARDWARE_KEY -> R.string.sign_type_hardware
+    StoredIdentityType.SK_ED25519 -> R.string.sign_type_sk_ed25519
+    StoredIdentityType.SK_ECDSA_P256 -> R.string.sign_type_sk_p256
+    else -> null
 }

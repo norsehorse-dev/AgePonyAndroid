@@ -1,5 +1,7 @@
 package com.agepony.app.ui
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -15,13 +17,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.review.ReviewPrompt
 import com.agepony.app.ui.files.FilesScreen
 import com.agepony.app.ui.identities.IdentitiesScreen
 import com.agepony.app.ui.notes.NotesScreen
 import com.agepony.app.ui.onboarding.OnboardingScreen
-import com.agepony.app.ui.sign.SignScreen
 import com.agepony.app.ui.text.TextScreen
 import com.agepony.app.ui.settings.SettingsScreen
 import com.agepony.app.vault.Vault
@@ -31,7 +33,9 @@ import com.agepony.app.vault.VaultViewModel
 private const val REVIEW_PROMPT_MIN_LAUNCHES = 3
 
 /**
- * Root composable: a Scaffold with a bottom NavigationBar over the six tabs.
+ * Root composable: a Scaffold with a bottom NavigationBar over the five tabs.
+ * Each tab draws its own TopAppBar, so this Scaffold leaves the top inset to
+ * them (contentWindowInsets is empty) and only pads for the bottom bar.
  * Selected tab survives configuration changes via rememberSaveable (AgeTab is
  * an enum, so the default Bundle-backed saver handles it).
  */
@@ -66,7 +70,7 @@ fun AgePonyApp(vm: VaultViewModel) {
     }
 
     // In-app review nudge (Phase 2f): fire Play's review flow at most once, after
-    // the user has come back a few times, and only past onboarding. Best-effort —
+    // the user has come back a few times, and only past onboarding. Best-effort;
     // Play may show nothing. The explicit Settings "Rate AgePony" button is the
     // reliable path; this is the contextual "nudge" the testers asked for.
     val activity = LocalContext.current as FragmentActivity
@@ -79,61 +83,51 @@ fun AgePonyApp(vm: VaultViewModel) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             NavigationBar {
                 AgeTab.entries.forEach { tab ->
                     NavigationBarItem(
                         selected = selectedTab == tab,
                         onClick = { selectedTab = tab },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
+                        icon = { Icon(tab.icon, contentDescription = null) },
+                        label = { Text(stringResource(tab.labelRes)) },
                     )
                 }
             }
         },
     ) { innerPadding ->
+        // consumeWindowInsets so the tab's own TopAppBar, imePadding and Scaffold
+        // insets know the bottom bar already covers the navigation bar.
+        val tabModifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .consumeWindowInsets(innerPadding)
         when (selectedTab) {
             AgeTab.IDENTITIES -> IdentitiesScreen(
                 vault = vault,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                modifier = tabModifier,
             )
 
             AgeTab.FILES -> FilesScreen(
                 vault = vault,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-            )
-
-            AgeTab.SIGN -> SignScreen(
-                vault = vault,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                modifier = tabModifier,
             )
 
             AgeTab.NOTES -> NotesScreen(
                 vault = vault,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                modifier = tabModifier,
             )
 
             AgeTab.TEXT -> TextScreen(
                 vault = vault,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                modifier = tabModifier,
             )
 
             AgeTab.SETTINGS -> SettingsScreen(
                 vm = vm,
                 onReplayOnboarding = { showOnboarding = true },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                modifier = tabModifier,
             )
         }
     }

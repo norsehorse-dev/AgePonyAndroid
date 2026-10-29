@@ -7,6 +7,7 @@ import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import android.security.keystore.UserNotAuthenticatedException
 import androidx.annotation.RequiresApi
+import com.agepony.app.R
 import com.agepony.app.vault.StoredIdentity
 import com.agepony.app.vault.StoredIdentityType
 import com.agepony.app.vault.b64e
@@ -144,8 +145,8 @@ object HardwareTagKeyService {
             ecdh(alias, peerUncompressed)
         } catch (e: UserNotAuthenticatedException) {
             HardwareAuthBroker.awaitAuthentication(
-                title = "Decrypt with your hardware key",
-                subtitle = "Confirm it's you to use this key",
+                title = R.string.core_prompt_hw_decrypt_title,
+                subtitle = R.string.core_prompt_hw_decrypt_subtitle,
             )
             ecdh(alias, peerUncompressed)
         }

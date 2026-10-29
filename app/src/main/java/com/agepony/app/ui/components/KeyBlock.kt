@@ -1,13 +1,10 @@
 package com.agepony.app.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -19,11 +16,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.agepony.app.R
 import com.agepony.app.security.ClipboardGuard
+import com.agepony.app.ui.theme.mono
 import kotlinx.coroutines.delay
 
 //
@@ -56,29 +53,17 @@ fun KeyBlock(
         if (label != null) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 6.dp),
+                modifier = Modifier.padding(bottom = 4.dp),
             )
         }
 
         Text(
             text = if (revealed) value else maskOf(value),
-            fontFamily = FontFamily.Monospace,
-            fontSize = 13.sp,
+            style = MaterialTheme.typography.mono,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
-                    shape = RoundedCornerShape(12.dp),
-                )
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                    shape = RoundedCornerShape(12.dp),
-                )
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
         )
 
         if (copyable || isSensitive) {
@@ -89,14 +74,15 @@ fun KeyBlock(
                 if (copyable) {
                     TextButton(onClick = {
                         ClipboardGuard.copySensitive(context, value)
-                        copied = true
+                        // Android 13+ confirms the copy itself.
+                        copied = showOwnCopyConfirmation
                     }) {
-                        Text(if (copied) "Copied" else "Copy")
+                        Text(stringResource(if (copied) R.string.action_copied else R.string.action_copy))
                     }
                 }
                 if (isSensitive) {
                     TextButton(onClick = { revealed = !revealed }) {
-                        Text(if (revealed) "Hide" else "Reveal")
+                        Text(stringResource(if (revealed) R.string.action_hide else R.string.action_reveal))
                     }
                 }
             }

@@ -1,0 +1,10 @@
+expect: no match
+file key: 59454c4c4f57205355424d4152494e45
+identity: AGE-SECRET-KEY-1EGTZVFFV20835NWYV6270LXYVK2VKNX2MMDKWYKLMGR48UAWX40Q2P2LM0
+comment: the ChaCha20Poly1305 authentication tag on the body of the X25519 stanza is wrong
+
+age-encryption.org/v1
+-> X25519 TEiF0ypqr+bpvcqXNyCVJpL7OuwPdVwPL7KQEbFDOCc
+hjabGXwSLQ9c3S6Lw2i+S2Tu2fiwQHHslbBN6B41FE4
+--- zOCHpynV0aV7p4R6c+bOapgpq9TtpFgGgYghQ2+PIX8
+îÏbÇÎ‘´3'NhÔòùL·L[þ÷¾ªRÈð¼™,ƒ1ûf

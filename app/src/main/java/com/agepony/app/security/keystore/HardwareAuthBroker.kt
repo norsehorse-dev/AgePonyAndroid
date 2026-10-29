@@ -2,6 +2,7 @@ package com.agepony.app.security.keystore
 
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.StringRes
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -28,8 +29,11 @@ object HardwareAuthBroker {
     fun attach(activity: FragmentActivity) { current = WeakReference(activity) }
     fun detach(activity: FragmentActivity) { if (current?.get() === activity) current = null }
 
-    /** Block the calling (non-main) thread until the user authenticates. Throws if they don't. */
-    fun awaitAuthentication(title: String, subtitle: String?) {
+    /**
+     * Block the calling (non-main) thread until the user authenticates. Throws if they don't.
+     * The prompt's [title] and [subtitle] are resources, read from the foreground activity.
+     */
+    fun awaitAuthentication(@StringRes title: Int, @StringRes subtitle: Int?) {
         check(Looper.myLooper() != Looper.getMainLooper()) { "awaitAuthentication must not run on the main thread" }
         val activity = current?.get() ?: throw AuthCancelled("AgePony needs to be open to use this hardware key.")
         val latch = CountDownLatch(1)
@@ -42,7 +46,7 @@ object HardwareAuthBroker {
             }
             val job = activity.lifecycleScope.launch {
                 try {
-                    BiometricGate.confirm(activity, title, subtitle)
+                    BiometricGate.confirm(activity, activity.getString(title), subtitle?.let { activity.getString(it) })
                 } catch (e: Throwable) {
                     failure = e
                 }

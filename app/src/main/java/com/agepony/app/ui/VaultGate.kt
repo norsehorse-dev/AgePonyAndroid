@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -34,6 +33,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -49,6 +51,12 @@ import com.agepony.app.security.UnlockAttempts
 import com.agepony.app.ui.passphrase.PassphraseOnlyScreen
 import com.agepony.app.vault.LockMode
 import com.agepony.app.vault.VaultViewModel
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 //
 // Gates the app shell behind the vault state, mirroring the iOS launch gate:
@@ -112,27 +120,30 @@ private fun WelcomeScreen(vm: VaultViewModel, activity: FragmentActivity) {
     val biometricAvailable = remember(vm.isBusy) { BiometricGate.canAuthenticate(activity) }
     var showCreatePassword by remember { mutableStateOf(false) }
 
+    // No Scaffold here, so the screen pads for the system bars and the keyboard itself, and
+    // scrolls when the keyboard leaves too little room (content stays centred otherwise).
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                "Welcome to AgePony",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary,
+                stringResource(R.string.app_welcome_title),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
             )
             Text(
                 if (biometricAvailable) {
-                    "AgePony stores your keys, recipients, and notes in a vault sealed on " +
-                        "this device. Unlock it with your biometric, a password, or both."
+                    stringResource(R.string.app_welcome_body_biometric)
                 } else {
-                    "AgePony stores your keys, recipients, and notes in a vault sealed on " +
-                        "this device. No screen lock is set up, so protect it with a password " +
-                        "or PIN. To unlock with a fingerprint instead, set up a screen lock in " +
-                        "Android settings first, then create the vault."
+                    stringResource(R.string.app_welcome_body_no_lock)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -143,28 +154,28 @@ private fun WelcomeScreen(vm: VaultViewModel, activity: FragmentActivity) {
             if (vm.isBusy) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             } else if (biometricAvailable) {
-                Button(onClick = { vm.bootstrap(activity) }, modifier = Modifier.width(260.dp)) {
-                    Text("Create with biometric")
+                Button(onClick = { vm.bootstrap(activity) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.app_create_with_biometrics))
                 }
                 TextButton(
                     onClick = { showCreatePassword = true },
                     modifier = Modifier.padding(top = 12.dp),
-                ) { Text("Use a password instead") }
+                ) { Text(stringResource(R.string.app_create_use_password_instead)) }
             } else {
                 val credentialCreate = Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&
                     BiometricGate.isDeviceSecure(activity)
                 if (credentialCreate) {
                     Button(
                         onClick = { vm.bootstrapWithDeviceCredential() },
-                        modifier = Modifier.width(260.dp),
-                    ) { Text("Use device PIN or password") }
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.app_create_use_device_credential)) }
                     TextButton(
                         onClick = { showCreatePassword = true },
                         modifier = Modifier.padding(top = 12.dp),
-                    ) { Text("Use an app password instead") }
+                    ) { Text(stringResource(R.string.app_create_use_app_password_instead)) }
                 } else {
-                    Button(onClick = { showCreatePassword = true }, modifier = Modifier.width(260.dp)) {
-                        Text("Create with a password")
+                    Button(onClick = { showCreatePassword = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.app_create_with_password))
                     }
                 }
             }
@@ -178,6 +189,7 @@ private fun WelcomeScreen(vm: VaultViewModel, activity: FragmentActivity) {
                     modifier = Modifier.padding(top = 24.dp),
                 )
             }
+        }
         }
     }
 
@@ -195,7 +207,6 @@ private fun WelcomeScreen(vm: VaultViewModel, activity: FragmentActivity) {
 @Composable
 private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassphraseOnly: () -> Unit) {
     val isPin = vm.unlockSecretKind == "pin"
-    val secretNoun = if (isPin) "PIN" else "password"
     // A duress secret makes the vault PIN-only: no OS gate is offered (audit H-1).
     val hardwareUnlock = !vm.duressEnrolled
     // With an OS gate, that gate leads and the password field is opt-in; a no-lock
@@ -222,25 +233,36 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
     val keyboard = LocalSoftwareKeyboardController.current
     val view = LocalView.current
 
+    // No Scaffold here, so the screen pads for the system bars and the keyboard itself, and
+    // scrolls when the keyboard leaves too little room (content stays centred otherwise).
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                "AgePony is locked",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary,
+                stringResource(R.string.app_locked_title),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
             )
             Text(
                 when {
-                    !hardwareUnlock -> "Enter your $secretNoun to unlock."
-                    vm.lockMode == LockMode.BIOMETRIC -> "Unlock your vault to access your keys and notes."
+                    !hardwareUnlock -> stringResource(
+                        if (isPin) R.string.app_locked_enter_pin else R.string.app_locked_enter_password
+                    )
+                    vm.lockMode == LockMode.BIOMETRIC -> stringResource(R.string.app_locked_biometric)
                     vm.lockMode == LockMode.DEVICE_CREDENTIAL ->
-                        "Confirm your device PIN, pattern, or password to unlock."
-                    else -> "Enter your $secretNoun to unlock."
+                        stringResource(R.string.app_locked_device_credential)
+                    else -> stringResource(
+                        if (isPin) R.string.app_locked_enter_pin else R.string.app_locked_enter_password
+                    )
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -253,8 +275,8 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
             } else {
                 when (if (hardwareUnlock) vm.lockMode else LockMode.OFF) {
                     LockMode.BIOMETRIC ->
-                        Button(onClick = { vm.unlock(activity) }, modifier = Modifier.width(240.dp)) {
-                            Text("Unlock")
+                        Button(onClick = { vm.unlock(activity) }, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.app_unlock))
                         }
                     LockMode.DEVICE_CREDENTIAL ->
                         Button(
@@ -264,15 +286,15 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                                 } else {
                                     val intent = BiometricGate.deviceCredentialIntent(
                                         activity,
-                                        "Unlock AgePony",
-                                        "Confirm your PIN, pattern, or password",
+                                        activity.getString(R.string.security_prompt_unlock_title),
+                                        activity.getString(R.string.security_device_credential_subtitle),
                                     )
                                     if (intent != null) credentialLauncher.launch(intent)
-                                    else vm.noteError("No device PIN, pattern, or password is set.")
+                                    else vm.noteError(activity.getString(R.string.app_no_device_credential))
                                 }
                             },
-                            modifier = Modifier.width(240.dp),
-                        ) { Text("Unlock") }
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.app_unlock)) }
                     LockMode.OFF -> Unit
                 }
 
@@ -282,7 +304,7 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                             value = secret,
                             onValueChange = { secret = it },
                             singleLine = true,
-                            label = { Text(secretNoun.replaceFirstChar { it.uppercase() }) },
+                            label = { Text(stringResource(if (isPin) R.string.app_pin else R.string.app_password)) },
                             visualTransformation = PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password
@@ -313,11 +335,19 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                             },
                             enabled = secret.isNotEmpty() && lockoutSeconds == 0L,
                             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                        ) { Text("Unlock with $secretNoun") }
+                        ) {
+                            Text(
+                                stringResource(
+                                    if (isPin) R.string.app_unlock_with_pin else R.string.app_unlock_with_password
+                                )
+                            )
+                        }
                         if (lockoutSeconds > 0L) {
                             Text(
-                                "Too many wrong attempts. Try again in " +
-                                    UnlockAttempts.describeWait(lockoutSeconds * 1000L) + ".",
+                                stringResource(
+                                    R.string.app_lockout_wait,
+                                    UnlockAttempts.describeWait(LocalContext.current, lockoutSeconds * 1000L),
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
@@ -332,28 +362,41 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                             TextButton(
                                 onClick = { confirmLegacyOpen = true },
                                 modifier = Modifier.padding(top = 8.dp),
-                            ) { Text("Forgot it? Open without the $secretNoun") }
+                            ) {
+                                Text(
+                                    stringResource(
+                                        if (isPin) R.string.app_legacy_open_pin else R.string.app_legacy_open_password
+                                    )
+                                )
+                            }
                         }
                         if (confirmLegacyOpen) {
                             AlertDialog(
                                 onDismissRequest = { confirmLegacyOpen = false },
-                                title = { Text("Open without the $secretNoun?") },
+                                title = {
+                                    Text(
+                                        stringResource(
+                                            if (isPin) R.string.app_legacy_open_title_pin
+                                            else R.string.app_legacy_open_title_password
+                                        )
+                                    )
+                                },
                                 text = {
                                     Text(
-                                        "Until this update, No lock opened the vault without asking for the " +
-                                            "$secretNoun. This opens it that way one more time and removes the " +
-                                            "$secretNoun, so the vault stays on No lock with nothing to confirm. " +
-                                            "You can set a new one in Settings.",
+                                        stringResource(
+                                            if (isPin) R.string.app_legacy_open_body_pin
+                                            else R.string.app_legacy_open_body_password
+                                        ),
                                     )
                                 },
                                 confirmButton = {
                                     TextButton(onClick = {
                                         confirmLegacyOpen = false
                                         vm.openLegacyNoLockAndRemovePassword()
-                                    }) { Text("Open and remove") }
+                                    }) { Text(stringResource(R.string.app_legacy_open_confirm)) }
                                 },
                                 dismissButton = {
-                                    TextButton(onClick = { confirmLegacyOpen = false }) { Text("Cancel") }
+                                    TextButton(onClick = { confirmLegacyOpen = false }) { Text(stringResource(R.string.action_cancel)) }
                                 },
                             )
                         }
@@ -361,14 +404,20 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                         TextButton(
                             onClick = { showPasswordField = true },
                             modifier = Modifier.padding(top = 16.dp),
-                        ) { Text("Use your $secretNoun instead") }
+                        ) {
+                            Text(
+                                stringResource(
+                                    if (isPin) R.string.app_use_pin_instead else R.string.app_use_password_instead
+                                )
+                            )
+                        }
                     }
                 }
             }
 
             if (!vm.isBusy) {
                 TextButton(onClick = onPassphraseOnly, modifier = Modifier.padding(top = 24.dp)) {
-                    Text("Just need a passphrase? Continue without unlocking")
+                    Text(stringResource(R.string.app_passphrase_only_entry))
                 }
             }
 
@@ -381,6 +430,7 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                     modifier = Modifier.padding(top = 24.dp),
                 )
             }
+        }
         }
     }
 }
@@ -404,29 +454,28 @@ private fun CreateSecretDialog(
     val isPin = kind == "pin"
     val mismatch = again.isNotEmpty() && value != again
     // Minimum length for a new secret (audit M-1).
-    val policyError = if (value.isEmpty()) null else PasswordVault.secretPolicyError(value, kind)
+    val policyError = if (value.isEmpty()) null else PasswordVault.secretPolicyError(LocalContext.current, value, kind)
     val valid = value.isNotEmpty() && policyError == null && value == again
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Protect your vault") },
+        title = { Text(stringResource(R.string.app_create_secret_title)) },
         text = {
             Column {
                 Text(
-                    "Choose a password or PIN to unlock AgePony. There is no recovery if you " +
-                        "forget it — the vault is sealed with it.",
+                    stringResource(R.string.app_create_secret_body),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Row(modifier = Modifier.padding(top = 8.dp)) {
                     TextButton(onClick = { kind = "password" }) {
                         Text(
-                            "Password",
+                            stringResource(R.string.app_password),
                             color = if (!isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     TextButton(onClick = { kind = "pin" }) {
                         Text(
-                            "PIN",
+                            stringResource(R.string.app_pin),
                             color = if (isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -438,16 +487,24 @@ private fun CreateSecretDialog(
                     value = value,
                     onValueChange = { value = it },
                     singleLine = true,
-                    label = { Text(if (isPin) "PIN" else "Password") },
+                    label = { Text(stringResource(if (isPin) R.string.app_pin else R.string.app_password)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = kb,
                     isError = policyError != null,
                     supportingText = {
                         Text(
                             policyError ?: if (isPin) {
-                                "At least ${PasswordVault.MIN_PIN_LENGTH} digits."
+                                pluralStringResource(
+                                    R.plurals.app_min_pin_digits,
+                                    PasswordVault.MIN_PIN_LENGTH,
+                                    PasswordVault.MIN_PIN_LENGTH,
+                                )
                             } else {
-                                "At least ${PasswordVault.MIN_PASSWORD_LENGTH} characters."
+                                pluralStringResource(
+                                    R.plurals.app_min_password_chars,
+                                    PasswordVault.MIN_PASSWORD_LENGTH,
+                                    PasswordVault.MIN_PASSWORD_LENGTH,
+                                )
                             }
                         )
                     },
@@ -470,7 +527,7 @@ private fun CreateSecretDialog(
                     value = again,
                     onValueChange = { again = it },
                     singleLine = true,
-                    label = { Text("Confirm") },
+                    label = { Text(stringResource(R.string.app_confirm_secret)) },
                     isError = mismatch,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = kb,
@@ -478,7 +535,7 @@ private fun CreateSecretDialog(
                 )
                 if (mismatch) {
                     Text(
-                        "They don't match.",
+                        stringResource(R.string.app_secret_mismatch),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -487,9 +544,9 @@ private fun CreateSecretDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(value.toCharArray(), kind) }, enabled = valid) {
-                Text("Create vault")
+                Text(stringResource(R.string.app_create_vault))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }

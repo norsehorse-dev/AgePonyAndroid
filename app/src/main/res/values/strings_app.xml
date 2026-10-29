@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tabs (Files reuses files_title) -->
+    <string name="app_tab_notes">Notes</string>
+    <string name="app_tab_text">Text</string>
+    <string name="app_tab_identities">Identities</string>
+    <string name="app_tab_settings">Settings</string>
+
+    <!-- Vault gate: welcome and create -->
+    <string name="app_welcome_title">Welcome to AgePony</string>
+    <string name="app_welcome_body_biometric">AgePony stores your keys, recipients, and notes in a vault sealed on this device. Unlock it with biometrics, a password, or both.</string>
+    <string name="app_welcome_body_no_lock">AgePony stores your keys, recipients, and notes in a vault sealed on this device. No screen lock is set up, so protect it with a password or PIN. To unlock with a fingerprint instead, set up a screen lock in Android settings first, then create the vault.</string>
+    <string name="app_create_with_biometrics">Create with biometrics</string>
+    <string name="app_create_use_password_instead">Use a password instead</string>
+    <string name="app_create_use_device_credential">Use device PIN or password</string>
+    <string name="app_create_use_app_password_instead">Use an app password instead</string>
+    <string name="app_create_with_password">Create with a password</string>
+    <string name="app_create_secret_title">Protect your vault</string>
+    <string name="app_create_secret_body">Choose a password or PIN to unlock AgePony. There is no recovery if you forget it: the vault is sealed with it.</string>
+    <string name="app_password">Password</string>
+    <string name="app_pin">PIN</string>
+    <plurals name="app_min_pin_digits">
+        <item quantity="one">At least %1$d digit.</item>
+        <item quantity="other">At least %1$d digits.</item>
+    </plurals>
+    <plurals name="app_min_password_chars">
+        <item quantity="one">At least %1$d character.</item>
+        <item quantity="other">At least %1$d characters.</item>
+    </plurals>
+    <string name="app_confirm_secret">Confirm</string>
+    <string name="app_secret_mismatch">They don\'t match.</string>
+    <string name="app_create_vault">Create vault</string>
+
+    <!-- Vault gate: locked -->
+    <string name="app_locked_title">AgePony is locked</string>
+    <string name="app_locked_enter_pin">Enter your PIN to unlock.</string>
+    <string name="app_locked_enter_password">Enter your password to unlock.</string>
+    <string name="app_locked_biometric">Unlock your vault to access your keys and notes.</string>
+    <string name="app_locked_device_credential">Confirm your device PIN, pattern, or password to unlock.</string>
+    <string name="app_unlock">Unlock</string>
+    <string name="app_no_device_credential">No device PIN, pattern, or password is set.</string>
+    <string name="app_unlock_with_pin">Unlock with PIN</string>
+    <string name="app_unlock_with_password">Unlock with password</string>
+    <!-- %1$s: a wait such as "30 seconds" -->
+    <string name="app_lockout_wait">Too many wrong attempts. Try again in %1$s.</string>
+    <string name="app_legacy_open_pin">Forgot it? Open without the PIN</string>
+    <string name="app_legacy_open_password">Forgot it? Open without the password</string>
+    <string name="app_legacy_open_title_pin">Open without the PIN?</string>
+    <string name="app_legacy_open_title_password">Open without the password?</string>
+    <string name="app_legacy_open_body_pin">Until this update, No lock opened the vault without asking for the PIN. This opens it that way one more time and removes the PIN, so the vault stays on No lock with nothing to confirm. You can set a new one in Settings.</string>
+    <string name="app_legacy_open_body_password">Until this update, No lock opened the vault without asking for the password. This opens it that way one more time and removes the password, so the vault stays on No lock with nothing to confirm. You can set a new one in Settings.</string>
+    <string name="app_legacy_open_confirm">Open and remove</string>
+    <string name="app_use_pin_instead">Use your PIN instead</string>
+    <string name="app_use_password_instead">Use your password instead</string>
+    <string name="app_passphrase_only_entry">Just need a passphrase? Continue without unlocking</string>
+
+    <!-- System unlock prompts -->
+    <string name="security_prompt_unlock_title">Unlock AgePony</string>
+    <string name="security_device_credential_subtitle">Confirm your PIN, pattern, or password</string>
+
+    <!-- Components -->
+    <string name="app_qr_recipient_description">QR code for this recipient</string>
+
+    <!-- Common -->
+    <string name="app_done">Done</string>
+
+    <!-- Sign a file -->
+    <string name="sign_sk_pin_needed">This security key needs a PIN. Enter it below and sign again.</string>
+    <string name="sign_sk_pin_wrong">Incorrect PIN. Try again.</string>
+    <string name="sign_failed">Signing failed.</string>
+    <string name="sign_intro">Produces a detached signature saved as its own small file next to the original. Send both; the file itself is not changed or encrypted.</string>
+    <string name="sign_no_keys">No signing keys in your vault yet. Add an SSH key, a hardware key, or a security key under Identities first.</string>
+    <string name="sign_with">Sign with</string>
+    <string name="sign_sk_pin_label">Security key PIN</string>
+    <string name="sign_pick_file">Pick a file to sign…</string>
+    <string name="sign_working_security_key">Hold your security key against the back of the phone…</string>
+    <string name="sign_working_hardware">Signing in the device\'s secure hardware…</string>
+    <string name="sign_working">Signing…</string>
+    <string name="sign_done_title">Signed</string>
+    <string name="sign_done_body">Send the signature file along with the original. Signatures are scoped to AgePony\'s namespace; to check one on the command line:</string>
+    <string name="sign_another">Sign another</string>
+    <string name="sign_type_ssh_ed25519">SSH Ed25519 · in-app key</string>
+    <string name="sign_type_ssh_rsa">SSH RSA · in-app key</string>
+    <string name="sign_type_hardware">Hardware key · signs in the device keystore</string>
+    <string name="sign_type_sk_ed25519">Security key · Ed25519 over NFC</string>
+    <string name="sign_type_sk_p256">Security key · ECDSA P-256 over NFC</string>
+
+    <!-- Trusted signers -->
+    <string name="sign_signers_none_in_file">No allowed_signers entries found in that file.</string>
+    <!-- %1$s: the error detail -->
+    <string name="sign_signers_import_failed">Import failed: %1$s</string>
+    <string name="sign_signers_export_failed">Export failed: %1$s</string>
+    <plurals name="sign_signers_imported_sentence">
+        <item quantity="one">Imported %1$d signer.</item>
+        <item quantity="other">Imported %1$d signers.</item>
+    </plurals>
+    <plurals name="sign_signers_already_present">
+        <item quantity="one">%1$d was already on the list.</item>
+        <item quantity="other">%1$d were already on the list.</item>
+    </plurals>
+    <plurals name="sign_signers_not_imported">
+        <item quantity="one">%1$d was not imported.</item>
+        <item quantity="other">%1$d were not imported.</item>
+    </plurals>
+    <string name="sign_signers_nothing_imported">Nothing imported.</string>
+    <string name="sign_signers_intro">Signatures from these keys verify with the name you gave them. The list imports from and exports to the OpenSSH allowed_signers format.</string>
+    <string name="sign_signers_empty">No trusted signers yet. Add one below, or from a valid-but-unknown verify result.</string>
+    <string name="sign_signers_paste">Paste a public key…</string>
+    <string name="sign_signers_import">Import allowed_signers…</string>
+    <string name="sign_signers_promote">Promote a saved recipient…</string>
+    <string name="sign_signers_export">Export allowed_signers…</string>
+    <string name="sign_signers_not_ssh_line">That doesn\'t look like an SSH public key line.</string>
+    <!-- %1$s: the signer name -->
+    <string name="sign_signers_added">Added \"%1$s\".</string>
+    <string name="sign_signers_already_listed">That key is already on the list.</string>
+    <string name="sign_signers_recipient_unreadable">Couldn\'t read that recipient\'s key.</string>
+    <string name="sign_signer_delete_body">Signatures from this key will verify as valid but unknown instead of carrying this name.</string>
+    <string name="sign_signers_import_title">Import allowed_signers</string>
+    <string name="sign_signers_review_intro">Tick the signers to trust. Files signed by a trusted signer show as signed by that name.</string>
+    <string name="sign_signers_unreadable_key">(unreadable key)</string>
+    <string name="sign_signers_review_present">Already on your list.</string>
+    <!-- %1$s: why the entry is blocked, a full sentence -->
+    <string name="sign_signers_review_blocked">%1$s Not imported.</string>
+    <plurals name="sign_signers_import_count">
+        <item quantity="one">Import %1$d</item>
+        <item quantity="other">Import %1$d</item>
+    </plurals>
+    <string name="sign_signers_import_action">Import</string>
+    <string name="sign_signers_paste_title">Paste a public key</string>
+    <string name="sign_signers_paste_body">An SSH public key line, like the contents of an id_ed25519.pub.</string>
+    <string name="sign_signers_name_label">Name</string>
+    <string name="sign_signers_key_line_label">ssh-ed25519 AAAA… or ssh-rsa AAAA…</string>
+    <string name="sign_signers_add">Add</string>
+    <string name="sign_signers_promote_title">Promote a saved recipient</string>
+    <string name="sign_signers_promote_body">A recipient saved for encryption isn\'t trusted for signatures yet. Pick one to add its key to your trusted signers.</string>
+
+    <!-- Verify a signature -->
+    <string name="sign_verify_not_ssh_signature">That doesn\'t look like an SSH signature.</string>
+    <string name="sign_verify_intro">Pick the file first, then its signature (the .sig that came with it). The file is only read, never changed.</string>
+    <string name="sign_verify_pick_file">Pick the file…</string>
+    <string name="sign_verify_working">Checking the signature…</string>
+    <!-- %1$s: the trusted signer name -->
+    <string name="sign_verify_signed_by">Signed by %1$s</string>
+    <string name="sign_verify_signed_by_known_key">Signed by a known key</string>
+    <string name="sign_verify_untrusted_title">Valid signature, but not trusted</string>
+    <!-- %1$s: signer name; %2$s: why the entry rejects it, a lowercase clause -->
+    <string name="sign_verify_untrusted_detail">The key belongs to \"%1$s\" on your trusted signers list, but %2$s.</string>
+    <string name="sign_verify_untrusted_default_reason">that entry does not allow this signature</string>
+    <string name="sign_verify_unknown_title">Valid signature, signer not in your vault</string>
+    <string name="sign_verify_unknown_detail">The math checks out, but this key isn\'t one of yours and isn\'t on your trusted signers list. If you know whose it is, add it so future signatures carry their name.</string>
+    <string name="sign_verify_invalid_title">Signature invalid</string>
+    <string name="sign_verify_failed">Verification failed.</string>
+    <!-- %1$s: the name just given -->
+    <string name="sign_verify_added_signer">Added to trusted signers as \"%1$s\".</string>
+    <string name="sign_verify_add_signer">Add this signer…</string>
+    <string name="sign_verify_another">Verify another</string>
+    <string name="sign_verify_add_signer_title">Add trusted signer</string>
+    <string name="sign_verify_add_signer_body">Name the person or system this key belongs to.</string>
+
+    <!-- Notes -->
+    <string name="notes_new">New note</string>
+    <string name="notes_empty_title">No notes yet</string>
+    <string name="notes_empty_body">Tap Add to write one. Each note is encrypted with its own passphrase.</string>
+    <string name="notes_untitled">Untitled</string>
+    <!-- %1$s: relative time, such as "5 minutes ago" -->
+    <string name="notes_edited">Edited %1$s</string>
+    <string name="notes_create_title_label">Title (stored in the vault, searchable)</string>
+    <string name="notes_create_body_label">Body (encrypted with this note\'s passphrase)</string>
+    <string name="notes_passphrase_warning">scrypt work factor 2^18 makes brute force expensive, but a guessable passphrase is still guessable. There\'s no recovery if you forget it.</string>
+    <string name="notes_oom_encrypt">Not enough memory to encrypt this note on this device.</string>
+    <string name="notes_create_failed">Couldn\'t create the note.</string>
+    <string name="notes_encrypting">Encrypting…</string>
+    <string name="notes_create">Create note</string>
+    <string name="notes_not_found">Note not found.</string>
+    <string name="notes_passphrase">Passphrase</string>
+    <string name="notes_show_passphrase">Show passphrase</string>
+    <string name="notes_wrong_passphrase">Wrong passphrase.</string>
+    <string name="notes_oom_decrypt">Not enough memory to decrypt this note.</string>
+    <string name="notes_unlock_failed">Couldn\'t unlock the note.</string>
+    <string name="notes_decrypting">Decrypting…</string>
+    <string name="notes_delete">Delete note</string>
+    <string name="notes_title_label">Title</string>
+    <string name="notes_body_label">Body</string>
+    <string name="notes_oom_save">Not enough memory to save this note.</string>
+    <string name="notes_save_failed">Couldn\'t save the note.</string>
+    <string name="notes_save">Save</string>
+    <string name="notes_lock">Lock</string>
+    <string name="notes_unsaved">Unsaved changes. Tap Save to re-encrypt.</string>
+    <string name="notes_confirm_passphrase">Confirm passphrase</string>
+    <string name="notes_passphrase_mismatch">Passphrases don\'t match.</string>
+
+    <!-- Passphrase only (from the lock screen) -->
+    <string name="app_passphrase_only_title">Passphrase only</string>
+    <string name="app_passphrase_only_intro">Your vault stays locked. Nothing here can see your keys, recipients or notes.</string>
+    <string name="app_passphrase_decrypted_text">Decrypted text</string>
+    <string name="app_passphrase_armored_output">Armored output</string>
+    <string name="app_passphrase_share_chooser">Share encrypted text</string>
+    <string name="app_share_ellipsis">Share…</string>
+    <string name="app_start_over">Start over</string>
+    <string name="app_passphrase_input_label">Text to encrypt, or an armored age block to decrypt</string>
+    <string name="app_passphrase_oom">Not enough memory for this passphrase\'s work factor on this device.</string>
+    <string name="app_decrypt_failed">Decrypt failed.</string>
+    <string name="app_encrypt_failed">Encrypt failed.</string>
+    <string name="app_passphrase_decrypt_action">Decrypt with passphrase</string>
+    <string name="app_passphrase_encrypt_action">Encrypt with passphrase</string>
+
+    <!-- Onboarding (the first page reuses app_welcome_title) -->
+    <string name="app_onboarding_welcome_body">AgePony encrypts files, text, and notes with the modern age encryption standard. Everything happens right here on your device.</string>
+    <string name="app_onboarding_identity_title">Your identity</string>
+    <string name="app_onboarding_identity_body">An identity is your personal keypair. The private key is sealed in your vault and never leaves this device. Create one on the Identities tab to start encrypting.</string>
+    <string name="app_onboarding_recipients_title">Recipients</string>
+    <string name="app_onboarding_recipients_body">Add recipients by their public key or GitHub username. Encrypt to one person or many at once, and to yourself so you can always open your own files.</string>
+    <string name="app_onboarding_files_title">Files, text and notes</string>
+    <string name="app_onboarding_files_body">Encrypt and decrypt files from the Files tab, encrypt short messages on the Text tab, and keep private notes locked behind your vault.</string>
+    <string name="app_onboarding_private_title">No accounts or servers</string>
+    <string name="app_onboarding_private_body">AgePony has no accounts, no servers and no tracking. Your vault is sealed on this device and opened only by biometrics, your device PIN or a password. Your keys and your data stay with you.</string>
+    <string name="app_onboarding_skip">Skip</string>
+    <string name="app_onboarding_next">Next</string>
+
+    <!-- Security prompts -->
+    <string name="security_yubikey_title">YubiKey</string>
+    <string name="security_yubikey_pin_title">YubiKey PIN</string>
+    <string name="security_yubikey_pin_body">This key needs its PIV PIN. You\'ll tap the YubiKey right after.</string>
+    <string name="security_continue">Continue</string>
+    <string name="security_ok">OK</string>
+    <string name="security_confirm_pin">Confirm your PIN</string>
+    <string name="security_confirm_password">Confirm your password</string>
+    <string name="security_check_pin_failed">Couldn\'t check the PIN.</string>
+    <string name="security_check_password_failed">Couldn\'t check the password.</string>
+    <string name="security_wrong_pin">Wrong PIN.</string>
+    <string name="security_wrong_password">Wrong password.</string>
+    <string name="security_confirm_failed_title">Couldn\'t confirm it\'s you</string>
+    <string name="security_confirm_subtitle">Confirm it\'s you</string>
+    <string name="security_sk_pin_body">Enter your security key PIN to authorize signing.</string>
+
+    <!-- QR scanner -->
+    <string name="app_scan_hint">Point the camera at a QR code containing an age recipient or SSH public key.</string>
+    <string name="app_scan_permission_needed">Camera access is needed to scan QR codes.</string>
+    <string name="app_scan_allow_camera">Allow camera access</string>
+
+    <!-- Share sheet -->
+    <string name="app_share_replace_unavailable">The app you selected this in only lets AgePony read the text, not change it. Copy the result and paste it back over your selection.</string>
+</resources>

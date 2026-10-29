@@ -1,4 +1,97 @@
 <resources>
     <string name="app_name">AgePony</string>
     <string name="share_label">AgePony</string>
+
+    <!-- 5.1.0 RC1: shared chrome and components -->
+    <string name="action_back">Back</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_copied">Copied</string>
+    <string name="action_reveal">Reveal</string>
+    <string name="action_hide">Hide</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="post_quantum_label">Quantum-safe</string>
+    <string name="action_more_options">More options</string>
+    <string name="action_add_identity">Add identity</string>
+    <string name="action_add_recipient">Add recipient</string>
+    <string name="scan_title">Scan a QR code</string>
+    <string name="recipient_title">Recipient</string>
+    <string name="identity_title">Identity</string>
+    <string name="note_title">Note</string>
+    <string name="identity_no_backup_title">No backup is possible</string>
+    <string name="send_keys_title">Send keys</string>
+    <string name="settings_identity_label">Identity</string>
+
+    <!-- Files tab -->
+    <string name="files_title">Files</string>
+    <string name="files_section_encryption">Encryption</string>
+    <string name="files_encrypt">Encrypt a file</string>
+    <string name="files_decrypt">Decrypt a file</string>
+    <string name="files_inspect">Inspect a file</string>
+    <string name="files_migrate">Upgrade files to quantum-safe</string>
+    <string name="files_section_signatures">Signatures</string>
+    <string name="files_sign">Sign a file</string>
+    <string name="files_signatures_footer">A signature shows who made a file and that it hasn\'t changed since. AgePony uses the same signature format as ssh-keygen.</string>
+    <string name="files_section_tools">Other tools</string>
+    <string name="files_tools_footer">Inspect shows who can open a file without decrypting it. Upgrade re-encrypts files so a quantum-safe identity can open them.</string>
+    <string name="files_verify">Verify a signature</string>
+    <string name="files_signers">Trusted signers</string>
+
+    <!-- Signature verdict titles (decrypt) -->
+    <string name="decrypt_verdict_trusted">Signature verified</string>
+    <string name="decrypt_verdict_unknown">Valid signature, unknown signer</string>
+    <string name="decrypt_verdict_untrusted">Signature not trusted</string>
+    <string name="decrypt_verdict_failed">Signature check failed</string>
+
+    <!-- Upgrade files to quantum-safe -->
+    <plurals name="migrate_files_chosen">
+        <item quantity="one">%1$d file chosen</item>
+        <item quantity="other">%1$d files chosen</item>
+    </plurals>
+    <plurals name="migrate_upgrade_files">
+        <item quantity="one">Upgrade %1$d file</item>
+        <item quantity="other">Upgrade %1$d files</item>
+    </plurals>
+
+    <!-- Trusted signers -->
+    <plurals name="signers_exported">
+        <item quantity="one">Exported %1$d signer.</item>
+        <item quantity="other">Exported %1$d signers.</item>
+    </plurals>
+    <plurals name="signers_unreadable_lines">
+        <item quantity="one">%1$d line couldn\'t be read and was skipped.</item>
+        <item quantity="other">%1$d lines couldn\'t be read and were skipped.</item>
+    </plurals>
+
+    <!-- Recipients -->
+    <plurals name="recipients_found">
+        <item quantity="one">Found %1$d recipient</item>
+        <item quantity="other">Found %1$d recipients</item>
+    </plurals>
+    <string name="recipient_delete_title">Delete \"%1$s\"?</string>
+    <string name="recipient_delete_body">It moves to Recently deleted, where you can restore it.</string>
+
+    <!-- Notes -->
+    <string name="note_delete_title">Delete this note?</string>
+    <string name="note_delete_body">The note and its encrypted text are removed for good. This can\'t be undone.</string>
+
+    <!-- Key transfer -->
+    <plurals name="transfer_identities">
+        <item quantity="one">%1$d identity</item>
+        <item quantity="other">%1$d identities</item>
+    </plurals>
+    <plurals name="transfer_recipients">
+        <item quantity="one">%1$d recipient</item>
+        <item quantity="other">%1$d recipients</item>
+    </plurals>
+    <plurals name="transfer_signers">
+        <item quantity="one">%1$d signer</item>
+        <item quantity="other">%1$d signers</item>
+    </plurals>
+
+    <!-- Paper backup -->
+    <plurals name="paper_restored">
+        <item quantity="one">Restored %1$d identity</item>
+        <item quantity="other">Restored %1$d identities</item>
+    </plurals>
 </resources>

@@ -12,7 +12,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -30,15 +29,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.agepony.app.security.ClipboardGuard
 import com.agepony.app.share.ShareOut
 import com.agepony.app.share.ShareSniff
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.agepony.app.ui.files.RecipientPicker
 import com.agepony.app.vault.FileEncryptor
@@ -51,6 +46,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.NavRow
+import com.agepony.app.ui.components.ScreenPadding
+import com.agepony.app.ui.components.SectionHeader
+import com.agepony.app.ui.components.showOwnCopyConfirmation
+import com.agepony.app.ui.theme.mono
 
 //
 // Text tab (Phase 2d-2). Android counterpart of iOS's Text mode: in-memory,
@@ -69,24 +76,18 @@ fun TextScreen(vault: Vault, modifier: Modifier = Modifier) {
     var mode by rememberSaveable { mutableStateOf(TextMode.HOME) }
 
     when (mode) {
-        TextMode.HOME -> Column(
-            modifier.fillMaxSize().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text("Text", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-            Text(
-                "Encrypt or decrypt a block of text — handy for chat, email, or anywhere binary attachments are awkward.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp, bottom = 28.dp),
-            )
-            Button(onClick = { mode = TextMode.ENCRYPT }, modifier = Modifier.fillMaxWidth()) { Text("Encrypt text") }
-            OutlinedButton(
-                onClick = { mode = TextMode.DECRYPT },
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-            ) { Text("Decrypt text") }
+        TextMode.HOME -> AgeScreen(title = stringResource(R.string.text_title), modifier = modifier) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+                Text(
+                    stringResource(R.string.text_intro),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp),
+                )
+                NavRow(stringResource(R.string.text_encrypt), onClick = { mode = TextMode.ENCRYPT })
+                ListDivider(Modifier.padding(start = ScreenPadding))
+                NavRow(stringResource(R.string.text_decrypt), onClick = { mode = TextMode.DECRYPT })
+            }
         }
 
         TextMode.ENCRYPT -> TextEncrypt(vault = vault, modifier = modifier, onClose = { mode = TextMode.HOME })
@@ -121,29 +122,35 @@ internal fun TextEncrypt(
     var result by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     if (stage == EncStage.PICKING) {
-        RecipientPicker(
-            vault = vault,
+        AgeScreen(
+            title = stringResource(R.string.files_choose_recipients),
             modifier = modifier,
-            onCancel = { stage = EncStage.FORM },
-            onConfirm = { r, p -> recipients = r; passphrase = p; stage = EncStage.FORM },
-        )
+            onBack = { stage = EncStage.FORM },
+        ) { padding ->
+            RecipientPicker(
+                vault = vault,
+                modifier = Modifier.fillMaxSize().padding(padding),
+                onCancel = { stage = EncStage.FORM },
+                onConfirm = { r, p -> recipients = r; passphrase = p; stage = EncStage.FORM },
+            )
+        }
         return
     }
 
+    AgeScreen(title = stringResource(R.string.text_encrypt), modifier = modifier, onBack = onClose) { padding ->
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Encrypt text", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-
         if (stage == EncStage.RESULT && result != null) {
-            CopyableResult(label = "Armored output", value = result!!)
+            CopyableResult(label = stringResource(R.string.text_armored_output), value = result!!, mono = true)
             val ctx = LocalContext.current
             if (onReplace != null) {
                 Button(onClick = { onReplace(result!!) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Replace the selected text")
+                    Text(stringResource(R.string.text_replace_selection))
                 }
             } else if (replaceUnavailableNote != null) {
                 Text(
@@ -152,34 +159,35 @@ internal fun TextEncrypt(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            val shareTitle = stringResource(R.string.text_share_encrypted)
             OutlinedButton(
-                onClick = { ShareOut.text(ctx, result!!, "Share encrypted text") },
+                onClick = { ShareOut.text(ctx, result!!, shareTitle) },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Share…") }
+            ) { Text(stringResource(R.string.text_share)) }
             Button(
                 onClick = { result = null; input = ""; recipients = emptyList(); passphrase = null; stage = EncStage.FORM },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Encrypt another") }
-            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+            ) { Text(stringResource(R.string.text_encrypt_another)) }
+            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.files_action_done)) }
             return@Column
         }
 
         OutlinedTextField(
             value = input,
             onValueChange = { input = it; error = null },
-            label = { Text("Text to encrypt") },
+            label = { Text(stringResource(R.string.text_input_label)) },
             minLines = 6,
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Text("Recipients", style = MaterialTheme.typography.titleSmall)
+        SectionHeader(stringResource(R.string.files_section_recipients))
         Text(
             recipientSummary(recipients.size, passphrase),
             style = MaterialTheme.typography.bodyMedium,
         )
-        TextButton(onClick = { stage = EncStage.PICKING }) { Text("Choose recipients") }
+        TextButton(onClick = { stage = EncStage.PICKING }) { Text(stringResource(R.string.files_choose_recipients)) }
 
-        if (error != null) ErrorLine(error!!)
+        if (error != null) ErrorText(error!!)
 
         val canEncrypt = stage != EncStage.WORKING && input.isNotEmpty() &&
             (recipients.isNotEmpty() || !passphrase.isNullOrEmpty())
@@ -198,23 +206,28 @@ internal fun TextEncrypt(
                         result = String(out, Charsets.UTF_8)
                         stage = EncStage.RESULT
                     } catch (e: OutOfMemoryError) {
-                        error = "Not enough memory to encrypt with a passphrase on this device."
+                        error = context.getString(R.string.text_oom_encrypt)
                         stage = EncStage.FORM
                     } catch (e: Exception) {
-                        error = e.message ?: "Encrypt failed."
+                        error = e.message ?: context.getString(R.string.files_encrypt_failed)
                         stage = EncStage.FORM
                     }
                 }
             },
             enabled = canEncrypt,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (stage == EncStage.WORKING) "Encrypting…" else "Encrypt") }
+        ) {
+            Text(
+                stringResource(if (stage == EncStage.WORKING) R.string.files_encrypting else R.string.text_encrypt_action),
+            )
+        }
         if (stage == EncStage.WORKING) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         }
-        TextButton(onClick = onClose) { Text("Cancel") }
+        TextButton(onClick = onClose) { Text(stringResource(R.string.action_cancel)) }
+    }
     }
 }
 
@@ -247,7 +260,7 @@ internal fun TextDecrypt(
     val context = LocalContext.current
 
     fun startDecrypt() = decryptTextInto(
-        input, vault, scope,
+        context, input, vault, scope,
         setStage = { stage = it }, setBinary = { binary = it },
         setResult = { result = it }, setError = { error = it },
     )
@@ -259,48 +272,44 @@ internal fun TextDecrypt(
     if (confirmShare && result != null) {
         AlertDialog(
             onDismissRequest = { confirmShare = false },
-            title = { Text("Share decrypted text?") },
+            title = { Text(stringResource(R.string.text_share_decrypted_title)) },
             text = {
-                Text(
-                    "This sends the plaintext to another app. Once it leaves AgePony, it is only as " +
-                        "private as the app you pick and wherever that app stores or syncs it."
-                )
+                Text(stringResource(R.string.text_share_decrypted_body))
             },
             confirmButton = {
                 TextButton(onClick = {
                     confirmShare = false
-                    ShareOut.text(context, result!!, "Share decrypted text")
-                }) { Text("Share anyway") }
+                    ShareOut.text(context, result!!, context.getString(R.string.text_share_decrypted))
+                }) { Text(stringResource(R.string.text_share_anyway)) }
             },
-            dismissButton = { TextButton(onClick = { confirmShare = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmShare = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 
+    AgeScreen(title = stringResource(R.string.text_decrypt), modifier = modifier, onBack = onClose) { padding ->
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Decrypt text", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-
         if (stage == DecStage.RESULT && result != null) {
-            CopyableResult(label = "Decrypted text", value = result!!)
+            CopyableResult(label = stringResource(R.string.text_decrypted), value = result!!, mono = false)
             OutlinedButton(onClick = { confirmShare = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("Share…")
+                Text(stringResource(R.string.text_share))
             }
             Button(
                 onClick = {
                     result = null; input = ""; binary = null; passphrase = ""; stage = DecStage.FORM
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Decrypt another") }
-            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+            ) { Text(stringResource(R.string.files_decrypt_another)) }
+            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.files_action_done)) }
             return@Column
         }
 
         OutlinedTextField(
             value = input,
             onValueChange = { input = it; error = null },
-            label = { Text("Paste armored age text (-----BEGIN AGE ENCRYPTED FILE-----)") },
+            label = { Text(stringResource(R.string.text_paste_label)) },
             minLines = 6,
             enabled = stage != DecStage.NEED_PASSPHRASE,
             modifier = Modifier.fillMaxWidth(),
@@ -308,14 +317,14 @@ internal fun TextDecrypt(
 
         if (stage == DecStage.NEED_PASSPHRASE) {
             Text(
-                "No matching identity. If this was encrypted with a passphrase, enter it.",
+                stringResource(R.string.text_no_identity),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedTextField(
                 value = passphrase,
                 onValueChange = { passphrase = it; error = null },
-                label = { Text("Passphrase") },
+                label = { Text(stringResource(R.string.files_passphrase)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -323,7 +332,7 @@ internal fun TextDecrypt(
             )
         }
 
-        if (error != null) ErrorLine(error!!)
+        if (error != null) ErrorText(error!!)
 
         if (stage == DecStage.WORKING) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -335,7 +344,7 @@ internal fun TextDecrypt(
             Button(
                 onClick = {
                     val bin = binary ?: return@Button
-                    if (passphrase.isEmpty()) { error = "Enter the passphrase."; return@Button }
+                    if (passphrase.isEmpty()) { error = context.getString(R.string.files_enter_passphrase); return@Button }
                     error = null
                     stage = DecStage.WORKING
                     val p = passphrase
@@ -349,28 +358,34 @@ internal fun TextDecrypt(
                         } catch (e: WrongPassphraseException) {
                             error = e.message; stage = DecStage.NEED_PASSPHRASE
                         } catch (e: OutOfMemoryError) {
-                            error = "Not enough memory to derive the key — the work factor is very high."
+                            error = context.getString(R.string.text_oom_derive)
                             stage = DecStage.NEED_PASSPHRASE
                         } catch (e: Exception) {
-                            error = e.message ?: "Decrypt failed."; stage = DecStage.NEED_PASSPHRASE
+                            error = e.message ?: context.getString(R.string.files_decrypt_failed); stage = DecStage.NEED_PASSPHRASE
                         }
                     }
                 },
                 enabled = passphrase.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Decrypt with passphrase") }
+            ) { Text(stringResource(R.string.text_decrypt_with_passphrase)) }
         } else {
             Button(
                 onClick = { startDecrypt() },
                 enabled = stage != DecStage.WORKING && input.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (stage == DecStage.WORKING) "Decrypting…" else "Decrypt") }
+            ) {
+                Text(
+                    stringResource(if (stage == DecStage.WORKING) R.string.files_decrypting else R.string.files_decrypt_action),
+                )
+            }
         }
-        TextButton(onClick = onClose) { Text("Cancel") }
+        TextButton(onClick = onClose) { Text(stringResource(R.string.action_cancel)) }
+    }
     }
 }
 
 private fun decryptTextInto(
+    context: android.content.Context,
     input: String,
     vault: Vault,
     scope: kotlinx.coroutines.CoroutineScope,
@@ -379,7 +394,7 @@ private fun decryptTextInto(
     setResult: (String) -> Unit,
     setError: (String?) -> Unit,
 ) {
-    if (input.isBlank()) { setError("Paste some text first."); return }
+    if (input.isBlank()) { setError(context.getString(R.string.text_paste_first)); return }
     setError(null)
     setStage(DecStage.WORKING)
     val raw = input.toByteArray(Charsets.UTF_8)
@@ -398,9 +413,9 @@ private fun decryptTextInto(
                 setStage(DecStage.NEED_PASSPHRASE)
             }
         } catch (e: OutOfMemoryError) {
-            setError("Not enough memory to decrypt this text."); setStage(DecStage.FORM)
+            setError(context.getString(R.string.text_oom_decrypt)); setStage(DecStage.FORM)
         } catch (e: Exception) {
-            setError(e.message ?: "This doesn't look like an armored age block.")
+            setError(e.message ?: context.getString(R.string.text_not_armored))
             setStage(DecStage.FORM)
         }
     }
@@ -409,13 +424,13 @@ private fun decryptTextInto(
 // MARK: - Shared
 
 @Composable
-private fun CopyableResult(label: String, value: String) {
+private fun CopyableResult(label: String, value: String, mono: Boolean) {
     val context = LocalContext.current
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) {
         if (copied) { delay(1500); copied = false }
     }
-    Text(label, style = MaterialTheme.typography.titleSmall)
+    SectionHeader(label)
     // Plain, non-selectable text rather than a read-only text field: a text field offers the
     // system's long-press Copy, which would skip ClipboardGuard's sensitive flag and timed clear
     // (audit L-23). The Copy button below is the only way out.
@@ -426,26 +441,24 @@ private fun CopyableResult(label: String, value: String) {
     ) {
         Text(
             value,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            // Monospace for armored ciphertext only; decrypted text is prose.
+            style = if (mono) MaterialTheme.typography.mono else MaterialTheme.typography.bodyLarge,
             minLines = 6,
             modifier = Modifier.fillMaxWidth().padding(16.dp),
         )
     }
     Button(
-        onClick = { ClipboardGuard.copySensitive(context, value); copied = true },
+        // Android 13+ confirms the copy itself; only older versions get our own "Copied".
+        onClick = { ClipboardGuard.copySensitive(context, value); copied = showOwnCopyConfirmation },
         modifier = Modifier.fillMaxWidth(),
-    ) { Text(if (copied) "Copied ✓" else "Copy") }
-    HorizontalDivider()
-}
-
-private fun recipientSummary(count: Int, passphrase: String?): String = when {
-    !passphrase.isNullOrEmpty() -> "Passphrase only (scrypt)"
-    count == 0 -> "None chosen yet"
-    count == 1 -> "1 recipient"
-    else -> "$count recipients"
+    ) { Text(stringResource(if (copied) R.string.action_copied else R.string.action_copy)) }
+    ListDivider()
 }
 
 @Composable
-private fun ErrorLine(message: String) {
-    Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+private fun recipientSummary(count: Int, passphrase: String?): String = when {
+    !passphrase.isNullOrEmpty() -> stringResource(R.string.files_passphrase_only_scrypt)
+    count == 0 -> stringResource(R.string.files_recipients_none)
+    else -> pluralStringResource(R.plurals.transfer_recipients, count, count)
 }
+

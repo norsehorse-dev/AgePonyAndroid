@@ -8,6 +8,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.agepony.app.R
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.security.Signature
 import java.util.concurrent.Executor
@@ -90,7 +91,7 @@ object BiometricGate {
         if (subtitle != null) infoBuilder.setSubtitle(subtitle)
         if (authenticators and BiometricManager.Authenticators.DEVICE_CREDENTIAL == 0) {
             // A negative button is required when DEVICE_CREDENTIAL is not allowed.
-            infoBuilder.setNegativeButtonText("Cancel")
+            infoBuilder.setNegativeButtonText(activity.getString(R.string.action_cancel))
         }
 
         prompt.authenticate(infoBuilder.build(), cryptoObject)
@@ -135,7 +136,7 @@ object BiometricGate {
             .setAllowedAuthenticators(allowedAuthenticators())
         if (subtitle != null) infoBuilder.setSubtitle(subtitle)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            infoBuilder.setNegativeButtonText("Cancel")
+            infoBuilder.setNegativeButtonText(activity.getString(R.string.action_cancel))
         }
 
         prompt.authenticate(infoBuilder.build(), cryptoObject)
@@ -171,7 +172,7 @@ object BiometricGate {
             .setAllowedAuthenticators(allowedAuthenticators())
         if (subtitle != null) infoBuilder.setSubtitle(subtitle)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            infoBuilder.setNegativeButtonText("Cancel")
+            infoBuilder.setNegativeButtonText(activity.getString(R.string.action_cancel))
         }
 
         prompt.authenticate(infoBuilder.build())

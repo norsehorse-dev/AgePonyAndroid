@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 5.1.0 RC1 U1: Files flows (encrypt, decrypt, inspect, upgrade, recipient picker) and the Text tab -->
+
+    <!-- Shared across the file flows -->
+    <string name="files_action_done">Done</string>
+    <string name="files_action_continue">Continue</string>
+    <string name="files_pick_file">Pick a file…</string>
+    <string name="files_pick_files">Pick files…</string>
+    <string name="files_reading_header">Reading the header…</string>
+    <string name="files_progress_bytes">%1$s of %2$s</string>
+    <string name="files_passphrase">Passphrase</string>
+    <string name="files_enter_passphrase">Enter the passphrase.</string>
+    <string name="files_encrypt_failed">Encrypt failed.</string>
+    <string name="files_decrypt_failed">Decrypt failed.</string>
+    <string name="files_not_age_file">This doesn\'t look like an age file.</string>
+    <string name="files_passphrase_only_scrypt">Passphrase only (scrypt)</string>
+    <string name="files_recipients_none">None chosen yet</string>
+    <string name="files_section_recipients">Recipients</string>
+    <string name="files_choose_recipients">Choose recipients</string>
+    <string name="files_decrypt_action">Decrypt</string>
+    <string name="files_decrypting">Decrypting…</string>
+    <string name="files_decrypt_another">Decrypt another</string>
+    <string name="files_encrypting">Encrypting…</string>
+
+    <!-- Encrypt a file -->
+    <string name="files_encrypt_pick_intro">Pick one or more files. With several, you choose whether they become one encrypted archive or one encrypted file each. Files are streamed, so size is not a limit.</string>
+    <string name="files_encrypt_still_set">Still set from last time: %1$s, %2$s.</string>
+    <string name="files_encrypt_output_armored">armored</string>
+    <string name="files_encrypt_output_binary">binary</string>
+    <string name="files_encrypt_clear_choices">Clear recipients &amp; passphrase</string>
+    <plurals name="files_encrypt_file_count">
+        <item quantity="one">%1$d file</item>
+        <item quantity="other">%1$d files</item>
+    </plurals>
+    <string name="files_encrypt_mode_question">How should they come out?</string>
+    <string name="files_encrypt_mode_bundle">One encrypted archive</string>
+    <plurals name="files_encrypt_mode_bundle_detail">
+        <item quantity="one">%1$d file goes into a single .tar.age. Decrypting gives back the archive, and any tar tool opens it.</item>
+        <item quantity="other">All %1$d files go into a single .tar.age. Decrypting gives back the archive, and any tar tool opens it.</item>
+    </plurals>
+    <string name="files_encrypt_mode_separate">One encrypted file each</string>
+    <plurals name="files_encrypt_mode_separate_detail">
+        <item quantity="one">%1$d separate .age file written into a folder you pick. Share or decrypt it independently.</item>
+        <item quantity="other">%1$d separate .age files written into a folder you pick. Share or decrypt them independently.</item>
+    </plurals>
+    <string name="files_encrypt_section_source">Source</string>
+    <plurals name="files_encrypt_source_separate">
+        <item quantity="one">%1$d file, one .age file each</item>
+        <item quantity="other">%1$d files, one .age file each</item>
+    </plurals>
+    <plurals name="files_encrypt_source_bundle">
+        <item quantity="one">%1$d file in one archive</item>
+        <item quantity="other">%1$d files in one archive</item>
+    </plurals>
+    <string name="files_encrypt_change_files">Change files</string>
+    <string name="files_encrypt_change_output">Change output</string>
+    <string name="files_encrypt_passphrase_kept">Kept until the vault locks, so the next file won\'t ask again.</string>
+    <string name="files_encrypt_change_recipients">Change recipients</string>
+    <string name="files_encrypt_forget_passphrase">Forget passphrase</string>
+    <string name="files_encrypt_section_sign">Sign (optional)</string>
+    <string name="files_encrypt_dont_sign">Don\'t sign</string>
+    <string name="files_encrypt_sign_detail">Signs the file with the chosen key, then encrypts. The recipient can verify it came from you; the signer stays hidden inside the ciphertext. Signed files are read twice, so this takes a little longer.</string>
+    <string name="files_encrypt_armor">Armor as text</string>
+    <string name="files_encrypt_armor_on">Output is text between BEGIN and END markers. Safe to paste anywhere, and about a third larger.</string>
+    <string name="files_encrypt_armor_off">Output is raw binary. Smaller, but it won\'t survive being pasted as text.</string>
+    <string name="files_encrypt_confirm_picker_first">Confirm or cancel the recipient list above to carry on.</string>
+    <string name="files_encrypt_folder_and_encrypt">Choose folder &amp; encrypt</string>
+    <string name="files_encrypt_sign_and_encrypt">Sign &amp; encrypt</string>
+    <string name="files_encrypt_destination_and_encrypt">Choose destination &amp; encrypt</string>
+    <string name="files_encrypt_signing">Signing…</string>
+    <string name="files_encrypt_encrypting_n">Encrypting %1$d of %2$d…</string>
+    <string name="files_encrypt_signing_n">Signing %1$d of %2$d…</string>
+    <string name="files_encrypt_done">Encrypted</string>
+    <string name="files_encrypt_share">Share encrypted file…</string>
+    <plurals name="files_encrypt_batch_result">
+        <item quantity="one">%1$d of %2$d file encrypted.</item>
+        <item quantity="other">%1$d of %2$d files encrypted.</item>
+    </plurals>
+    <string name="files_encrypt_more">Encrypt more files</string>
+    <string name="files_encrypt_more_detail">Keeps your recipient and output choices and goes straight to picking files.</string>
+    <string name="files_encrypt_item_signed">Signed and encrypted.</string>
+    <string name="files_encrypt_item_done">Encrypted.</string>
+    <string name="files_encrypt_read_failed">Couldn\'t read the files.</string>
+    <string name="files_encrypt_oom_passphrase">Not enough memory for the passphrase key derivation on this device. scrypt needs about 256 MB while it runs, whatever the file size, so a smaller file will not help. Encrypting to a recipient key instead needs almost none.</string>
+    <string name="files_encrypt_oom">Not enough memory to finish this encrypt. Files are streamed, so this is unusual. Closing other apps and trying again should clear it.</string>
+
+    <!-- Decrypt a file -->
+    <string name="files_decrypt_pick_intro">Pick an age file (.age, binary or armored). AgePony tries your identities first, then offers a passphrase if the file needs one. Files are streamed, so size is not a limit.</string>
+    <string name="files_decrypt_no_identity">No matching identity in your vault. If this file was encrypted with a passphrase, enter it.</string>
+    <string name="files_decrypt_wrong_passphrase">Wrong passphrase, or this file isn\'t passphrase-encrypted.</string>
+    <string name="files_decrypt_done">Decrypted</string>
+    <string name="files_decrypt_original_name">Original name inside the signed file: %1$s</string>
+    <string name="files_decrypt_name_not_covered">Name inside the file (not covered by the signature): %1$s</string>
+    <string name="files_decrypt_bundle_failed">This is a bundle of files, but its signature check failed, so AgePony won\'t extract it. Only open the saved file if you trust where it came from.</string>
+    <string name="files_decrypt_bundle">This is a bundle of files. You can extract them into a folder.</string>
+    <string name="files_decrypt_extracting">Extracting…</string>
+    <string name="files_decrypt_extract">Extract files into a folder…</string>
+    <string name="files_decrypt_bundle_empty">No files found in the bundle.</string>
+    <string name="files_decrypt_extract_failed">Extract failed: %1$s</string>
+    <plurals name="files_decrypt_extracted">
+        <item quantity="one">Extracted %1$d file to the folder.</item>
+        <item quantity="other">Extracted %1$d files to the folder.</item>
+    </plurals>
+    <string name="files_decrypt_signed_by">Signed by %1$s</string>
+    <string name="files_decrypt_signed_by_known">Signed by a known key</string>
+    <string name="files_decrypt_not_trusted">Valid signature from \"%1$s\", but not trusted: %2$s</string>
+    <string name="files_decrypt_not_trusted_default">Valid signature from \"%1$s\", but not trusted: its trusted-signer entry does not allow it</string>
+    <string name="files_decrypt_valid_unknown">Valid signature (signer not in your vault)</string>
+    <string name="files_decrypt_invalid">Signature invalid: %1$s</string>
+    <string name="files_decrypt_invalid_default">Signature invalid: verification failed</string>
+    <string name="files_decrypt_unreadable">Signature present but unreadable: %1$s</string>
+    <string name="files_decrypt_saved_before_check">%1$s. The file was saved before the signature could be checked: treat its contents as untrusted.</string>
+    <string name="files_decrypt_v1_stanza_note">Older signature format (v1): it covers the contents but not who the file was encrypted to.</string>
+    <string name="files_decrypt_v1_bundle_note">Older signature format (v1): it covers the contents but not the file name.</string>
+    <string name="files_decrypt_oom_passphrase">Not enough memory to derive the key from this passphrase. The file\'s scrypt work factor sets how much is needed, whatever the file size, and this one asks for more than this device has.</string>
+    <string name="files_decrypt_oom">Not enough memory to finish this decrypt. Files are streamed, so this is unusual. Closing other apps and trying again should clear it.</string>
+
+    <!-- Inspect a file -->
+    <string name="files_inspect_intro">Shows what an age file is encrypted to, without decrypting it. Only the header is read, so this is instant even for very large files, and it reveals nothing that is not already public in the file.</string>
+    <string name="files_inspect_summary_armored">%1$s, armored text, %2$d byte header</string>
+    <string name="files_inspect_summary_binary">%1$s, binary, %2$d byte header</string>
+    <string name="files_inspect_summary_armored_no_size">Armored text, %1$d byte header</string>
+    <string name="files_inspect_summary_binary_no_size">Binary, %1$d byte header</string>
+    <string name="files_inspect_can_decrypt">You can decrypt this</string>
+    <string name="files_inspect_needs_passphrase">Needs the passphrase it was encrypted with</string>
+    <string name="files_inspect_cannot_open">No identity in your vault can open this</string>
+    <plurals name="files_inspect_encrypted_to">
+        <item quantity="one">Encrypted to %1$d recipient</item>
+        <item quantity="other">Encrypted to %1$d recipients</item>
+    </plurals>
+    <string name="files_inspect_stanza_row">%1$d. %2$s</string>
+    <string name="files_inspect_footer">Recipient stanzas are not secret: anyone holding the file can read them. They say which keys can open it, not what is inside.</string>
+    <string name="files_inspect_another">Inspect another</string>
+    <string name="files_inspect_scrypt">Passphrase (scrypt)</string>
+    <string name="files_inspect_scrypt_detail">Work factor 2^%1$d, about %2$d MB of memory to derive the key</string>
+    <string name="files_inspect_scrypt_unreadable">Work factor not readable</string>
+    <string name="files_inspect_x25519">age recipient (X25519)</string>
+    <string name="files_inspect_ephemeral_share">Ephemeral share %1$s</string>
+    <string name="files_inspect_mlkem">Post-quantum age recipient (ML-KEM-768 with X25519)</string>
+    <string name="files_inspect_encapsulation">Encapsulation %1$s</string>
+    <string name="files_inspect_ssh_ed25519">SSH Ed25519 recipient</string>
+    <string name="files_inspect_ssh_rsa">SSH RSA recipient</string>
+    <string name="files_inspect_key_tag">Key tag %1$s</string>
+    <string name="files_inspect_p256tag">Hardware-key recipient (age1tag, P-256)</string>
+    <string name="files_inspect_mlkem_p256tag">Post-quantum hardware-key recipient (age1tagpq, ML-KEM-768 with P-256)</string>
+    <string name="files_inspect_signature">AgePony signature (encrypted)</string>
+    <string name="files_inspect_signature_detail">Only a recipient can read who signed. Plain age ignores this stanza.</string>
+    <string name="files_inspect_piv">YubiKey recipient (PIV P-256)</string>
+    <string name="files_inspect_unknown">Unrecognised stanza: %1$s</string>
+    <plurals name="files_inspect_unknown_detail">
+        <item quantity="one">Written by a newer or different age implementation. %1$d argument.</item>
+        <item quantity="other">Written by a newer or different age implementation. %1$d arguments.</item>
+    </plurals>
+    <string name="files_inspect_arg_none">(none)</string>
+
+    <!-- Upgrade files to quantum-safe -->
+    <string name="files_migrate_intro">Re-encrypt existing age files to your quantum-safe identity. AgePony decrypts each with your identities (or the passphrase below) and re-encrypts it to the identity you pick.</string>
+    <string name="files_migrate_section_identity">Quantum-safe identity</string>
+    <string name="files_migrate_no_identity">You have no quantum-safe identity yet. Create one on the Identities tab (Add, then Generate, then Quantum-safe) and come back.</string>
+    <string name="files_migrate_none_chosen">None chosen</string>
+    <string name="files_migrate_choose_files">Choose files…</string>
+    <string name="files_migrate_section_destination">Destination folder</string>
+    <string name="files_migrate_folder_chosen">Folder chosen</string>
+    <string name="files_migrate_choose_folder">Choose folder…</string>
+    <string name="files_migrate_section_passphrase">Passphrase (optional)</string>
+    <string name="files_migrate_passphrase_label">For any passphrase-encrypted files</string>
+    <string name="files_migrate_upgrade">Upgrade files</string>
+    <string name="files_migrate_progress">Upgrading %1$d of %2$d…</string>
+    <string name="files_migrate_done">Upgrade complete</string>
+    <plurals name="files_migrate_result">
+        <item quantity="one">%1$d of %2$d file upgraded to quantum-safe.</item>
+        <item quantity="other">%1$d of %2$d files upgraded to quantum-safe.</item>
+    </plurals>
+    <string name="files_migrate_more">Upgrade more</string>
+    <string name="files_migrate_open_failed">Couldn\'t open the file.</string>
+    <string name="files_migrate_read_failed">Couldn\'t read the file.</string>
+    <string name="files_migrate_not_age">Not an age file.</string>
+    <string name="files_migrate_no_match">No matching identity, and no passphrase given.</string>
+    <string name="files_migrate_other_passphrase">Needs a different passphrase. Skipped.</string>
+    <string name="files_migrate_reencrypt_failed">Re-encrypt failed: %1$s</string>
+    <string name="files_migrate_item_done">Re-encrypted to your quantum-safe identity.</string>
+    <string name="files_migrate_save_failed">Couldn\'t save to the folder: %1$s</string>
+
+    <!-- Recipient picker -->
+    <string name="files_picker_confirm_passphrase">Confirm passphrase</string>
+    <string name="files_picker_mismatch">Passphrases don\'t match.</string>
+    <string name="files_picker_suggest">Suggest a passphrase</string>
+    <plurals name="files_picker_suggestion_detail">
+        <item quantity="one">%1$d random word, about %2$d bits. Write it down before you use it: nothing can recover a file if this is lost.</item>
+        <item quantity="other">%1$d random words, about %2$d bits. Write it down before you use it: nothing can recover a file if this is lost.</item>
+    </plurals>
+    <string name="files_picker_shorter">Shorter</string>
+    <string name="files_picker_longer">Longer</string>
+    <string name="files_picker_again">Again</string>
+    <string name="files_picker_use_it">Use it</string>
+    <string name="files_picker_scrypt_detail">Anyone with the passphrase can decrypt; nobody else can. There is no recovery if you forget it. Work factor 2^%1$d, which needs about %2$d MB of memory while the key is derived, whatever the file size (change it in Settings).</string>
+    <string name="files_picker_scrypt_low_memory">This device does not have that much free right now. Lower the work factor in Settings, or encrypt to a recipient key instead.</string>
+    <string name="files_picker_section_self">Encrypt to self</string>
+    <string name="files_picker_no_identities">You have no identities in this vault.</string>
+    <string name="files_picker_section_saved">Saved recipients</string>
+    <string name="files_picker_section_one_time">One-time recipient</string>
+    <string name="files_picker_save">Save</string>
+    <string name="files_picker_remove">Remove</string>
+    <string name="files_picker_save_name">Name for this recipient</string>
+    <string name="files_picker_save_failed">Couldn\'t save this recipient.</string>
+    <string name="files_picker_save_to_recipients">Save to recipients</string>
+    <string name="files_picker_paste_label">Paste age1… / age1pq… or ssh-* AAAA… (one-time)</string>
+    <string name="files_picker_parse_failed">Couldn\'t parse that.</string>
+    <string name="files_picker_add_one_time">Add one-time recipient</string>
+    <string name="files_picker_load_failed">Couldn\'t load a selected recipient.</string>
+    <string name="files_picker_use_passphrase">Use passphrase</string>
+    <string name="files_picker_pick_recipient">Pick a recipient</string>
+    <plurals name="files_picker_use_recipients">
+        <item quantity="one">Use %1$d recipient</item>
+        <item quantity="other">Use %1$d recipients</item>
+    </plurals>
+    <string name="files_picker_nothing_to_add">Nothing to add.</string>
+    <string name="files_picker_ssh_ed25519_one_time">SSH Ed25519 (one-time)</string>
+    <string name="files_picker_ssh_rsa_one_time">SSH RSA (one-time)</string>
+    <string name="files_picker_rsa_too_small">That ssh-rsa key is %1$d bits. age needs at least %2$d bits to encrypt to it.</string>
+    <string name="files_picker_unrecognised">Expected an age1… / age1pq… / age1tag1… / age1yubikey1… recipient or an ssh-ed25519 / ssh-rsa line.</string>
+    <string name="files_picker_cant_encrypt_to">Can\'t encrypt to: %1$s. Untick it and try again.</string>
+
+    <!-- Key type labels in the recipient picker -->
+    <string name="files_type_age_x25519">age X25519</string>
+    <string name="files_type_mlkem">Quantum-safe (ML-KEM-768 + X25519)</string>
+    <string name="files_type_ssh_ed25519">SSH Ed25519</string>
+    <string name="files_type_ssh_rsa">SSH RSA</string>
+    <string name="files_type_hardware_p256">Hardware key (P-256)</string>
+    <string name="files_type_sk_ed25519">Security key (Ed25519)</string>
+    <string name="files_type_sk_p256">Security key (P-256)</string>
+    <string name="files_type_hardware_tag">Hardware decryption key (P-256)</string>
+    <string name="files_type_hardware_tag_pq">Hardware decryption key, quantum-safe</string>
+    <string name="files_type_yubikey_piv">YubiKey (PIV P-256)</string>
+    <string name="files_type_yubikey_p256">YubiKey (P-256)</string>
+    <string name="files_type_tag">Hardware key (age1tag)</string>
+    <string name="files_type_tag_pq">Hardware key, quantum-safe (age1tagpq)</string>
+
+    <!-- Text tab -->
+    <string name="text_title">Text</string>
+    <string name="text_intro">Encrypt or decrypt a block of text for chat, email or anywhere a file attachment is awkward.</string>
+    <string name="text_encrypt">Encrypt text</string>
+    <string name="text_decrypt">Decrypt text</string>
+    <string name="text_armored_output">Armored output</string>
+    <string name="text_replace_selection">Replace the selected text</string>
+    <string name="text_share_encrypted">Share encrypted text</string>
+    <string name="text_share">Share…</string>
+    <string name="text_encrypt_another">Encrypt another</string>
+    <string name="text_input_label">Text to encrypt</string>
+    <string name="text_encrypt_action">Encrypt</string>
+    <string name="text_oom_encrypt">Not enough memory to encrypt with a passphrase on this device.</string>
+    <string name="text_share_decrypted_title">Share decrypted text?</string>
+    <string name="text_share_decrypted_body">This sends the plaintext to another app. Once it leaves AgePony, it is only as private as the app you pick and wherever that app stores or syncs it.</string>
+    <string name="text_share_decrypted">Share decrypted text</string>
+    <string name="text_share_anyway">Share anyway</string>
+    <string name="text_decrypted">Decrypted text</string>
+    <string name="text_paste_label">Paste armored age text (-----BEGIN AGE ENCRYPTED FILE-----)</string>
+    <string name="text_no_identity">No matching identity. If this was encrypted with a passphrase, enter it.</string>
+    <string name="text_oom_derive">Not enough memory to derive the key. The work factor is very high.</string>
+    <string name="text_decrypt_with_passphrase">Decrypt with passphrase</string>
+    <string name="text_paste_first">Paste some text first.</string>
+    <string name="text_oom_decrypt">Not enough memory to decrypt this text.</string>
+    <string name="text_not_armored">This doesn\'t look like an armored age block.</string>
+</resources>

@@ -31,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.signing.FileVerifier
@@ -52,6 +51,24 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedOutputStream
 import java.io.InputStream
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.SectionHeader
+import com.agepony.app.ui.components.StatusText
+import com.agepony.app.ui.components.VerdictPanel
+import com.agepony.app.ui.theme.AgeStatus
+import com.agepony.app.ui.theme.mono
 
 //
 // Decrypt flow. Android counterpart of iOS's DecryptFlow:
@@ -81,6 +98,8 @@ fun DecryptFlow(
     vault: Vault,
     modifier: Modifier = Modifier,
     initialUri: Uri? = null,
+    /** False when embedded under another screen's app bar (the locked-vault passphrase screen). */
+    showTopBar: Boolean = true,
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -93,7 +112,7 @@ fun DecryptFlow(
     var error by remember { mutableStateOf<String?>(null) }
     var savedName by remember { mutableStateOf<String?>(null) }
     var originalName by remember { mutableStateOf<String?>(null) }
-    var verdict by remember { mutableStateOf<String?>(null) }
+    var verdict by remember { mutableStateOf<SignatureVerdict?>(null) }
     var bytesDone by remember { mutableStateOf(0L) }
     var isBundle by remember { mutableStateOf(false) }
     var savedDest by remember { mutableStateOf<Uri?>(null) }
@@ -147,10 +166,10 @@ fun DecryptFlow(
                 error = e.message
                 stage = DecryptStage.NEED_PASSPHRASE
             } catch (e: OutOfMemoryError) {
-                error = decryptOutOfMemoryMessage(pass != null)
+                error = context.getString(decryptOutOfMemoryMessage(pass != null))
                 stage = if (usePassphrase) DecryptStage.NEED_PASSPHRASE else DecryptStage.PICK
             } catch (e: Exception) {
-                error = e.message ?: "Decrypt failed."
+                error = e.message ?: context.getString(R.string.files_decrypt_failed)
                 stage = if (usePassphrase) DecryptStage.NEED_PASSPHRASE else DecryptStage.PICK
             }
         }
@@ -184,7 +203,7 @@ fun DecryptFlow(
                     stage = DecryptStage.NEED_PASSPHRASE
                 }
             } catch (e: Exception) {
-                error = e.message ?: "This doesn't look like an age file."
+                error = e.message ?: context.getString(R.string.files_not_age_file)
                 stage = DecryptStage.PICK
             }
         }
@@ -216,7 +235,7 @@ fun DecryptFlow(
                 val msg = withContext(Dispatchers.IO) { extractBundleToTree(context, src, tree) }
                 extractResult = msg
             } catch (e: Exception) {
-                extractResult = "Extract failed: ${e.message}"
+                extractResult = context.getString(R.string.files_decrypt_extract_failed, e.message.orEmpty())
             } finally {
                 extracting = false
             }
@@ -235,26 +254,32 @@ fun DecryptFlow(
     val haptics = rememberHaptics()
     LaunchedEffect(stage) { if (stage == DecryptStage.DONE) haptics.success() }
 
-    Column(modifier.fillMaxSize()) {
+    // Leaving while the header is read or the file is written would cancel the job, so
+    // back is held for those stages.
+    if (stage == DecryptStage.PROBING || stage == DecryptStage.WORKING) BackHandler {}
+    val onBack: (() -> Unit)? = when (stage) {
+        DecryptStage.PROBING, DecryptStage.WORKING -> null
+        else -> onClose
+    }
+
+    AgeScreen(title = stringResource(R.string.files_decrypt), modifier = modifier, onBack = onBack, showTopBar = showTopBar) { padding ->
+    Column(Modifier.fillMaxSize().padding(padding)) {
         when (stage) {
             DecryptStage.PICK -> Column(
                 Modifier.fillMaxSize().padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text("Decrypt a file", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                 Text(
-                    "Pick an age file (.age, binary or armored). AgePony tries your identities first, " +
-                        "then offers a passphrase if the file needs one. Files are streamed, so size " +
-                        "is not a limit.",
+                    stringResource(R.string.files_decrypt_pick_intro),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (error != null) ErrorLine(error!!)
+                if (error != null) ErrorText(error!!)
                 Button(
                     onClick = { error = null; vault.autoLockSuppressed = true; openInput.launch(arrayOf("*/*")) },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Pick a file…") }
-                TextButton(onClick = onClose) { Text("Cancel") }
+                ) { Text(stringResource(R.string.files_pick_file)) }
+                TextButton(onClick = onClose) { Text(stringResource(R.string.action_cancel)) }
             }
 
             DecryptStage.PROBING -> Column(
@@ -264,44 +289,43 @@ fun DecryptFlow(
             ) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 Text(
-                    "Reading the header…",
+                    stringResource(R.string.files_reading_header),
                     modifier = Modifier.padding(top = 16.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             DecryptStage.NEED_PASSPHRASE -> Column(
-                Modifier.fillMaxSize().padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Passphrase", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                SectionHeader(stringResource(R.string.files_passphrase))
                 Text(
                     sourceName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.mono,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "No matching identity in your vault. If this file was encrypted with a passphrase, enter it.",
+                    stringResource(R.string.files_decrypt_no_identity),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
                     value = passphrase,
                     onValueChange = { passphrase = it; error = null },
-                    label = { Text("Passphrase") },
+                    label = { Text(stringResource(R.string.files_passphrase)) },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (error != null) ErrorLine(error!!)
+                if (error != null) ErrorText(error!!)
                 Button(
                     onClick = {
                         val ref = source ?: return@Button
-                        if (passphrase.isEmpty()) { error = "Enter the passphrase."; return@Button }
+                        if (passphrase.isEmpty()) { error = context.getString(R.string.files_enter_passphrase); return@Button }
                         val entered = passphrase
                         error = null
                         stage = DecryptStage.PROBING
@@ -313,25 +337,25 @@ fun DecryptFlow(
                                     headerOpensWith(context, ref, listOf(ScryptIdentity(entered)))
                                 }
                                 if (!opens) {
-                                    error = "Wrong passphrase, or this file isn't passphrase-encrypted."
+                                    error = context.getString(R.string.files_decrypt_wrong_passphrase)
                                     stage = DecryptStage.NEED_PASSPHRASE
                                 } else {
                                     vault.autoLockSuppressed = true
                                     createOutput.launch(FileEncryptor.decryptedName(ref.name))
                                 }
                             } catch (e: OutOfMemoryError) {
-                                error = decryptOutOfMemoryMessage(true)
+                                error = context.getString(decryptOutOfMemoryMessage(true))
                                 stage = DecryptStage.NEED_PASSPHRASE
                             } catch (e: Exception) {
-                                error = e.message ?: "Decrypt failed."
+                                error = e.message ?: context.getString(R.string.files_decrypt_failed)
                                 stage = DecryptStage.NEED_PASSPHRASE
                             }
                         }
                     },
                     enabled = passphrase.isNotEmpty(),
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Decrypt") }
-                TextButton(onClick = onClose) { Text("Cancel") }
+                ) { Text(stringResource(R.string.files_decrypt_action)) }
+                TextButton(onClick = onClose) { Text(stringResource(R.string.action_cancel)) }
             }
 
             DecryptStage.WORKING -> Column(
@@ -350,13 +374,13 @@ fun DecryptFlow(
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
                 Text(
-                    "Decrypting…",
+                    stringResource(R.string.files_decrypting),
                     modifier = Modifier.padding(top = 16.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (total > 0) {
                     Text(
-                        "${SafIo.humanSize(bytesDone)} of ${SafIo.humanSize(total)}",
+                        stringResource(R.string.files_progress_bytes, SafIo.humanSize(bytesDone), SafIo.humanSize(total)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -364,15 +388,16 @@ fun DecryptFlow(
             }
 
             DecryptStage.DONE -> Column(
-                Modifier.fillMaxSize().padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
             ) {
-                Text("Decrypted ✓", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                StatusText(
+                    text = stringResource(R.string.files_decrypt_done),
+                    color = AgeStatus.colors.success,
+                    icon = Icons.Filled.CheckCircle,
+                )
                 Text(
                     savedName ?: FileEncryptor.decryptedName(sourceName),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.mono,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                     maxLines = 1,
@@ -382,21 +407,44 @@ fun DecryptFlow(
                 if (original != null && (original != savedName || !nameCovered)) {
                     Text(
                         if (nameCovered) {
-                            "Original name inside the signed file: $original"
+                            stringResource(R.string.files_decrypt_original_name, original)
                         } else {
-                            "Name inside the file (not covered by the signature): $original"
+                            stringResource(R.string.files_decrypt_name_not_covered, original)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp),
                     )
                 }
-                if (verdict != null) {
-                    Text(
-                        verdict!!,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (verdict!!.startsWith("⚠")) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.primary,
+                verdict?.let { v ->
+                    // The state travels in a typed value; color and icon follow its kind.
+                    val (title, color, icon) = when (v.kind) {
+                        VerdictKind.TRUSTED -> Triple(
+                            stringResource(R.string.decrypt_verdict_trusted),
+                            AgeStatus.colors.success,
+                            Icons.Filled.CheckCircle,
+                        )
+                        VerdictKind.UNKNOWN_SIGNER -> Triple(
+                            stringResource(R.string.decrypt_verdict_unknown),
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                            Icons.Filled.Info,
+                        )
+                        VerdictKind.NOT_TRUSTED -> Triple(
+                            stringResource(R.string.decrypt_verdict_untrusted),
+                            AgeStatus.colors.warning,
+                            Icons.Filled.Warning,
+                        )
+                        VerdictKind.FAILED -> Triple(
+                            stringResource(R.string.decrypt_verdict_failed),
+                            AgeStatus.colors.failure,
+                            Icons.Filled.Warning,
+                        )
+                    }
+                    VerdictPanel(
+                        title = title,
+                        detail = v.text,
+                        color = color,
+                        icon = icon,
                         modifier = Modifier.padding(bottom = if (signatureNote != null) 4.dp else 16.dp),
                     )
                 }
@@ -410,15 +458,14 @@ fun DecryptFlow(
                 }
                 if (isBundle && signatureFailed) {
                     Text(
-                        "This is a bundle of files, but its signature check failed, so AgePony won't " +
-                            "extract it. Only open the saved file if you trust where it came from.",
+                        stringResource(R.string.files_decrypt_bundle_failed),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(bottom = 8.dp),
                     )
                 } else if (isBundle) {
                     Text(
-                        "This is a bundle of files. You can extract them into a folder.",
+                        stringResource(R.string.files_decrypt_bundle),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp),
@@ -427,29 +474,41 @@ fun DecryptFlow(
                         onClick = { vault.autoLockSuppressed = true; pickExtractTree.launch(null) },
                         enabled = !extracting,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    ) { Text(if (extracting) "Extracting\u2026" else "Extract files into a folder\u2026") }
+                    ) {
+                        Text(
+                            stringResource(
+                                if (extracting) R.string.files_decrypt_extracting else R.string.files_decrypt_extract,
+                            ),
+                        )
+                    }
                     val msg = extractResult
                     if (msg != null) {
                         Text(
                             msg,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
                 }
-                Button(onClick = { reset() }, modifier = Modifier.fillMaxWidth()) { Text("Decrypt another") }
-                OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Done") }
+                Button(onClick = { reset() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.files_decrypt_another)) }
+                OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(stringResource(R.string.files_action_done)) }
             }
         }
+    }
     }
 }
 
 // ---- Work ----
 
+/** What a signature check found. The UI picks color and icon from [kind], never from the text. */
+private enum class VerdictKind { TRUSTED, UNKNOWN_SIGNER, NOT_TRUSTED, FAILED }
+
+private class SignatureVerdict(val kind: VerdictKind, val text: String)
+
 private class DecryptOutcome(
     val originalName: String?,
-    val verdict: String?,
+    val verdict: SignatureVerdict?,
     /** A signature was present and failed (invalid or unreadable). Blocks bundle extraction. */
     val signatureFailed: Boolean = false,
     /** False for a v1 signed bundle, whose name the signature does not cover (audit L-8). */
@@ -457,11 +516,6 @@ private class DecryptOutcome(
     /** What an older (v1) signature does not cover, shown under the verdict. */
     val note: String? = null,
 )
-
-private const val V1_STANZA_NOTE =
-    "Older signature format (v1): it covers the contents but not who the file was encrypted to."
-private const val V1_BUNDLE_NOTE =
-    "Older signature format (v1): it covers the contents but not the file name."
 
 /**
  * Can any of [identities] unwrap this file? Reads the age header and stops there, so this costs
@@ -492,18 +546,47 @@ private fun headerHasSignatureStanza(context: android.content.Context, source: S
         false
     }
 
-private fun verdictFor(result: FileVerifier.Result): String = when (result.trust) {
-    FileVerifier.Trust.TRUSTED -> "Signed by ${result.signerName ?: "a known key"} ✓"
-    FileVerifier.Trust.VALID_UNKNOWN -> {
-        val listed = result.untrustedSignerName
-        if (listed != null) {
-            "⚠ Valid signature from \"$listed\", but not trusted: ${result.untrustedReason ?: "its trusted-signer entry does not allow it"}"
-        } else {
-            "Valid signature (signer not in your vault)"
+private fun verdictFor(context: android.content.Context, result: FileVerifier.Result): SignatureVerdict =
+    when (result.trust) {
+        FileVerifier.Trust.TRUSTED -> {
+            val name = result.signerName
+            SignatureVerdict(
+                VerdictKind.TRUSTED,
+                if (name != null) {
+                    context.getString(R.string.files_decrypt_signed_by, name)
+                } else {
+                    context.getString(R.string.files_decrypt_signed_by_known)
+                },
+            )
+        }
+        FileVerifier.Trust.VALID_UNKNOWN -> {
+            val listed = result.untrustedSignerName
+            if (listed != null) {
+                val reason = result.untrustedReason
+                SignatureVerdict(
+                    VerdictKind.NOT_TRUSTED,
+                    if (reason != null) {
+                        context.getString(R.string.files_decrypt_not_trusted, listed, reason)
+                    } else {
+                        context.getString(R.string.files_decrypt_not_trusted_default, listed)
+                    },
+                )
+            } else {
+                SignatureVerdict(VerdictKind.UNKNOWN_SIGNER, context.getString(R.string.files_decrypt_valid_unknown))
+            }
+        }
+        FileVerifier.Trust.INVALID -> {
+            val reason = result.reason
+            SignatureVerdict(
+                VerdictKind.FAILED,
+                if (reason != null) {
+                    context.getString(R.string.files_decrypt_invalid, reason)
+                } else {
+                    context.getString(R.string.files_decrypt_invalid_default)
+                },
+            )
         }
     }
-    FileVerifier.Trust.INVALID -> "⚠ Signature invalid: ${result.reason ?: "verification failed"}"
-}
 
 /**
  * The verdict for a signature-stanza file, checked against the in-memory plaintext before any of
@@ -511,13 +594,21 @@ private fun verdictFor(result: FileVerifier.Result): String = when (result.trust
  * "unsigned" (audit L-9). The namespace and signed message come from the stanza's version.
  */
 private fun stanzaOutcome(
+    context: android.content.Context,
     recovered: Age.DecryptedWithSignature,
     known: List<StoredIdentity>,
     signers: List<StoredSigner>,
 ): DecryptOutcome = when (val opening = recovered.signature) {
     is SignatureStanza.Opening.Absent -> DecryptOutcome(null, null)
     is SignatureStanza.Opening.Unreadable ->
-        DecryptOutcome(null, "⚠ Signature present but unreadable: ${opening.reason}", signatureFailed = true)
+        DecryptOutcome(
+            null,
+            SignatureVerdict(
+                VerdictKind.FAILED,
+                context.getString(R.string.files_decrypt_unreadable, opening.reason),
+            ),
+            signatureFailed = true,
+        )
     is SignatureStanza.Opening.Opened -> {
         val plaintext = recovered.plaintext
         val result = FileVerifier().verifyHashed(
@@ -528,9 +619,9 @@ private fun stanzaOutcome(
         ) { alg -> opening.messageHash(alg) { hashAlg -> SSHSig.hashMessage(plaintext, hashAlg) } }
         DecryptOutcome(
             originalName = null,
-            verdict = verdictFor(result),
+            verdict = verdictFor(context, result),
             signatureFailed = result.trust == FileVerifier.Trust.INVALID,
-            note = if (opening.coversRecipients) null else V1_STANZA_NOTE,
+            note = if (opening.coversRecipients) null else context.getString(R.string.files_decrypt_v1_stanza_note),
         )
     }
 }
@@ -574,7 +665,7 @@ private fun writeDecrypted(
             .use { it.readBytes() }
         val recovered = FileEncryptor.decryptSignedBytes(FileEncryptor.toBinary(rawBytes), identities)
         // Everything is in memory, so the verdict is settled before a byte is written.
-        val outcome = stanzaOutcome(recovered, known, signers)
+        val outcome = stanzaOutcome(context, recovered, known, signers)
         BufferedOutputStream(SafIo.openOutput(context, dest)).use { out ->
             out.write(recovered.plaintext)
             out.flush()
@@ -609,14 +700,21 @@ private fun writeDecrypted(
         bundle.namespace,
     ) { alg -> bundle.messageHash(alg) }
     val failed = result.trust == FileVerifier.Trust.INVALID
-    val verdict = verdictFor(result) +
-        if (failed) ". The file was saved before the signature could be checked: treat its contents as untrusted." else ""
+    val checked = verdictFor(context, result)
+    val verdict = if (failed) {
+        SignatureVerdict(
+            checked.kind,
+            context.getString(R.string.files_decrypt_saved_before_check, checked.text),
+        )
+    } else {
+        checked
+    }
     return DecryptOutcome(
         originalName = bundle.name,
         verdict = verdict,
         signatureFailed = failed,
         nameCovered = bundle.nameCovered,
-        note = if (bundle.nameCovered) null else V1_BUNDLE_NOTE,
+        note = if (bundle.nameCovered) null else context.getString(R.string.files_decrypt_v1_bundle_note),
     )
 }
 
@@ -657,8 +755,8 @@ private fun extractBundleToTree(context: android.content.Context, src: Uri, tree
             count++
         }
     }
-    if (count == 0) throw IllegalStateException("No files found in the bundle.")
-    return "Extracted $count file${if (count == 1) "" else "s"} to the folder."
+    if (count == 0) throw IllegalStateException(context.getString(R.string.files_decrypt_bundle_empty))
+    return context.resources.getQuantityString(R.plurals.files_decrypt_extracted, count, count)
 }
 
 private fun sanitizeEntryName(name: String): String {
@@ -670,17 +768,6 @@ private fun sanitizeEntryName(name: String): String {
  * Decrypting streams, so a memory failure here is almost always scrypt: the work factor is
  * chosen by whoever encrypted the file, and a hostile one can demand gigabytes.
  */
-private fun decryptOutOfMemoryMessage(usingPassphrase: Boolean): String =
-    if (usingPassphrase) {
-        "Not enough memory to derive the key from this passphrase. The file's scrypt work factor " +
-            "sets how much is needed, whatever the file size, and this one asks for more than " +
-            "this device has."
-    } else {
-        "Not enough memory to finish this decrypt. Files are streamed, so this is unusual — " +
-            "closing other apps and trying again should clear it."
-    }
-
-@Composable
-private fun ErrorLine(message: String) {
-    Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-}
+@StringRes
+private fun decryptOutOfMemoryMessage(usingPassphrase: Boolean): Int =
+    if (usingPassphrase) R.string.files_decrypt_oom_passphrase else R.string.files_decrypt_oom

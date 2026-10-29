@@ -15,6 +15,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.fragment.app.FragmentActivity
@@ -53,19 +55,18 @@ fun rememberSensitiveConfirm(
     var askPassword by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val isPin = vault.unlockSecretKind == "pin"
-    val noun = if (isPin) "PIN" else "password"
 
     if (askPassword && pending != null) {
         var value by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { askPassword = false; pending = null },
-            title = { Text("Confirm your $noun") },
+            title = { Text(stringResource(if (isPin) R.string.security_confirm_pin else R.string.security_confirm_password)) },
             text = {
                 OutlinedTextField(
                     value = value,
                     onValueChange = { value = it },
                     singleLine = true,
-                    label = { Text(noun.replaceFirstChar { it.uppercase() }) },
+                    label = { Text(stringResource(if (isPin) R.string.app_pin else R.string.app_password)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password,
@@ -84,29 +85,33 @@ fun rememberSensitiveConfirm(
                         val result = try {
                             withContext(Dispatchers.IO) { vault.verifyAppPassword(chars) }
                         } catch (e: Exception) {
-                            error = e.message ?: "Couldn't check the $noun."
+                            error = e.message ?: activity.getString(
+                                if (isPin) R.string.security_check_pin_failed else R.string.security_check_password_failed
+                            )
                             null
                         } finally {
                             chars.fill(' ')
                         }
                         when (result) {
                             PasswordCheck.Ok -> action?.second?.invoke()
-                            PasswordCheck.Wrong -> error = "Wrong $noun."
-                            is PasswordCheck.LockedOut -> error = UnlockAttempts.lockoutMessage(result.remainingMillis)
+                            PasswordCheck.Wrong -> error = activity.getString(
+                                if (isPin) R.string.security_wrong_pin else R.string.security_wrong_password
+                            )
+                            is PasswordCheck.LockedOut -> error = UnlockAttempts.lockoutMessage(activity, result.remainingMillis)
                             null -> Unit
                         }
                     }
-                }) { Text("Continue") }
+                }) { Text(stringResource(R.string.security_continue)) }
             },
-            dismissButton = { TextButton(onClick = { askPassword = false; pending = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { askPassword = false; pending = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
     if (error != null) {
         AlertDialog(
             onDismissRequest = { error = null },
-            title = { Text("Couldn't confirm it's you") },
+            title = { Text(stringResource(R.string.security_confirm_failed_title)) },
             text = { Text(error ?: "") },
-            confirmButton = { TextButton(onClick = { error = null }) { Text("OK") } },
+            confirmButton = { TextButton(onClick = { error = null }) { Text(stringResource(R.string.security_ok)) } },
         )
     }
 
@@ -119,7 +124,7 @@ fun rememberSensitiveConfirm(
             }
             BiometricGate.canAuthenticate(activity) -> scope.launch {
                 try {
-                    BiometricGate.confirm(activity, title, "Confirm it's you")
+                    BiometricGate.confirm(activity, title, activity.getString(R.string.security_confirm_subtitle))
                     onGranted()
                 } catch (e: BiometricGateException) {
                     if (e.code != BiometricPrompt.ERROR_USER_CANCELED && e.code != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {

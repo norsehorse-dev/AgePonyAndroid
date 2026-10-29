@@ -4,25 +4,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
@@ -54,6 +49,23 @@ import com.agepony.app.vault.isPostQuantum
 import com.agepony.app.vault.publicDisplayString
 import kotlinx.coroutines.launch
 import java.util.UUID
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import com.agepony.app.R
+import android.content.Context
+import androidx.annotation.StringRes
+import androidx.compose.ui.platform.LocalContext
+import com.agepony.core.recipients.MIN_RSA_RECIPIENT_BITS
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.EmptyState
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.QuietAction
+import com.agepony.app.ui.components.SectionHeader
+import com.agepony.app.ui.components.pluralResource
 
 //
 // Recipients pane (Phase 2c-2): list / detail / add. Add Recipient supports the
@@ -69,33 +81,19 @@ import java.util.UUID
 @Composable
 internal fun RecipientList(
     vault: Vault,
-    onAdd: () -> Unit,
     onOpen: (String) -> Unit,
-    onRecentlyDeleted: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 12.dp, top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onRecentlyDeleted) { Text("Recently deleted") }
-            TextButton(onClick = onAdd) { Text("Add") }
-        }
-
-        if (vault.recipients.isEmpty()) {
-            EmptyPane(
-                title = "No recipients yet",
-                body = "Tap Add to paste a public key or fetch from GitHub.",
-            )
-        } else {
-            LazyColumn(Modifier.fillMaxSize()) {
-                items(vault.recipients, key = { it.id }) { recipient ->
-                    RecipientRow(recipient = recipient, onClick = { onOpen(recipient.id) })
-                    HorizontalDivider()
-                }
+    // Add and Recently deleted live in the Identities app bar.
+    if (vault.recipients.isEmpty()) {
+        EmptyState(
+            title = stringResource(R.string.identities_recipients_empty_title),
+            body = stringResource(R.string.identities_recipients_empty_body),
+        )
+    } else {
+        LazyColumn(Modifier.fillMaxSize()) {
+            items(vault.recipients, key = { it.id }) { recipient ->
+                RecipientRow(recipient = recipient, onClick = { onOpen(recipient.id) })
+                ListDivider()
             }
         }
     }
@@ -107,7 +105,7 @@ private fun RecipientRow(recipient: StoredRecipient, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -119,19 +117,14 @@ private fun RecipientRow(recipient: StoredRecipient, onClick: () -> Unit) {
             Text(recipient.name, style = MaterialTheme.typography.bodyLarge)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (recipient.type.isPostQuantum) {
-                    PostQuantumBadge(modifier = Modifier.padding(end = 6.dp))
+                    PostQuantumBadge(modifier = Modifier.padding(end = 8.dp))
                 }
-                Surface(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Text(
-                        text = sourceLabel(recipient.source),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
-                }
+                // Where the key came from, as a plain word (no pill).
+                Text(
+                    text = stringResource(sourceLabel(recipient.source)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(
                     text = recipient.publicDisplayString(),
                     style = MaterialTheme.typography.bodySmall,
@@ -146,7 +139,7 @@ private fun RecipientRow(recipient: StoredRecipient, onClick: () -> Unit) {
             // rather than only when a file is encrypted.
             if (tooSmall) {
                 Text(
-                    RecipientImport.rsaTooSmallMessage(null),
+                    rsaTooSmallText(LocalContext.current, null),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -160,20 +153,34 @@ internal fun RecipientDetail(
     vault: Vault,
     recipientId: String,
     onBack: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val recipient = vault.recipients.firstOrNull { it.id == recipientId }
+    var confirmDelete by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onBack) { Text("‹ Back") }
-        }
+    if (confirmDelete && recipient != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.recipient_delete_title, recipient.name)) },
+            text = { Text(stringResource(R.string.recipient_delete_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    vault.deleteRecipient(recipientId)
+                    onBack()
+                }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
 
+    AgeScreen(title = stringResource(R.string.recipient_title), modifier = modifier, onBack = onBack) { padding ->
+    Column(Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState())) {
         if (recipient == null) {
             Text(
-                "Recipient not found.",
+                stringResource(R.string.identities_recipient_not_found),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(24.dp),
             )
@@ -181,7 +188,7 @@ internal fun RecipientDetail(
         }
 
         Column(
-            Modifier.padding(horizontal = 20.dp),
+            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val renaming = remember(recipientId) { mutableStateOf(false) }
@@ -190,38 +197,47 @@ internal fun RecipientDetail(
                 OutlinedTextField(
                     value = draftName.value,
                     onValueChange = { draftName.value = it },
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.identities_name_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { renaming.value = false }) { Text("Cancel") }
+                    TextButton(onClick = { renaming.value = false }) { Text(stringResource(R.string.action_cancel)) }
                     Button(
                         onClick = {
                             vault.renameRecipient(recipientId, draftName.value)
                             renaming.value = false
                         },
                         enabled = draftName.value.isNotBlank(),
-                    ) { Text("Save") }
+                    ) { Text(stringResource(R.string.identities_save)) }
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         recipient.name,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(onClick = {
                         draftName.value = recipient.name
                         renaming.value = true
-                    }) { Text("Rename") }
+                    }) { Text(stringResource(R.string.identities_rename)) }
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "${typeLabel(recipient.type)}  •  ${sourceLabel(recipient.source)}" +
-                        (recipient.sourceMetadata?.let { "  •  $it" } ?: ""),
+                    recipient.sourceMetadata?.let { meta ->
+                        stringResource(
+                            R.string.identities_recipient_meta_extra,
+                            stringResource(typeLabel(recipient.type)),
+                            stringResource(sourceDetailLabel(recipient.source)),
+                            meta,
+                        )
+                    } ?: stringResource(
+                        R.string.identities_recipient_meta,
+                        stringResource(typeLabel(recipient.type)),
+                        stringResource(sourceDetailLabel(recipient.source)),
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f, fill = false),
@@ -239,36 +255,39 @@ internal fun RecipientDetail(
             }
             if (RecipientImport.isRsaBelowMinimum(recipient.type, recipient.publicKeyB64)) {
                 Text(
-                    RecipientImport.rsaTooSmallMessage(RecipientImport.rsaBits(recipient.type, recipient.publicKeyB64)) +
-                        " Files can't be encrypted to this key; ask for a larger or an Ed25519 key.",
+                    rsaTooSmallText(
+                        LocalContext.current,
+                        RecipientImport.rsaBits(recipient.type, recipient.publicKeyB64),
+                        withAdvice = true,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
             }
 
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            ListDivider(Modifier.padding(vertical = 8.dp))
 
-            KeyBlock(label = "Public key", value = recipient.publicDisplayString())
+            KeyBlock(label = stringResource(R.string.identities_public_key), value = recipient.publicDisplayString())
 
-            TextButton(onClick = {
-                vault.deleteRecipient(recipientId)
-                onBack()
-            }) {
-                Text("Delete recipient", color = MaterialTheme.colorScheme.error)
-            }
+            QuietAction(text = stringResource(R.string.identities_recipient_delete_button), onClick = { confirmDelete = true }, destructive = true)
             Text(
-                "Recipients are public keys — you can always add this one again later.",
+                stringResource(R.string.identities_recipient_delete_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 24.dp),
             )
         }
     }
+    }
 }
 
 // MARK: - Add recipient
 
-private enum class AddRecipientSource(val label: String) { PASTE("Paste"), GITHUB("GitHub"), SCAN("Scan") }
+private enum class AddRecipientSource(@StringRes val label: Int) {
+    PASTE(R.string.identities_add_source_paste),
+    GITHUB(R.string.identities_add_source_github),
+    SCAN(R.string.identities_add_source_scan),
+}
 
 private class EditableCandidate(val candidate: RecipientCandidate) {
     val key: String = UUID.randomUUID().toString()
@@ -283,6 +302,7 @@ internal fun AddRecipientFlow(
     vault: Vault,
     onDone: () -> Unit,
     onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var source by rememberSaveable { mutableStateOf(AddRecipientSource.PASTE) }
     var pasteText by rememberSaveable { mutableStateOf("") }
@@ -311,6 +331,7 @@ internal fun AddRecipientFlow(
                 showScanner = false
             },
             onCancel = { showScanner = false },
+            modifier = modifier,
         )
         return
     }
@@ -337,44 +358,38 @@ internal fun AddRecipientFlow(
     if (confirmUnnamed) {
         AlertDialog(
             onDismissRequest = { confirmUnnamed = false },
-            title = { Text("Unnamed recipient") },
+            title = { Text(stringResource(R.string.identities_unnamed_title)) },
             text = {
-                Text(
-                    "You haven't written the name of one or more recipients. " +
-                        "Save changes anyway?"
-                )
+                Text(stringResource(R.string.identities_unnamed_body))
             },
             confirmButton = {
                 TextButton(onClick = {
                     confirmUnnamed = false
                     commit()
-                }) { Text("Save anyway") }
+                }) { Text(stringResource(R.string.identities_unnamed_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmUnnamed = false }) { Text("Go back") }
+                TextButton(onClick = { confirmUnnamed = false }) { Text(stringResource(R.string.identities_unnamed_go_back)) }
             },
         )
     }
 
+    AgeScreen(title = stringResource(R.string.action_add_recipient), modifier = modifier, onBack = onCancel) { padding ->
     Column(
         Modifier
             .fillMaxSize()
+            .padding(padding)
+            .imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            "Add recipient",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
-
         PrimaryTabRow(selectedTabIndex = source.ordinal) {
             AddRecipientSource.entries.forEach { s ->
                 Tab(
                     selected = source == s,
                     onClick = { source = s; inputError = null },
-                    text = { Text(s.label) },
+                    text = { Text(stringResource(s.label)) },
                 )
             }
         }
@@ -384,7 +399,7 @@ internal fun AddRecipientFlow(
                 OutlinedTextField(
                     value = pasteText,
                     onValueChange = { pasteText = it; inputError = null },
-                    label = { Text("age1… / age1pq… or ssh-ed25519 / ssh-rsa AAAA…") },
+                    label = { Text(stringResource(R.string.identities_paste_label)) },
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -400,14 +415,14 @@ internal fun AddRecipientFlow(
                         }
                     },
                     enabled = pasteText.isNotBlank(),
-                ) { Text("Parse") }
+                ) { Text(stringResource(R.string.identities_parse)) }
             }
 
             AddRecipientSource.GITHUB -> {
                 OutlinedTextField(
                     value = githubUser,
                     onValueChange = { githubUser = it; inputError = null },
-                    label = { Text("GitHub username") },
+                    label = { Text(stringResource(R.string.identities_github_username)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -432,10 +447,14 @@ internal fun AddRecipientFlow(
                     },
                     enabled = githubUser.isNotBlank() && !loading,
                 ) {
-                    if (loading) CircularProgressIndicator(modifier = Modifier.height(18.dp)) else Text("Fetch")
+                    if (loading) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(stringResource(R.string.identities_fetch))
+                    }
                 }
                 Text(
-                    "Fetches github.com/<username>.keys. Only ed25519 and RSA keys are read.",
+                    stringResource(R.string.identities_github_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -443,30 +462,25 @@ internal fun AddRecipientFlow(
 
             AddRecipientSource.SCAN -> {
                 Text(
-                    "Scan a QR code that encodes an age recipient (age1… / age1pq…) or an OpenSSH public key.",
+                    stringResource(R.string.identities_scan_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = { inputError = null; showScanner = true }) { Text("Open camera") }
+                Button(onClick = { inputError = null; showScanner = true }) { Text(stringResource(R.string.identities_open_camera)) }
             }
         }
 
-        if (inputError != null) {
-            Text(inputError!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        }
+        if (inputError != null) ErrorText(inputError!!)
 
         if (candidates.isNotEmpty()) {
-            HorizontalDivider()
-            Text(
-                "Found ${candidates.size} recipient${if (candidates.size == 1) "" else "s"}",
-                style = MaterialTheme.typography.titleSmall,
-            )
+            ListDivider()
+            SectionHeader(pluralResource(R.plurals.recipients_found, candidates.size, candidates.size))
             candidates.forEach { ec ->
                 CandidateRow(
                     ec = ec,
                     onDiscard = { candidates.removeAll { it.key == ec.key } },
                 )
-                HorizontalDivider()
+                ListDivider()
             }
         }
 
@@ -482,9 +496,15 @@ internal fun AddRecipientFlow(
                 },
                 enabled = savable > 0,
                 modifier = Modifier.weight(1f),
-            ) { Text(if (savable > 0) "Save $savable" else "Save") }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel") }
+            ) {
+                Text(
+                    if (savable > 0) pluralResource(R.plurals.identities_save_count, savable, savable)
+                    else stringResource(R.string.identities_save)
+                )
+            }
+            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_cancel)) }
         }
+    }
     }
 }
 
@@ -493,12 +513,20 @@ private fun CandidateRow(ec: EditableCandidate, onDiscard: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         // Which key this is, first — then an empty field to name it. The order matters:
         // a name field pre-filled with the key reads as a label, not as an input.
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Switch(checked = ec.include, onCheckedChange = { ec.include = it })
+        // The whole row toggles "include"; the Switch only draws it. Discard stays its own button.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.toggleable(
+                value = ec.include,
+                role = Role.Switch,
+                onValueChange = { ec.include = it },
+            ),
+        ) {
+            Switch(checked = ec.include, onCheckedChange = null)
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(
-                    typeLabel(ec.candidate.type),
-                    style = MaterialTheme.typography.labelSmall,
+                    stringResource(typeLabel(ec.candidate.type)),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
@@ -520,21 +548,22 @@ private fun CandidateRow(ec: EditableCandidate, onDiscard: () -> Unit) {
                 }
                 if (ec.tooSmall) {
                     Text(
-                        RecipientImport.rsaTooSmallMessage(
-                            RecipientImport.rsaBits(ec.candidate.type, ec.candidate.publicKeyB64)
+                        rsaTooSmallText(
+                            LocalContext.current,
+                            RecipientImport.rsaBits(ec.candidate.type, ec.candidate.publicKeyB64),
                         ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
             }
-            TextButton(onClick = onDiscard) { Text("Discard") }
+            TextButton(onClick = onDiscard) { Text(stringResource(R.string.identities_discard)) }
         }
         OutlinedTextField(
             value = ec.name,
             onValueChange = { ec.name = it },
-            label = { Text("Name") },
-            placeholder = { Text("e.g. Alice") },
+            label = { Text(stringResource(R.string.identities_name_label)) },
+            placeholder = { Text(stringResource(R.string.identities_name_placeholder)) },
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
@@ -570,20 +599,42 @@ private fun candidateKeySummary(candidate: RecipientCandidate): String {
 
 // MARK: - Labels
 
-private fun typeLabel(t: StoredRecipientType): String = when (t) {
-    StoredRecipientType.X25519 -> "age X25519"
-    StoredRecipientType.MLKEM768X25519 -> "Quantum-safe (ML-KEM-768 + X25519)"
-    StoredRecipientType.SSH_ED25519 -> "SSH Ed25519"
-    StoredRecipientType.SSH_RSA -> "SSH RSA"
-    StoredRecipientType.YUBIKEY_P256 -> "YubiKey (P-256)"
-    StoredRecipientType.TAG -> "Hardware key (age1tag)"
-    StoredRecipientType.TAG_PQ -> "Hardware key, quantum-safe (age1tagpq)"
+@StringRes
+private fun typeLabel(t: StoredRecipientType): Int = when (t) {
+    StoredRecipientType.X25519 -> R.string.identities_type_x25519
+    StoredRecipientType.MLKEM768X25519 -> R.string.identities_type_mlkem
+    StoredRecipientType.SSH_ED25519 -> R.string.identities_type_ssh_ed25519
+    StoredRecipientType.SSH_RSA -> R.string.identities_type_ssh_rsa
+    StoredRecipientType.YUBIKEY_P256 -> R.string.identities_rtype_yubikey
+    StoredRecipientType.TAG -> R.string.identities_rtype_tag
+    StoredRecipientType.TAG_PQ -> R.string.identities_rtype_tag_pq
 }
 
-private fun sourceLabel(s: StoredRecipientSource): String = when (s) {
-    StoredRecipientSource.PASTE_AGE -> "PASTE"
-    StoredRecipientSource.PASTE_SSH -> "PASTE"
-    StoredRecipientSource.QR_SCAN -> "QR"
-    StoredRecipientSource.GITHUB -> "GITHUB"
-    StoredRecipientSource.DERIVED_FROM_IDENTITY -> "SELF"
+/** Where a recipient came from, as a row label (sentence start). */
+@StringRes
+private fun sourceLabel(s: StoredRecipientSource): Int = when (s) {
+    StoredRecipientSource.PASTE_AGE -> R.string.identities_source_pasted
+    StoredRecipientSource.PASTE_SSH -> R.string.identities_source_pasted
+    StoredRecipientSource.QR_SCAN -> R.string.identities_source_scanned
+    StoredRecipientSource.GITHUB -> R.string.identities_source_github
+    StoredRecipientSource.DERIVED_FROM_IDENTITY -> R.string.identities_source_identity
+}
+
+/** The same source word in the middle of the detail line ("age X25519, pasted"). */
+@StringRes
+private fun sourceDetailLabel(s: StoredRecipientSource): Int = when (s) {
+    StoredRecipientSource.PASTE_AGE -> R.string.identities_source_pasted_inline
+    StoredRecipientSource.PASTE_SSH -> R.string.identities_source_pasted_inline
+    StoredRecipientSource.QR_SCAN -> R.string.identities_source_scanned_inline
+    StoredRecipientSource.GITHUB -> R.string.identities_source_github
+    StoredRecipientSource.DERIVED_FROM_IDENTITY -> R.string.identities_source_identity_inline
+}
+
+/** "Too small to encrypt to" text for an ssh-rsa key under the minimum (audit L-4). */
+internal fun rsaTooSmallText(context: Context, bits: Int?, withAdvice: Boolean = false): String = when {
+    bits != null && withAdvice ->
+        context.getString(R.string.identities_rsa_too_small_bits_advice, bits, MIN_RSA_RECIPIENT_BITS)
+    bits != null -> context.getString(R.string.identities_rsa_too_small_bits, bits, MIN_RSA_RECIPIENT_BITS)
+    withAdvice -> context.getString(R.string.identities_rsa_too_small_advice, MIN_RSA_RECIPIENT_BITS)
+    else -> context.getString(R.string.identities_rsa_too_small, MIN_RSA_RECIPIENT_BITS)
 }

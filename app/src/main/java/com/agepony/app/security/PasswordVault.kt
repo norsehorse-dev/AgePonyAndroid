@@ -1,5 +1,8 @@
 package com.agepony.app.security
 
+import android.content.Context
+import com.agepony.app.R as AppR
+import com.agepony.app.vault.UiText
 import com.agepony.app.vault.VaultCrypto
 import com.agepony.core.crypto.Scrypt
 import java.security.SecureRandom
@@ -186,16 +189,24 @@ object PasswordVault {
      * or null if it's acceptable (audit M-1). A PIN must be digits only, since the unlock
      * screen shows a number pad for it.
      */
-    fun secretPolicyError(secret: CharSequence, kind: String): String? =
+    fun secretPolicyErrorText(secret: CharSequence, kind: String): UiText? =
         if (kind == "pin") {
             when {
-                secret.any { it !in '0'..'9' } -> "A PIN can only contain digits."
-                secret.length < MIN_PIN_LENGTH -> "Use at least $MIN_PIN_LENGTH digits."
+                secret.any { it !in '0'..'9' } -> UiText.res(AppR.string.core_pin_digits_only)
+                secret.length < MIN_PIN_LENGTH -> UiText.plural(AppR.plurals.core_pin_min_digits, MIN_PIN_LENGTH, MIN_PIN_LENGTH)
                 else -> null
             }
         } else {
-            if (secret.length < MIN_PASSWORD_LENGTH) "Use at least $MIN_PASSWORD_LENGTH characters." else null
+            if (secret.length < MIN_PASSWORD_LENGTH) {
+                UiText.plural(AppR.plurals.core_password_min_chars, MIN_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH)
+            } else {
+                null
+            }
         }
+
+    /** [secretPolicyErrorText] in the app's language, for display. */
+    fun secretPolicyError(context: Context, secret: CharSequence, kind: String): String? =
+        secretPolicyErrorText(secret, kind)?.resolve(context)
 
     // --- internals ---
 

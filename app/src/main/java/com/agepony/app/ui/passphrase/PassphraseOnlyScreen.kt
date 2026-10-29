@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,7 +15,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
@@ -32,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -47,6 +44,16 @@ import com.agepony.app.vault.WrongPassphraseException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.SectionHeader
+import com.agepony.app.ui.components.showOwnCopyConfirmation
+import com.agepony.app.ui.theme.mono
+import kotlinx.coroutines.delay
 
 /**
  * Passphrase work without unlocking the vault (issue #13). The app lock guards the vault's keys
@@ -63,30 +70,22 @@ fun PassphraseOnlyScreen(
     initialFile: Uri? = null,
 ) {
     var tab by rememberSaveable { mutableStateOf(if (initialFile != null) 1 else 0) }
-    Scaffold { padding ->
+    // The app bar back arrow and system back return to the unlock screen.
+    AgeScreen(title = stringResource(R.string.app_passphrase_only_title), onBack = onClose) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onClose) { Text("‹ Back to unlock") }
-            }
             Text(
-                "Passphrase only",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
-            Text(
-                "Your vault stays locked. Nothing here can see your keys, recipients or notes.",
-                style = MaterialTheme.typography.bodySmall,
+                stringResource(R.string.app_passphrase_only_intro),
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            PrimaryTabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Text") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Decrypt a file") })
+            PrimaryTabRow(selectedTabIndex = tab, containerColor = MaterialTheme.colorScheme.background) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.app_tab_text)) })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.files_decrypt)) })
             }
             when (tab) {
                 0 -> PassphraseText(vault, initialText.orEmpty())
-                else -> DecryptFlow(vault = vault, initialUri = initialFile, onClose = onClose)
+                else -> DecryptFlow(vault = vault, initialUri = initialFile, showTopBar = false, onClose = onClose)
             }
         }
     }
@@ -104,13 +103,17 @@ private fun PassphraseText(vault: Vault, initialText: String) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val decrypting = ShareSniff.textLooksEncrypted(input)
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) { delay(1500); copied = false }
+    }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (result != null) {
-            Text(if (resultIsPlaintext) "Decrypted text" else "Armored output", style = MaterialTheme.typography.titleSmall)
+            SectionHeader(stringResource(if (resultIsPlaintext) R.string.app_passphrase_decrypted_text else R.string.app_passphrase_armored_output))
             // Non-selectable text, so a long-press Copy can't skip ClipboardGuard (audit L-23).
             Surface(
                 shape = MaterialTheme.shapes.extraSmall,
@@ -119,29 +122,34 @@ private fun PassphraseText(vault: Vault, initialText: String) {
             ) {
                 Text(
                     result!!,
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    // Monospace for armored ciphertext only; decrypted text is prose.
+                    style = if (resultIsPlaintext) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.mono,
                     minLines = 6,
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                 )
             }
-            Button(onClick = { ClipboardGuard.copySensitive(context, result!!) }, modifier = Modifier.fillMaxWidth()) { Text("Copy") }
+            // Android 13+ confirms the copy itself; only older versions get our own "Copied".
+            Button(
+                onClick = { ClipboardGuard.copySensitive(context, result!!); copied = showOwnCopyConfirmation },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(if (copied) R.string.action_copied else R.string.action_copy)) }
             if (!resultIsPlaintext) {
-                OutlinedButton(onClick = { ShareOut.text(context, result!!, "Share encrypted text") }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Share…")
+                OutlinedButton(onClick = { ShareOut.text(context, result!!, context.getString(R.string.app_passphrase_share_chooser)) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.app_share_ellipsis))
                 }
             }
-            TextButton(onClick = { result = null; input = ""; passphrase = ""; confirm = "" }) { Text("Start over") }
+            TextButton(onClick = { result = null; input = ""; passphrase = ""; confirm = "" }) { Text(stringResource(R.string.app_start_over)) }
             return@Column
         }
 
         OutlinedTextField(
             value = input, onValueChange = { input = it; error = null },
-            label = { Text("Text to encrypt, or an armored age block to decrypt") },
+            label = { Text(stringResource(R.string.app_passphrase_input_label)) },
             minLines = 6, modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = passphrase, onValueChange = { passphrase = it; error = null },
-            label = { Text("Passphrase") }, singleLine = true,
+            label = { Text(stringResource(R.string.notes_passphrase)) }, singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth(),
@@ -149,13 +157,13 @@ private fun PassphraseText(vault: Vault, initialText: String) {
         if (!decrypting) {
             OutlinedTextField(
                 value = confirm, onValueChange = { confirm = it; error = null },
-                label = { Text("Confirm passphrase") }, singleLine = true,
+                label = { Text(stringResource(R.string.notes_confirm_passphrase)) }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        error?.let { ErrorText(it) }
         val ready = !busy && input.isNotBlank() && passphrase.isNotEmpty() && (decrypting || passphrase == confirm)
         Button(
             onClick = {
@@ -180,9 +188,11 @@ private fun PassphraseText(vault: Vault, initialText: String) {
                     } catch (e: ScryptMemoryException) {
                         error = e.message
                     } catch (e: OutOfMemoryError) {
-                        error = "Not enough memory for this passphrase's work factor on this device."
+                        error = context.getString(R.string.app_passphrase_oom)
                     } catch (e: Exception) {
-                        error = e.message ?: if (decrypting) "Decrypt failed." else "Encrypt failed."
+                        error = e.message ?: context.getString(
+                            if (decrypting) R.string.app_decrypt_failed else R.string.app_encrypt_failed
+                        )
                     } finally {
                         busy = false
                     }
@@ -190,10 +200,16 @@ private fun PassphraseText(vault: Vault, initialText: String) {
             },
             enabled = ready,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (decrypting) "Decrypt with passphrase" else "Encrypt with passphrase") }
+        ) {
+            Text(
+                stringResource(
+                    if (decrypting) R.string.app_passphrase_decrypt_action else R.string.app_passphrase_encrypt_action
+                )
+            )
+        }
         if (busy) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
         if (!decrypting && confirm.isNotEmpty() && passphrase != confirm) {
-            Text("The passphrases don't match.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.notes_passphrase_mismatch), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

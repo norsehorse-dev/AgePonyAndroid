@@ -19,7 +19,7 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,10 +32,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.systemBarsPadding
 
 //
 // First-run dynamic walkthrough (Phase 2e). Shown once after the vault is first
@@ -54,44 +59,35 @@ import kotlinx.coroutines.launch
 
 private data class OnboardingPage(
     val icon: ImageVector,
-    val title: String,
-    val body: String,
+    @StringRes val title: Int,
+    @StringRes val body: Int,
 )
 
 private fun onboardingPages(): List<OnboardingPage> = listOf(
     OnboardingPage(
         icon = Icons.Filled.Lock,
-        title = "Welcome to AgePony",
-        body = "AgePony encrypts files, text, and notes with the modern age " +
-            "encryption standard. Everything happens right here on your device.",
+        title = R.string.app_welcome_title,
+        body = R.string.app_onboarding_welcome_body,
     ),
     OnboardingPage(
         icon = Icons.Filled.Person,
-        title = "Your identity, your keys",
-        body = "An identity is your personal keypair. The private key is sealed " +
-            "in your vault and never leaves this device. Create one on the " +
-            "Identities tab to start encrypting.",
+        title = R.string.app_onboarding_identity_title,
+        body = R.string.app_onboarding_identity_body,
     ),
     OnboardingPage(
-        icon = Icons.Filled.Send,
-        title = "Encrypt for anyone",
-        body = "Add recipients by their public key or GitHub username. Encrypt " +
-            "to one person or many at once, and to yourself so you can always " +
-            "open your own files.",
+        icon = Icons.AutoMirrored.Filled.Send,
+        title = R.string.app_onboarding_recipients_title,
+        body = R.string.app_onboarding_recipients_body,
     ),
     OnboardingPage(
         icon = Icons.Filled.Create,
-        title = "Files, Text, and Notes",
-        body = "Encrypt and decrypt files from the Files tab, scramble short " +
-            "messages on the Text tab, and keep private notes locked behind " +
-            "your vault.",
+        title = R.string.app_onboarding_files_title,
+        body = R.string.app_onboarding_files_body,
     ),
     OnboardingPage(
         icon = Icons.Filled.Info,
-        title = "Private by design",
-        body = "No accounts. No servers. No tracking. Your vault is sealed on " +
-            "this device and opened only by your biometric or device passcode. " +
-            "Your keys and your data stay with you.",
+        title = R.string.app_onboarding_private_title,
+        body = R.string.app_onboarding_private_body,
     ),
 )
 
@@ -101,6 +97,8 @@ fun OnboardingScreen(onFinish: () -> Unit) {
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
     val onLastPage = pagerState.currentPage == pages.lastIndex
+    // System back leaves the walkthrough (same as Skip) instead of closing the app.
+    BackHandler(onBack = onFinish)
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -109,10 +107,11 @@ fun OnboardingScreen(onFinish: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .systemBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
             // Skip is available on every page except the last, where the primary
-            // button reads "Get started" and finishes. Keep the row height stable
+            // button reads "Done" and finishes. Keep the row height stable
             // so slides don't shift when Skip hides.
             Row(
                 modifier = Modifier
@@ -122,7 +121,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (!onLastPage) {
-                    TextButton(onClick = onFinish) { Text("Skip") }
+                    TextButton(onClick = onFinish) { Text(stringResource(R.string.app_onboarding_skip)) }
                 }
             }
 
@@ -155,7 +154,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (onLastPage) "Get started" else "Next")
+                Text(stringResource(if (onLastPage) R.string.app_done else R.string.app_onboarding_next))
             }
         }
     }
@@ -186,14 +185,14 @@ private fun PageContent(page: OnboardingPage) {
         }
         Spacer(Modifier.height(32.dp))
         Text(
-            text = page.title,
+            text = stringResource(page.title),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = page.body,
+            text = stringResource(page.body),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center,

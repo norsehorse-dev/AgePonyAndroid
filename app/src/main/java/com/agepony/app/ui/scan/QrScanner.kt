@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +43,9 @@ import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import com.agepony.app.ui.components.AgeScreen
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
 
 //
 // QR scanner (Phase 2d-3c). Android counterpart of the iOS AddRecipientView
@@ -74,11 +76,14 @@ fun QrScanner(
         if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
-    Box(modifier.fillMaxSize()) {
+    // Full screen with its own app bar: the back arrow and the system back gesture
+    // both cancel the scan.
+    AgeScreen(title = stringResource(R.string.scan_title), modifier = modifier, onBack = onCancel) { padding ->
+    Box(Modifier.fillMaxSize().padding(padding)) {
         if (hasPermission) {
             CameraPreview(onResult = onResult)
             Text(
-                "Point the camera at a QR code containing an age recipient or SSH public key.",
+                stringResource(R.string.app_scan_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White,
                 textAlign = TextAlign.Center,
@@ -93,21 +98,17 @@ fun QrScanner(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    "Camera access is needed to scan QR codes.",
+                    stringResource(R.string.app_scan_permission_needed),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                 )
                 Button(
                     onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
                     modifier = Modifier.padding(top = 16.dp),
-                ) { Text("Grant camera access") }
+                ) { Text(stringResource(R.string.app_scan_allow_camera)) }
             }
         }
-
-        TextButton(
-            onClick = onCancel,
-            modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
-        ) { Text("Cancel") }
+    }
     }
 }
 

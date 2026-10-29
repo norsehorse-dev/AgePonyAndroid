@@ -1,5 +1,7 @@
 package com.agepony.app.vault
 
+import android.content.Context
+import com.agepony.app.R
 import com.agepony.core.recipients.AgeIdentity
 import com.agepony.core.recipients.AgeRecipient
 import com.agepony.core.recipients.HybridIdentity
@@ -121,19 +123,17 @@ fun StoredIdentity.publicDisplayString(): String = when (type) {
     StoredIdentityType.YUBIKEY_PIV -> P256Recipient(b64d(publicKeyB64)).toBech32()
 }
 
-fun StoredIdentity.privateDisplayString(): String = when (type) {
+fun StoredIdentity.privateDisplayString(context: Context): String = when (type) {
     StoredIdentityType.X25519 -> X25519Identity(b64d(privateKeyB64)).toBech32()
     StoredIdentityType.MLKEM768X25519 -> HybridIdentity(b64d(privateKeyB64)).toBech32()
-    StoredIdentityType.SSH_ED25519 ->
-        "(SSH Ed25519 — private key stored in the vault; not exportable as text)"
+    StoredIdentityType.SSH_ED25519 -> context.getString(R.string.core_private_ssh_ed25519)
     // The stored decrypted PEM, same as iOS. The vault's encryption is what protects it.
     StoredIdentityType.SSH_RSA -> String(b64d(privateKeyB64), Charsets.UTF_8)
-    StoredIdentityType.HARDWARE_KEY ->
-        "(hardware key — private key stays in the device keystore; not exportable)"
+    StoredIdentityType.HARDWARE_KEY -> context.getString(R.string.core_private_hardware)
     StoredIdentityType.SK_ED25519, StoredIdentityType.SK_ECDSA_P256 ->
-        "(security key — signing happens on the FIDO device over NFC; no exportable private key)"
+        context.getString(R.string.core_private_security_key)
     StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ ->
-        "(hardware key: decryption happens inside this device's secure hardware; not exportable)"
+        context.getString(R.string.core_private_hardware_tag)
     // The age-plugin-yubikey identity line: a pointer to the slot, safe to copy to a computer.
     StoredIdentityType.YUBIKEY_PIV -> YubiKeyStub.fromBytes(b64d(privateKeyB64)).encode()
 }

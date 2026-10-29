@@ -16,6 +16,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.agepony.app.R
 import com.agepony.app.ui.files.DecryptFlow
 import com.agepony.app.ui.files.EncryptFlow
 import com.agepony.app.ui.text.TextDecrypt
@@ -23,6 +25,7 @@ import com.agepony.app.ui.text.TextEncrypt
 import com.agepony.app.vault.Vault
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.WindowInsets
 
 private enum class ShareMode { DETECTING, ENCRYPT, DECRYPT }
 
@@ -54,7 +57,9 @@ fun ShareScreen(
         }
     }
 
-    Scaffold { padding ->
+    // The flows below draw their own TopAppBar and handle the system-bar insets
+    // themselves, so this Scaffold adds none.
+    Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { padding ->
         val modifier = Modifier.fillMaxSize().padding(padding)
         when (mode) {
             ShareMode.DETECTING -> Column(
@@ -71,8 +76,7 @@ fun ShareScreen(
                     initialText = payload.text,
                     onReplace = if (payload.canReplace) onReplaceText else null,
                     replaceUnavailableNote = if (payload.processText && !payload.canReplace) {
-                        "The app you selected this in only lets AgePony read the text, not change it. " +
-                            "Copy the result and paste it back over your selection."
+                        stringResource(R.string.app_share_replace_unavailable)
                     } else null,
                 )
                 is SharePayload.Files -> EncryptFlow(

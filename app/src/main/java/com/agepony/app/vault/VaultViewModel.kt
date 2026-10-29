@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.agepony.app.R
 import com.agepony.app.security.AutoLock
 import com.agepony.app.security.BiometricGate
 import com.agepony.app.security.BiometricGateException
@@ -86,15 +87,15 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             error = null
             try {
                 if (!BiometricGate.canAuthenticate(activity)) {
-                    error = "Set up a screen lock or biometric to secure your AgePony vault."
+                    error = str(R.string.core_vault_no_screen_lock)
                     return@launch
                 }
                 KeystoreMasterKey.generate()
                 val cipher = KeystoreMasterKey.wrapCipher()
                 val authed = BiometricGate.authenticate(
                     activity,
-                    title = "Create AgePony vault",
-                    subtitle = "Confirm it's you to secure your keys",
+                    title = str(R.string.core_prompt_create_title),
+                    subtitle = str(R.string.core_prompt_create_subtitle),
                     cryptoObject = BiometricPrompt.CryptoObject(cipher)
                 )
                 withContext(Dispatchers.IO) {
@@ -112,9 +113,9 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: BiometricGateException) {
                 error = if (e.code == BiometricPrompt.ERROR_USER_CANCELED ||
                     e.code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                ) null else (e.message ?: "Authentication failed")
+                ) null else (e.message ?: str(R.string.core_auth_failed))
             } catch (e: Exception) {
-                error = e.message ?: "Could not create the vault"
+                error = e.message ?: str(R.string.core_vault_create_failed)
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -134,7 +135,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             isBusy = true
             error = null
             try {
-                PasswordVault.secretPolicyError(CharBuffer.wrap(secret), kind)?.let {
+                PasswordVault.secretPolicyError(getApplication<Application>(), CharBuffer.wrap(secret), kind)?.let {
                     throw IllegalStateException(it)
                 }
                 withContext(Dispatchers.IO) {
@@ -151,7 +152,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 provisioned = true
                 secretBelowMinimum = false
             } catch (e: Exception) {
-                error = e.message ?: "Could not create the vault"
+                error = e.message ?: str(R.string.core_vault_create_failed)
             } finally {
                 secret.fill('\u0000')
                 syncSecretFlags()
@@ -183,7 +184,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 provisioned = true
             } catch (e: Exception) {
-                error = e.message ?: "Could not create the vault"
+                error = e.message ?: str(R.string.core_vault_create_failed)
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -233,8 +234,8 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 val cipher = KeystoreMasterKey.unwrapCipher(iv)
                 val authed = BiometricGate.authenticate(
                     activity,
-                    title = "Unlock AgePony",
-                    subtitle = "Confirm it's you",
+                    title = str(R.string.security_prompt_unlock_title),
+                    subtitle = str(R.string.security_confirm_subtitle),
                     cryptoObject = BiometricPrompt.CryptoObject(cipher),
                     deviceCredentialOnly = deviceCredentialOnly,
                 )
@@ -246,12 +247,12 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: BiometricGateException) {
                 error = if (e.code == BiometricPrompt.ERROR_USER_CANCELED ||
                     e.code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                ) null else (e.message ?: "Authentication failed")
+                ) null else (e.message ?: str(R.string.core_auth_failed))
             } catch (e: KekUnavailableException) {
                 recoverOrphanedVault()
             } catch (e: Exception) {
                 // A KEK invalidated by new biometric enrollment lands here.
-                error = e.message ?: "Could not unlock the vault"
+                error = e.message ?: str(R.string.core_vault_unlock_failed)
             } finally {
                 isBusy = false
             }
@@ -305,7 +306,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: KekUnavailableException) {
                 recoverOrphanedVault()
             } catch (e: Exception) {
-                error = e.message ?: "Could not unlock the vault"
+                error = e.message ?: str(R.string.core_vault_unlock_failed)
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -331,7 +332,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: KekUnavailableException) {
                 recoverOrphanedVault()
             } catch (e: Exception) {
-                error = e.message ?: "Could not unlock the vault"
+                error = e.message ?: str(R.string.core_vault_unlock_failed)
             } finally {
                 isBusy = false
             }
@@ -354,9 +355,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             vault.reset()
         }
         syncSecretFlags()
-        error = "AgePony was reinstalled or restored from a backup, and the device " +
-            "key that sealed your old vault is gone, so it can't be reopened. Set up " +
-            "a new vault to continue."
+        error = str(R.string.core_vault_orphaned)
     }
 
     // MARK: - App-owned password / PIN unlock (4.0.0)
@@ -392,11 +391,11 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val wait = vault.unlockAttempts.remainingLockoutMillis()
                 if (wait > 0L) {
-                    error = UnlockAttempts.lockoutMessage(wait)
+                    error = UnlockAttempts.lockoutMessage(getApplication<Application>(), wait)
                     return@launch
                 }
                 val belowMinimum =
-                    PasswordVault.secretPolicyError(CharBuffer.wrap(secret), vault.unlockSecretKind ?: "password") != null
+                    PasswordVault.secretPolicyErrorText(CharBuffer.wrap(secret), vault.unlockSecretKind ?: "password") != null
                 var attemptCount = 0
                 val outcome = withContext(Dispatchers.IO) {
                     // Counted before the check, so killing the app mid-attempt can't make a guess free.
@@ -429,17 +428,18 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     PasswordVault.Outcome.Wrong -> {
                         if (vault.eraseAfterFailedAttempts && attemptCount >= UnlockAttempts.ERASE_AFTER) {
-                            val erasedNoun = noun
+                            val erasedId = pick(R.plurals.core_vault_erased_pin, R.plurals.core_vault_erased_password)
                             withContext(Dispatchers.IO) { performFailedAttemptsWipe() }
-                            error = "The $erasedNoun was entered wrong ${UnlockAttempts.ERASE_AFTER} times, so the " +
-                                "vault was erased as set in Settings."
+                            error = getApplication<Application>().resources.getQuantityString(
+                                erasedId, UnlockAttempts.ERASE_AFTER, UnlockAttempts.ERASE_AFTER,
+                            )
                         } else {
                             error = wrongSecretMessage(attemptCount)
                         }
                     }
                 }
             } catch (e: Exception) {
-                error = e.message ?: "Could not unlock the vault"
+                error = e.message ?: str(R.string.core_vault_unlock_failed)
             } finally {
                 secret.fill('\u0000')
                 syncSecretFlags()
@@ -501,15 +501,16 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The lock screen's wrong-secret message. The lock screen shows any backoff wait itself. */
     private fun wrongSecretMessage(attemptCount: Int): String {
-        val base = "Wrong $noun."
         if (vault.eraseAfterFailedAttempts) {
             val left = UnlockAttempts.ERASE_AFTER - attemptCount
             if (left in 1..3) {
-                return base + (if (left == 1) " One more wrong try" else " $left more wrong tries") +
-                    " will erase the vault."
+                return getApplication<Application>().resources.getQuantityString(
+                    pick(R.plurals.core_wrong_pin_erase_warning, R.plurals.core_wrong_password_erase_warning),
+                    left, left,
+                )
             }
         }
-        return base
+        return str(pick(R.string.security_wrong_pin, R.string.security_wrong_password))
     }
 
     /**
@@ -527,18 +528,18 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             isBusy = true
             error = null
             try {
-                PasswordVault.secretPolicyError(CharBuffer.wrap(secret), kind)?.let {
+                PasswordVault.secretPolicyError(getApplication<Application>(), CharBuffer.wrap(secret), kind)?.let {
                     throw IllegalStateException(it)
                 }
                 // The duress secret is typed on the same keyboard; a PIN pad can't enter a
                 // password-style decoy, so the kind can't change under it.
                 if (vault.duressBlobExists() && kind != (vault.unlockSecretKind ?: "password")) {
                     throw IllegalStateException(
-                        "Remove the duress $noun first to switch between a password and a PIN."
+                        str(pick(R.string.core_remove_duress_first_pin, R.string.core_remove_duress_first_password))
                     )
                 }
                 val vk = vault.snapshotVaultKey()
-                    ?: throw IllegalStateException("Unlock the vault first.")
+                    ?: throw IllegalStateException(str(R.string.core_unlock_vault_first))
                 try {
                     withContext(Dispatchers.IO) {
                         if (vault.duressBlobExists()) {
@@ -546,7 +547,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                             val clash = check is PasswordVault.Outcome.Duress
                             check.wipe()
                             if (clash) {
-                                throw IllegalStateException("It must differ from your duress $noun.")
+                                throw IllegalStateException(str(pick(R.string.core_differs_from_duress_pin, R.string.core_differs_from_duress_password)))
                             }
                         }
                         val blob = PasswordVault.wrapVaultKey(secret, vk)
@@ -555,10 +556,16 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                         val check = PasswordVault.tryUnlock(secret, blob, null)
                         val opens = check is PasswordVault.Outcome.Real && check.vaultKey.contentEquals(vk)
                         check.wipe()
-                        if (!opens) throw IllegalStateException("Couldn't set the $noun on this device.")
+                        if (!opens) {
+                            throw IllegalStateException(
+                                str(kindPick(kind, R.string.core_secret_set_device_failed_pin, R.string.core_secret_set_device_failed_password))
+                            )
+                        }
                         vault.writePasswordKeyBlob(blob)
                         if (!vault.readPasswordKeyBlob().contentEquals(blob)) {
-                            throw IllegalStateException("Couldn't save the $noun.")
+                            throw IllegalStateException(
+                                str(kindPick(kind, R.string.core_secret_save_failed_pin, R.string.core_secret_save_failed_password))
+                            )
                         }
                         vault.unlockSecretKind = kind
                         if (vault.lockMode == LockMode.OFF) dropWrapsMadeRedundantByPassword()
@@ -568,7 +575,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 secretBelowMinimum = false
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't set the password"
+                error = e.message ?: str(kindPick(kind, R.string.core_secret_set_failed_pin, R.string.core_secret_set_failed_password))
             } finally {
                 secret.fill('\u0000')
                 syncSecretFlags()
@@ -598,26 +605,26 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             error = null
             try {
                 if (!vault.passwordKeyBlobExists()) {
-                    throw IllegalStateException("Set a $noun before a duress $noun.")
+                    throw IllegalStateException(str(pick(R.string.core_duress_needs_secret_pin, R.string.core_duress_needs_secret_password)))
                 }
-                PasswordVault.secretPolicyError(CharBuffer.wrap(secret), vault.unlockSecretKind ?: "password")?.let {
+                PasswordVault.secretPolicyError(getApplication<Application>(), CharBuffer.wrap(secret), vault.unlockSecretKind ?: "password")?.let {
                     throw IllegalStateException(it)
                 }
                 val vk = vault.snapshotVaultKey()
-                    ?: throw IllegalStateException("Unlock the vault first.")
+                    ?: throw IllegalStateException(str(R.string.core_unlock_vault_first))
                 try {
                     withContext(Dispatchers.IO) {
                         if (current != null) {
                             verifyCurrentSecret(current, vk)
                         } else if (!vault.passwordIsOnlyUnlock()) {
-                            throw IllegalStateException("Enter your current $noun first.")
+                            throw IllegalStateException(str(pick(R.string.core_enter_current_pin, R.string.core_enter_current_password)))
                         }
                         val real = vault.readPasswordKeyBlob()
                         val check = PasswordVault.tryUnlock(secret, real, null)
                         val matchesReal = check is PasswordVault.Outcome.Real
                         check.wipe()
                         if (matchesReal) {
-                            throw IllegalStateException("The duress $noun must differ from your real one.")
+                            throw IllegalStateException(str(pick(R.string.core_duress_differs_pin, R.string.core_duress_differs_password)))
                         }
                         vault.writeDuressBlob(PasswordVault.duressBlob(secret))
                         dropWrapsMadeRedundantByPassword()
@@ -626,7 +633,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                     vk.fill(0)
                 }
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't set the duress password"
+                error = e.message ?: str(pick(R.string.core_duress_set_failed_pin, R.string.core_duress_set_failed_password))
             } finally {
                 secret.fill('\u0000')
                 current?.fill('\u0000')
@@ -643,12 +650,12 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun verifyCurrentSecret(current: CharArray, vk: ByteArray) {
         val wait = vault.unlockAttempts.remainingLockoutMillis()
-        if (wait > 0L) throw IllegalStateException(UnlockAttempts.lockoutMessage(wait))
+        if (wait > 0L) throw IllegalStateException(UnlockAttempts.lockoutMessage(getApplication<Application>(), wait))
         vault.unlockAttempts.recordAttempt()
         val outcome = PasswordVault.tryUnlock(current, vault.readPasswordKeyBlob(), null)
         try {
             val ok = outcome is PasswordVault.Outcome.Real && outcome.vaultKey.contentEquals(vk)
-            if (!ok) throw IllegalStateException("Wrong $noun.")
+            if (!ok) throw IllegalStateException(str(pick(R.string.security_wrong_pin, R.string.security_wrong_password)))
             vault.unlockAttempts.reset()
             if ((outcome as PasswordVault.Outcome.Real).needsRewrap) {
                 runCatching {
@@ -687,7 +694,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 secretBelowMinimum = false
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't remove the password"
+                error = e.message ?: str(pick(R.string.core_secret_remove_failed_pin, R.string.core_secret_remove_failed_password))
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -698,11 +705,9 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     /** Why the password can't be removed right now (audit L-16). */
     fun passwordOnlyMessage(): String =
         if (vault.duressBlobExists()) {
-            "Your $noun is the only way into the vault. Remove the duress $noun, then pick " +
-                "Biometric or Device PIN above before removing it."
+            str(pick(R.string.core_password_only_duress_pin, R.string.core_password_only_duress_password))
         } else {
-            "Your $noun is the only way into the vault. Pick Biometric or Device PIN above " +
-                "before removing it."
+            str(pick(R.string.core_password_only_pin, R.string.core_password_only_password))
         }
 
     /**
@@ -717,7 +722,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 withContext(Dispatchers.IO) { vault.deleteDuressBlob() }
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't remove the duress password"
+                error = e.message ?: str(pick(R.string.core_duress_remove_failed_pin, R.string.core_duress_remove_failed_password))
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -740,11 +745,11 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 when (val check = withContext(Dispatchers.IO) { vault.verifyAppPassword(secret) }) {
                     PasswordCheck.Ok -> onVerified()
-                    PasswordCheck.Wrong -> error = "Wrong $noun."
-                    is PasswordCheck.LockedOut -> error = UnlockAttempts.lockoutMessage(check.remainingMillis)
+                    PasswordCheck.Wrong -> error = str(pick(R.string.security_wrong_pin, R.string.security_wrong_password))
+                    is PasswordCheck.LockedOut -> error = UnlockAttempts.lockoutMessage(getApplication<Application>(), check.remainingMillis)
                 }
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't verify the $noun"
+                error = e.message ?: str(pick(R.string.security_check_pin_failed, R.string.security_check_password_failed))
             } finally {
                 secret.fill('\u0000')
                 isBusy = false
@@ -807,8 +812,16 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { KeystoreMasterKey.deletePlain() }
     }
 
-    /** "PIN" or "password", for messages. */
-    private val noun: String get() = if (vault.unlockSecretKind == "pin") "PIN" else "password"
+    /** [pin] when the vault's secret is a PIN, otherwise [password]: picks a message's resource. */
+    private fun pick(pin: Int, password: Int): Int = kindPick(vault.unlockSecretKind, pin, password)
+
+    /** [pin] for [kind] "pin", otherwise [password]. */
+    private fun kindPick(kind: String?, pin: Int, password: Int): Int = if (kind == "pin") pin else password
+
+    /** A string resource in the app's current language. */
+    private fun str(id: Int, vararg args: Any): String =
+        if (args.isEmpty()) getApplication<Application>().getString(id)
+        else getApplication<Application>().getString(id, *args)
 
     private fun syncSecretFlags() {
         provisioned = vault.isProvisioned()
@@ -838,7 +851,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     fun applyLockMode(activity: FragmentActivity, target: LockMode) {
         if (isBusy || target == vault.lockMode) return
         if (vault.duressBlobExists()) {
-            error = "Turn off the duress $noun to use fingerprint or device unlock."
+            error = str(pick(R.string.settings_pin_only_note_pin, R.string.settings_pin_only_note_password))
             return
         }
         viewModelScope.launch {
@@ -848,7 +861,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 when (target) {
                     LockMode.OFF ->
                         if (vault.passwordKeyBlobExists()) {
-                            if (!vault.isUnlocked) throw IllegalStateException("Unlock the vault first.")
+                            if (!vault.isUnlocked) throw IllegalStateException(str(R.string.core_unlock_vault_first))
                             withContext(Dispatchers.IO) {
                                 vault.lockMode = LockMode.OFF
                                 dropWrapsMadeRedundantByPassword()
@@ -867,9 +880,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                             }
                         } else {
                             if (!BiometricGate.isDeviceSecure(activity)) {
-                                throw IllegalStateException(
-                                    "Set a device PIN, pattern, or password in Android settings first."
-                                )
+                                throw IllegalStateException(str(R.string.core_set_device_lock_first))
                             }
                             writePlainBlobFromCurrentVk()
                         }
@@ -890,9 +901,9 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: BiometricGateException) {
                 error = if (e.code == BiometricPrompt.ERROR_USER_CANCELED ||
                     e.code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                ) null else (e.message ?: "Authentication failed")
+                ) null else (e.message ?: str(R.string.core_auth_failed))
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't change the lock setting"
+                error = e.message ?: str(R.string.core_lock_change_failed)
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -903,7 +914,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     /** Wrap the current in-memory VK under a fresh non-auth plain KEK. */
     private suspend fun writePlainBlobFromCurrentVk() {
         val vk = vault.snapshotVaultKey()
-            ?: throw IllegalStateException("Unlock the vault first.")
+            ?: throw IllegalStateException(str(R.string.core_unlock_vault_first))
         withContext(Dispatchers.IO) {
             KeystoreMasterKey.generatePlain()
             val cipher = KeystoreMasterKey.wrapCipherPlain()
@@ -920,13 +931,13 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
      */
     private suspend fun enrollAuthKek(activity: FragmentActivity, deviceCredentialOnly: Boolean) {
         val vk = vault.snapshotVaultKey()
-            ?: throw IllegalStateException("Unlock the vault first.")
+            ?: throw IllegalStateException(str(R.string.core_unlock_vault_first))
         KeystoreMasterKey.generate()
         val cipher = KeystoreMasterKey.wrapCipher()
         val authed = BiometricGate.authenticate(
             activity,
-            title = "Confirm it's you",
-            subtitle = "Add this lock to your AgePony vault",
+            title = str(R.string.security_confirm_subtitle),
+            subtitle = str(R.string.core_prompt_add_lock_subtitle),
             cryptoObject = BiometricPrompt.CryptoObject(cipher),
             deviceCredentialOnly = deviceCredentialOnly,
         )

@@ -1,6 +1,7 @@
 package com.agepony.app.signing
 
 import androidx.fragment.app.FragmentActivity
+import com.agepony.app.R
 import com.agepony.app.security.SecurityKeyService
 import com.agepony.app.security.keystore.HardwareKeyService
 import com.agepony.app.vault.StoredIdentity
@@ -57,7 +58,7 @@ class FileSigner(
                     activity = activity,
                     alias = alias,
                     message = message,
-                    title = "Sign with hardware key",
+                    title = activity.getString(R.string.core_prompt_sign_title),
                     subtitle = identity.name,
                     namespace = namespace,
                 )
@@ -103,7 +104,7 @@ class FileSigner(
                         activity = activity,
                         alias = alias,
                         messageHash = messageHash,
-                        title = "Sign with hardware key",
+                        title = activity.getString(R.string.core_prompt_sign_title),
                         subtitle = identity.name,
                         namespace = namespace,
                     )

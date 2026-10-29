@@ -1,5 +1,7 @@
 package com.agepony.app.vault
 
+import android.content.Context
+import com.agepony.app.R
 import com.agepony.core.crypto.P256Curve
 import com.agepony.core.portability.KeyTransfer
 import com.agepony.core.portability.PaperBackup
@@ -220,7 +222,7 @@ object KeyPortability {
         }
         var signers = 0
         for (s in incoming.signers) {
-            if (s.unenforceableReason() != null) { skipped++; continue }
+            if (!s.isEnforceable()) { skipped++; continue }
             if (vault.addSigner(s.copy(id = UUID.randomUUID().toString()))) signers++ else skipped++
         }
         return ImportSummary(ids, recips, signers, skipped)
@@ -261,7 +263,7 @@ object KeyPortability {
     private fun sameName(a: String, b: String): Boolean = a.trim().equals(b.trim(), ignoreCase = true)
 
     /** The key as the preview shows it: `SHA256:` fingerprint for SSH keys, the shortened key string otherwise. */
-    fun keySummary(identity: StoredIdentity): String = runCatching {
+    fun keySummary(context: Context, identity: StoredIdentity): String = runCatching {
         when (identity.type) {
             StoredIdentityType.SSH_ED25519 ->
                 StoredSigner.sshFingerprint(SSHSig.ed25519PublicWire(b64d(identity.publicKeyB64)))
@@ -270,50 +272,55 @@ object KeyPortability {
                 StoredSigner.sshFingerprint(b64d(identity.publicKeyB64))
             else -> shorten(identity.publicDisplayString())
         }
-    }.getOrDefault("(unreadable key)")
+    }.getOrDefault(context.getString(R.string.identities_transfer_unreadable_key))
 
-    fun keySummary(recipient: StoredRecipient): String = runCatching {
+    fun keySummary(context: Context, recipient: StoredRecipient): String = runCatching {
         when (recipient.type) {
             StoredRecipientType.SSH_ED25519 ->
                 StoredSigner.sshFingerprint(SSHSig.ed25519PublicWire(b64d(recipient.publicKeyB64)))
             StoredRecipientType.SSH_RSA -> sshLineFingerprint(String(b64d(recipient.publicKeyB64), Charsets.UTF_8))
             else -> shorten(recipient.publicDisplayString())
         }
-    }.getOrDefault("(unreadable key)")
+    }.getOrDefault(context.getString(R.string.identities_transfer_unreadable_key))
 
-    fun typeLabel(t: StoredIdentityType): String = when (t) {
-        StoredIdentityType.X25519 -> "age X25519"
-        StoredIdentityType.MLKEM768X25519 -> "Quantum-safe (ML-KEM-768 + X25519)"
-        StoredIdentityType.SSH_ED25519 -> "SSH Ed25519"
-        StoredIdentityType.SSH_RSA -> "SSH RSA"
-        StoredIdentityType.HARDWARE_KEY -> "Hardware key"
-        StoredIdentityType.SK_ED25519 -> "Security key (Ed25519)"
-        StoredIdentityType.SK_ECDSA_P256 -> "Security key (P-256)"
-        StoredIdentityType.HARDWARE_TAG -> "Hardware key (age1tag)"
-        StoredIdentityType.HARDWARE_TAG_PQ -> "Hardware key, quantum-safe (age1tagpq)"
-        StoredIdentityType.YUBIKEY_PIV -> "YubiKey (PIV)"
-    }
+    // The same labels the Identities and Recipients screens show.
+    fun typeLabel(context: Context, t: StoredIdentityType): String = context.getString(
+        when (t) {
+            StoredIdentityType.X25519 -> R.string.identities_type_x25519
+            StoredIdentityType.MLKEM768X25519 -> R.string.identities_type_mlkem
+            StoredIdentityType.SSH_ED25519 -> R.string.identities_type_ssh_ed25519
+            StoredIdentityType.SSH_RSA -> R.string.identities_type_ssh_rsa
+            StoredIdentityType.HARDWARE_KEY -> R.string.identities_type_hardware_key
+            StoredIdentityType.SK_ED25519 -> R.string.identities_type_sk_ed25519
+            StoredIdentityType.SK_ECDSA_P256 -> R.string.identities_type_sk_p256
+            StoredIdentityType.HARDWARE_TAG -> R.string.identities_type_hardware_tag
+            StoredIdentityType.HARDWARE_TAG_PQ -> R.string.identities_type_hardware_tag_pq
+            StoredIdentityType.YUBIKEY_PIV -> R.string.identities_type_yubikey
+        }
+    )
 
-    fun typeLabel(t: StoredRecipientType): String = when (t) {
-        StoredRecipientType.X25519 -> "age X25519"
-        StoredRecipientType.MLKEM768X25519 -> "Quantum-safe (ML-KEM-768 + X25519)"
-        StoredRecipientType.SSH_ED25519 -> "SSH Ed25519"
-        StoredRecipientType.SSH_RSA -> "SSH RSA"
-        StoredRecipientType.YUBIKEY_P256 -> "YubiKey (P-256)"
-        StoredRecipientType.TAG -> "Hardware key (age1tag)"
-        StoredRecipientType.TAG_PQ -> "Hardware key, quantum-safe (age1tagpq)"
-    }
+    fun typeLabel(context: Context, t: StoredRecipientType): String = context.getString(
+        when (t) {
+            StoredRecipientType.X25519 -> R.string.identities_type_x25519
+            StoredRecipientType.MLKEM768X25519 -> R.string.identities_type_mlkem
+            StoredRecipientType.SSH_ED25519 -> R.string.identities_type_ssh_ed25519
+            StoredRecipientType.SSH_RSA -> R.string.identities_type_ssh_rsa
+            StoredRecipientType.YUBIKEY_P256 -> R.string.identities_rtype_yubikey
+            StoredRecipientType.TAG -> R.string.identities_rtype_tag
+            StoredRecipientType.TAG_PQ -> R.string.identities_rtype_tag_pq
+        }
+    )
 
     /**
      * A note for identities whose public key can't be fully checked here (audit AS-2): for a
      * security key or a YubiKey the private half stays on the device, so only the key itself can
      * prove the pairing. Null for the rest, which [isConsistent] checks in full.
      */
-    fun unverifiableNote(identity: StoredIdentity): String? = when (identity.type) {
+    fun unverifiableNote(context: Context, identity: StoredIdentity): String? = when (identity.type) {
         StoredIdentityType.SK_ED25519, StoredIdentityType.SK_ECDSA_P256 ->
-            "Lives on a security key: its public key can't be checked without that key."
+            context.getString(R.string.core_transfer_lives_on_security_key)
         StoredIdentityType.YUBIKEY_PIV ->
-            "Lives on a YubiKey: decrypting with it needs that YubiKey."
+            context.getString(R.string.core_transfer_lives_on_yubikey)
         else -> null
     }
 

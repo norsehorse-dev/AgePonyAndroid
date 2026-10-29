@@ -1,5 +1,7 @@
 package com.agepony.app.security
 
+import com.agepony.app.R
+import com.agepony.app.vault.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -97,9 +99,10 @@ class UnlockAttemptsTest {
 
     @Test
     fun waitsAreDescribedRoundedUp() {
-        assertEquals("30 seconds", UnlockAttempts.describeWait(29_001L))
-        assertEquals("1 second", UnlockAttempts.describeWait(1L))
-        assertEquals("2 minutes", UnlockAttempts.describeWait(120_000L))
-        assertEquals("1 hour", UnlockAttempts.describeWait(3_600_000L))
+        // The words are resources (no Context in host tests): check the plural and its count.
+        assertEquals(UiText.plural(R.plurals.core_wait_seconds, 30, 30), UnlockAttempts.describeWaitText(29_001L))
+        assertEquals(UiText.plural(R.plurals.core_wait_seconds, 1, 1), UnlockAttempts.describeWaitText(1L))
+        assertEquals(UiText.plural(R.plurals.core_wait_minutes, 2, 2), UnlockAttempts.describeWaitText(120_000L))
+        assertEquals(UiText.plural(R.plurals.core_wait_hours, 1, 1), UnlockAttempts.describeWaitText(3_600_000L))
     }
 }

@@ -248,12 +248,12 @@ class PasswordVaultTest {
 
     @Test
     fun newSecretsMustMeetTheMinimumLength() {
-        assertNotNull(PasswordVault.secretPolicyError("12345", "pin"))
-        assertNull(PasswordVault.secretPolicyError("123456", "pin"))
-        assertNotNull("a PIN is digits only", PasswordVault.secretPolicyError("12345a", "pin"))
-        assertNotNull(PasswordVault.secretPolicyError("", "pin"))
-        assertNotNull(PasswordVault.secretPolicyError("seven77", "password"))
-        assertNull(PasswordVault.secretPolicyError("eight888", "password"))
-        assertNull("passwords may be anything", PasswordVault.secretPolicyError("p ss w0rd!", "password"))
+        assertNotNull(PasswordVault.secretPolicyErrorText("12345", "pin"))
+        assertNull(PasswordVault.secretPolicyErrorText("123456", "pin"))
+        assertNotNull("a PIN is digits only", PasswordVault.secretPolicyErrorText("12345a", "pin"))
+        assertNotNull(PasswordVault.secretPolicyErrorText("", "pin"))
+        assertNotNull(PasswordVault.secretPolicyErrorText("seven77", "password"))
+        assertNull(PasswordVault.secretPolicyErrorText("eight888", "password"))
+        assertNull("passwords may be anything", PasswordVault.secretPolicyErrorText("p ss w0rd!", "password"))
     }
 }

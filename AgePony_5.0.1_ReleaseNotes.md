@@ -1,8 +1,10 @@
 # AgePony 5.0.1
 
-A security release. After 5.0.0 went out I ran a full security audit of the Android app, the
-iOS app and the shared crypto code. 5.0.1 fixes everything the audit found on Android. None
-of it breaks the age format or your existing files, keys or vault.
+A security release. After 5.0.0 went out I ran an internal security review of the Android app,
+the iOS app and the shared crypto code. It wasn't an independent audit. The full report is
+published as [SECURITY_REVIEW_2026-09-23.md](https://github.com/norsehorse-dev/AgePonyAndroid/blob/main/SECURITY_REVIEW_2026-09-23.md).
+5.0.1 fixes everything the review found on Android. None of it breaks the age format or your
+existing files, keys or vault.
 
 ## New signing key
 

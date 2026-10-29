@@ -6,7 +6,6 @@ import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,7 +23,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,7 +33,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.vault.FileEncryptor
@@ -50,6 +49,22 @@ import com.agepony.core.recipients.AgeRecipient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Icon
+import com.agepony.app.R
+import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.RadioRow
+import com.agepony.app.ui.components.SectionHeader
+import com.agepony.app.ui.components.VerdictPanel
+import com.agepony.app.ui.theme.AgeStatus
+import com.agepony.app.ui.theme.mono
 
 //
 // Migrate flow: batch "upgrade to quantum-safe". Pick a post-quantum identity as the target,
@@ -92,74 +107,74 @@ fun MigrateFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         sourceUris = emptyList(); destTree = null; results = emptyList(); progress = 0; error = null
     }
 
-    Column(modifier.fillMaxSize()) {
+    // Back is held while files are being rewritten; the job belongs to this screen.
+    if (stage == MigrateStage.WORKING) BackHandler {}
+
+    AgeScreen(
+        title = stringResource(R.string.files_migrate),
+        modifier = modifier,
+        onBack = if (stage == MigrateStage.WORKING) null else onClose,
+    ) { padding ->
+    Column(Modifier.fillMaxSize().padding(padding)) {
         when (stage) {
             MigrateStage.SETUP -> Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Upgrade files to quantum-safe", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                 Text(
-                    "Re-encrypt existing age files to your quantum-safe identity. AgePony decrypts each " +
-                        "with your identities (or the passphrase below) and re-encrypts it to the identity you pick.",
+                    stringResource(R.string.files_migrate_intro),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
                 HorizontalDivider()
 
-                Text("Quantum-safe identity", style = MaterialTheme.typography.titleSmall)
+                SectionHeader(stringResource(R.string.files_migrate_section_identity))
                 if (pqcIdentities.isEmpty()) {
                     Text(
-                        "You have no quantum-safe identity yet. Create one in Identities → Add → Generate → " +
-                            "Quantum-safe, then come back.",
+                        stringResource(R.string.files_migrate_no_identity),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
                 } else {
                     pqcIdentities.forEach { id ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable { targetId = id.id }.padding(vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = targetId == id.id, onClick = { targetId = id.id })
-                            Text(id.name, modifier = Modifier.padding(start = 8.dp))
-                        }
+                        RadioRow(title = id.name, selected = targetId == id.id, onClick = { targetId = id.id })
                     }
                 }
 
                 HorizontalDivider()
 
-                Text("Files", style = MaterialTheme.typography.titleSmall)
+                SectionHeader(stringResource(R.string.files_title))
                 Text(
-                    if (sourceUris.isEmpty()) "None chosen" else "${sourceUris.size} file${if (sourceUris.size == 1) "" else "s"} chosen",
+                    if (sourceUris.isEmpty()) stringResource(R.string.files_migrate_none_chosen)
+                    else pluralStringResource(R.plurals.migrate_files_chosen, sourceUris.size, sourceUris.size),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                TextButton(onClick = { vault.autoLockSuppressed = true; pickFiles.launch(arrayOf("*/*")) }) { Text("Choose files…") }
+                TextButton(onClick = { vault.autoLockSuppressed = true; pickFiles.launch(arrayOf("*/*")) }) { Text(stringResource(R.string.files_migrate_choose_files)) }
 
-                Text("Destination folder", style = MaterialTheme.typography.titleSmall)
+                SectionHeader(stringResource(R.string.files_migrate_section_destination))
                 Text(
-                    if (destTree == null) "None chosen" else "Folder chosen ✓",
+                    stringResource(
+                        if (destTree == null) R.string.files_migrate_none_chosen else R.string.files_migrate_folder_chosen,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                TextButton(onClick = { vault.autoLockSuppressed = true; pickFolder.launch(null) }) { Text("Choose folder…") }
+                TextButton(onClick = { vault.autoLockSuppressed = true; pickFolder.launch(null) }) { Text(stringResource(R.string.files_migrate_choose_folder)) }
 
                 HorizontalDivider()
 
-                Text("Passphrase (optional)", style = MaterialTheme.typography.titleSmall)
+                SectionHeader(stringResource(R.string.files_migrate_section_passphrase))
                 OutlinedTextField(
                     value = passphrase,
                     onValueChange = { passphrase = it },
-                    label = { Text("For any passphrase-encrypted files") },
+                    label = { Text(stringResource(R.string.files_migrate_passphrase_label)) },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                if (error != null) {
-                    Text(error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                }
+                if (error != null) ErrorText(error!!)
 
                 val canStart = targetId != null && sourceUris.isNotEmpty() && destTree != null
                 Button(
@@ -193,8 +208,13 @@ fun MigrateFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                     },
                     enabled = canStart,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Upgrade ${if (sourceUris.isEmpty()) "" else "${sourceUris.size} "}file${if (sourceUris.size == 1) "" else "s"}") }
-                TextButton(onClick = onClose) { Text("Cancel") }
+                ) {
+                    Text(
+                        if (sourceUris.isEmpty()) stringResource(R.string.files_migrate_upgrade)
+                        else pluralStringResource(R.plurals.migrate_upgrade_files, sourceUris.size, sourceUris.size)
+                    )
+                }
+                TextButton(onClick = onClose) { Text(stringResource(R.string.action_cancel)) }
             }
 
             MigrateStage.WORKING -> Column(
@@ -204,7 +224,7 @@ fun MigrateFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
             ) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 Text(
-                    "Upgrading $progress of ${sourceUris.size}…",
+                    stringResource(R.string.files_migrate_progress, progress, sourceUris.size),
                     modifier = Modifier.padding(top = 16.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -212,38 +232,51 @@ fun MigrateFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
 
             MigrateStage.DONE -> Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 val okCount = results.count { it.ok }
-                Text("Upgrade complete", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                VerdictPanel(
+                    title = stringResource(R.string.files_migrate_done),
+                    detail = null,
+                    color = if (okCount == results.size) AgeStatus.colors.success else AgeStatus.colors.warning,
+                    icon = if (okCount == results.size) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                )
                 Text(
-                    "$okCount of ${results.size} upgraded to quantum-safe.",
+                    pluralStringResource(R.plurals.files_migrate_result, results.size, okCount, results.size),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                HorizontalDivider()
+                ListDivider()
                 results.forEach { item ->
                     Column(Modifier.fillMaxWidth()) {
-                        Text(
-                            (if (item.ok) "✓ " else "⚠ ") + item.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (item.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (item.ok) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                                contentDescription = null,
+                                tint = if (item.ok) AgeStatus.colors.success else AgeStatus.colors.failure,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Text(
+                                item.name,
+                                style = MaterialTheme.typography.mono,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
                         Text(
                             item.detail,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    HorizontalDivider()
+                    ListDivider()
                 }
-                Button(onClick = { reset() }, modifier = Modifier.fillMaxWidth()) { Text("Upgrade more") }
-                OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Done") }
+                Button(onClick = { reset() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.files_migrate_more)) }
+                OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(stringResource(R.string.files_action_done)) }
             }
         }
+    }
     }
 }
 
@@ -259,46 +292,46 @@ private fun migrateOne(
     val name = queryDisplayName(context, uri)
     val raw = try {
         context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            ?: return MigrateItem(name, false, "Couldn't open the file.")
+            ?: return MigrateItem(name, false, context.getString(R.string.files_migrate_open_failed))
     } catch (e: Exception) {
-        return MigrateItem(name, false, "Couldn't read the file.")
+        return MigrateItem(name, false, context.getString(R.string.files_migrate_read_failed))
     }
 
     val bin = try {
         FileEncryptor.toBinary(raw)
     } catch (e: Exception) {
-        return MigrateItem(name, false, "Not an age file.")
+        return MigrateItem(name, false, context.getString(R.string.files_migrate_not_age))
     }
 
     val plain: ByteArray = try {
         FileEncryptor.decryptWithIdentities(bin, ids)
     } catch (e: NoMatchingVaultIdentityException) {
         if (passphrase.isBlank()) {
-            return MigrateItem(name, false, "No matching identity, and no passphrase given.")
+            return MigrateItem(name, false, context.getString(R.string.files_migrate_no_match))
         }
         try {
             FileEncryptor.decryptWithPassphrase(bin, passphrase)
         } catch (e2: WrongPassphraseException) {
-            return MigrateItem(name, false, "Needs a different passphrase — skipped.")
+            return MigrateItem(name, false, context.getString(R.string.files_migrate_other_passphrase))
         } catch (e2: Exception) {
-            return MigrateItem(name, false, e2.message ?: "Decrypt failed.")
+            return MigrateItem(name, false, e2.message ?: context.getString(R.string.files_decrypt_failed))
         }
     } catch (e: Exception) {
-        return MigrateItem(name, false, e.message ?: "Decrypt failed.")
+        return MigrateItem(name, false, e.message ?: context.getString(R.string.files_decrypt_failed))
     }
 
     val wasArmored = FileEncryptor.isArmored(raw)
     val out = try {
         FileEncryptor.encrypt(plain, listOf(target), null, wasArmored)
     } catch (e: Exception) {
-        return MigrateItem(name, false, "Re-encrypt failed: ${e.message}")
+        return MigrateItem(name, false, context.getString(R.string.files_migrate_reencrypt_failed, e.message.orEmpty()))
     }
 
     return try {
         writeToTree(context, destTree, name, out)
-        MigrateItem(name, true, "Re-encrypted to your quantum-safe identity.")
+        MigrateItem(name, true, context.getString(R.string.files_migrate_item_done))
     } catch (e: Exception) {
-        MigrateItem(name, false, "Couldn't save to the folder: ${e.message}")
+        MigrateItem(name, false, context.getString(R.string.files_migrate_save_failed, e.message.orEmpty()))
     }
 }
 

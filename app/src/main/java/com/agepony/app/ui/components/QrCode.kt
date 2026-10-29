@@ -9,8 +9,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.agepony.app.R
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
@@ -28,7 +30,7 @@ fun QrImage(
     modifier: Modifier = Modifier,
     size: Dp = 220.dp,
     lowErrorCorrection: Boolean = false,
-    contentDescription: String = "QR code for this recipient",
+    contentDescription: String = stringResource(R.string.app_qr_recipient_description),
 ) {
     val bitmap = remember(content, lowErrorCorrection) {
         qrBitmap(content, 900, if (lowErrorCorrection) ErrorCorrectionLevel.L else ErrorCorrectionLevel.M)
