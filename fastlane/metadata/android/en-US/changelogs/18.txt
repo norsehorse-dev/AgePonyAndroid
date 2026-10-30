@@ -1,0 +1,16 @@
+AgePony 5.1.0
+
+New:
+- YubiKey asks for the PIN first, then one tap
+- Biometrics only lock
+- Files tab with Encrypt and Decrypt up front
+- Key pickers show the key type and a short key
+- Paste button on Text decrypt
+- Clearer error messages
+
+Security:
+- Owner check before the first app password
+- Decrypted temp files cleaned up on lock
+- Text decrypt checks signatures
+- Safer NFC retries with security keys
+- Tested against the C2SP age test vectors
