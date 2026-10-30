@@ -130,4 +130,32 @@
     <string name="core_signer_warn_not_agepony">Not allowed to sign AgePony files (only for %1$s).</string>
     <string name="core_share_chooser_text">Share</string>
     <string name="core_share_chooser_file">Share encrypted file</string>
+
+    <!-- YubiKey PIN before the tap (5.1.0 item 1) and NFC resend rule (5.1.0, L-8) -->
+    <string name="core_yubikey_pin_body">Enter the PIV PIN for this YubiKey, then hold the key to the back of the phone. AgePony keeps the PIN only until this decrypt is done.</string>
+    <string name="core_yubikey_no_pin">This key has no PIN</string>
+    <string name="core_yubikey_pin_note_needs">This YubiKey key needs its PIN.</string>
+    <string name="core_yubikey_pin_note_length">A YubiKey PIN is 6 to 8 characters.</string>
+    <plurals name="core_yubikey_pin_note_wrong">
+        <item quantity="one">Wrong PIN. %1$d try left before it locks.</item>
+        <item quantity="other">Wrong PIN. %1$d tries left before it locks.</item>
+    </plurals>
+    <string name="core_yubikey_hold_again">The YubiKey lost contact during the PIN check. Hold it to the back of the phone and try again.</string>
+    <string name="core_nfc_hold_key_again">The key lost contact during the PIN check. Hold it to the back of the phone and try again.</string>
+    <!-- 5.1.0: Biometrics only lock (iOS E6) and the first-password owner check (iOS H-1) -->
+    <string name="core_owner_check_needed">Confirm it\'s you with your fingerprint, face or screen lock, then set the password or PIN again.</string>
+    <string name="core_biometric_changed_pin">A fingerprint or face was added or removed on this phone, so biometrics can\'t open the vault until you enter your PIN once. After that you can turn biometric unlock back on. If you didn\'t change this yourself, check your phone\'s security settings for a fingerprint or face you didn\'t add before you enter your PIN.</string>
+    <string name="core_biometric_changed_password">A fingerprint or face was added or removed on this phone, so biometrics can\'t open the vault until you enter your password once. After that you can turn biometric unlock back on. If you didn\'t change this yourself, check your phone\'s security settings for a fingerprint or face you didn\'t add before you enter your password.</string>
+    <string name="core_biometric_unavailable_pin">Biometrics aren\'t available right now. Enter your PIN to open the vault. The phone\'s screen lock doesn\'t open it.</string>
+    <string name="core_biometric_unavailable_password">Biometrics aren\'t available right now. Enter your password to open the vault. The phone\'s screen lock doesn\'t open it.</string>
+    <string name="core_biometric_lockout_pin">Biometrics are locked after too many tries. Enter your PIN to open the vault. Unlocking the phone with its screen lock turns biometrics back on, but the screen lock doesn\'t open AgePony.</string>
+    <string name="core_biometric_lockout_password">Biometrics are locked after too many tries. Enter your password to open the vault. Unlocking the phone with its screen lock turns biometrics back on, but the screen lock doesn\'t open AgePony.</string>
+    <string name="core_biometric_only_needs_secret">Set a password or PIN first. It\'s the way back in if your biometrics change.</string>
+    <string name="core_biometric_only_no_biometric">This lock needs a fingerprint or face set up on this phone, in Android\'s security settings.</string>
+    <string name="core_biometric_only_refused">Android wouldn\'t store the vault key behind biometrics alone. The lock is unchanged.</string>
+    <!-- %1$d: Android Keystore numeric error code -->
+    <string name="core_biometric_only_refused_code">Android wouldn\'t store the vault key behind biometrics alone (Keystore error %1$d). The lock is unchanged.</string>
+    <string name="core_prompt_biometric_only_subtitle">Use biometrics alone to unlock AgePony</string>
+    <string name="core_password_only_biometric_pin">Biometrics only needs your PIN as the way back in if your biometrics change. Choose another lock above before removing it.</string>
+    <string name="core_password_only_biometric_password">Biometrics only needs your password as the way back in if your biometrics change. Choose another lock above before removing it.</string>
 </resources>

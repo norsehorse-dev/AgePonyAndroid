@@ -44,11 +44,15 @@ import java.io.ByteArrayOutputStream
 internal fun b64d(s: String): ByteArray = java.util.Base64.getDecoder().decode(s)
 internal fun b64e(b: ByteArray): String = java.util.Base64.getEncoder().encodeToString(b)
 
-private const val HARDWARE_SIGNING_ONLY =
-    "hardware key is signing-only; it cannot decrypt or act as an encryption recipient"
+/**
+ * A signing-only key (a hardware signing key or a security key) was asked to decrypt or to be an
+ * encryption recipient. Mapped by [type]; the message is internal (5.1.0, UI plan U5).
+ */
+class SigningOnlyKeyException(val type: StoredIdentityType) :
+    IllegalStateException("${type.name} is signing-only; it can't decrypt or be an encryption recipient")
 
-private const val SK_SIGNING_ONLY =
-    "security key is signing-only; it cannot decrypt or act as an encryption recipient"
+/** A stored key that no longer reads as its type. The message is internal. */
+class StoredKeyDamagedException(message: String) : IllegalStateException(message)
 
 /** Build a one-line `ssh-ed25519 BASE64 [comment]` string from the raw 32-byte key. */
 internal fun sshEd25519Line(edPublicKey: ByteArray, comment: String?): String {
@@ -76,14 +80,15 @@ fun StoredIdentity.toAgeIdentity(): AgeIdentity = when (type) {
     StoredIdentityType.SSH_ED25519 -> SSHEd25519Identity(b64d(privateKeyB64))
     StoredIdentityType.SSH_RSA ->
         SSHRSAIdentity.fromPEM(String(b64d(privateKeyB64), Charsets.UTF_8))
-    StoredIdentityType.HARDWARE_KEY -> throw IllegalStateException(HARDWARE_SIGNING_ONLY)
-    StoredIdentityType.SK_ED25519 -> throw IllegalStateException(SK_SIGNING_ONLY)
-    StoredIdentityType.SK_ECDSA_P256 -> throw IllegalStateException(SK_SIGNING_ONLY)
+    StoredIdentityType.HARDWARE_KEY -> throw SigningOnlyKeyException(type)
+    StoredIdentityType.SK_ED25519 -> throw SigningOnlyKeyException(type)
+    StoredIdentityType.SK_ECDSA_P256 -> throw SigningOnlyKeyException(type)
     StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ ->
         HardwareTagKeyService.toTagIdentity(this)
     StoredIdentityType.YUBIKEY_PIV -> {
         val stub = YubiKeyStub.fromBytes(b64d(privateKeyB64))
-        YubiKeyIdentity(stub, b64d(publicKeyB64), YubiKeyBroker.keyAgreement(stub))
+        // The stored PIN policy decides whether the PIN is asked before the tap (5.1.0 item 1).
+        YubiKeyIdentity(stub, b64d(publicKeyB64), YubiKeyBroker.keyAgreement(stub, id, yubiKeyPinPolicy))
     }
 }
 
@@ -95,12 +100,12 @@ fun StoredIdentity.toAgeRecipient(): AgeRecipient = when (type) {
         val line = String(b64d(publicKeyB64), Charsets.UTF_8)
         when (val parsed = OpenSSHPublicKey.parse(line)) {
             is OpenSSHPublicKey.RSA -> SSHRSARecipient(parsed)
-            else -> throw IllegalStateException("stored ssh-rsa identity did not parse as RSA")
+            else -> throw StoredKeyDamagedException("stored ssh-rsa identity did not parse as RSA")
         }
     }
-    StoredIdentityType.HARDWARE_KEY -> throw IllegalStateException(HARDWARE_SIGNING_ONLY)
-    StoredIdentityType.SK_ED25519 -> throw IllegalStateException(SK_SIGNING_ONLY)
-    StoredIdentityType.SK_ECDSA_P256 -> throw IllegalStateException(SK_SIGNING_ONLY)
+    StoredIdentityType.HARDWARE_KEY -> throw SigningOnlyKeyException(type)
+    StoredIdentityType.SK_ED25519 -> throw SigningOnlyKeyException(type)
+    StoredIdentityType.SK_ECDSA_P256 -> throw SigningOnlyKeyException(type)
     StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ -> TagRecipient(b64d(publicKeyB64))
     // piv-p256, which every age-plugin-yubikey version can decrypt.
     StoredIdentityType.YUBIKEY_PIV -> P256Recipient(b64d(publicKeyB64))
@@ -165,7 +170,7 @@ fun StoredRecipient.toAgeRecipient(): AgeRecipient = when (type) {
         val line = String(b64d(publicKeyB64), Charsets.UTF_8)
         when (val parsed = OpenSSHPublicKey.parse(line)) {
             is OpenSSHPublicKey.RSA -> SSHRSARecipient(parsed)
-            else -> throw IllegalStateException("stored ssh-rsa recipient did not parse as RSA")
+            else -> throw StoredKeyDamagedException("stored ssh-rsa recipient did not parse as RSA")
         }
     }
     StoredRecipientType.YUBIKEY_P256 -> P256Recipient(b64d(publicKeyB64))

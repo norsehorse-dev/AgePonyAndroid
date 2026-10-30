@@ -71,6 +71,9 @@ class PivP256Identity(compressedPublicKey: ByteArray, private val ka: P256KeyAgr
 
     override fun matches(stanza: Stanza): Boolean = parse(stanza) != null
 
+    /** Costs a tap: tried after on-device hardware keys (5.1.0, M-4). */
+    override val isExternalDevice: Boolean get() = true
+
     override fun unwrap(stanza: Stanza): ByteArray? {
         val epk = parse(stanza) ?: return null
         val shared = ka.sharedX(P256Curve.toUncompressed(epk))
@@ -105,6 +108,9 @@ class YubiKeyIdentity(val stub: YubiKeyStub, compressedPublicKey: ByteArray, ka:
     }
 
     override fun matches(stanza: Stanza): Boolean = piv.matches(stanza) || tag.matches(stanza)
+
+    /** Costs a tap: tried after on-device hardware keys (5.1.0, M-4). */
+    override val isExternalDevice: Boolean get() = true
 
     override fun unwrap(stanza: Stanza): ByteArray? = when (stanza.type) {
         "piv-p256" -> piv.unwrap(stanza)

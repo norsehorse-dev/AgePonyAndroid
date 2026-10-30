@@ -1,5 +1,6 @@
 package com.agepony.app.ui.text
 
+import com.agepony.app.ui.UserMessage
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,7 +14,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import android.content.ClipboardManager
 import com.agepony.app.security.ClipboardGuard
 import com.agepony.app.share.ShareOut
 import com.agepony.app.share.ShareSniff
@@ -38,8 +39,8 @@ import androidx.compose.ui.unit.dp
 import com.agepony.app.ui.files.RecipientPicker
 import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.NoMatchingVaultIdentityException
+import com.agepony.app.vault.TextDecryptor
 import com.agepony.app.vault.Vault
-import com.agepony.app.vault.WrongPassphraseException
 import com.agepony.app.vault.toAgeIdentity
 import com.agepony.core.recipients.AgeRecipient
 import kotlinx.coroutines.Dispatchers
@@ -55,7 +56,15 @@ import com.agepony.app.ui.components.ErrorText
 import com.agepony.app.ui.components.ListDivider
 import com.agepony.app.ui.components.NavRow
 import com.agepony.app.ui.components.ScreenPadding
+import com.agepony.app.ui.components.SecondaryAction
+import com.agepony.app.ui.components.DoneAction
+import com.agepony.app.ui.components.PrimaryAction
+import com.agepony.app.ui.components.RowAction
 import com.agepony.app.ui.components.SectionHeader
+import com.agepony.app.ui.files.DecryptedHeadline
+import com.agepony.app.ui.files.SignatureVerdictPanel
+import com.agepony.app.ui.files.textVerdict
+import com.agepony.app.ui.files.textVerdictNote
 import com.agepony.app.ui.components.showOwnCopyConfirmation
 import com.agepony.app.ui.theme.mono
 
@@ -65,6 +74,10 @@ import com.agepony.app.ui.theme.mono
 // chat/email/forums); paste an armored block to decrypt. Encrypt reuses the
 // Files-tab RecipientPicker; decrypt tries vault identities, then a passphrase.
 // Output is always armored (binary would defeat the point of text mode).
+//
+// 5.1.0 (iOS 5.1.1 L-1, L-3): a signature in the text (a header stanza or a signed bundle) is
+// checked as the file decrypt checks it and shown under the plaintext; a failed one also changes
+// the headline. Decrypt has a Paste button that reads the clipboard only when tapped.
 //
 
 private enum class TextMode { HOME, ENCRYPT, DECRYPT }
@@ -140,7 +153,12 @@ internal fun TextEncrypt(
         return
     }
 
-    AgeScreen(title = stringResource(R.string.text_encrypt), modifier = modifier, onBack = onClose) { padding ->
+    AgeScreen(
+        title = stringResource(R.string.text_encrypt),
+        modifier = modifier,
+        onBack = onClose,
+        actions = { if (stage == EncStage.RESULT && result != null) DoneAction(onClose) },
+    ) { padding ->
     Column(
         Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -149,9 +167,12 @@ internal fun TextEncrypt(
             CopyableResult(label = stringResource(R.string.text_armored_output), value = result!!, mono = true)
             val ctx = LocalContext.current
             if (onReplace != null) {
-                Button(onClick = { onReplace(result!!) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.text_replace_selection))
-                }
+                // Copy is the filled button; replacing the selection is the other way out.
+                SecondaryAction(
+                    stringResource(R.string.text_replace_selection),
+                    onClick = { onReplace(result!!) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             } else if (replaceUnavailableNote != null) {
                 Text(
                     replaceUnavailableNote,
@@ -160,15 +181,17 @@ internal fun TextEncrypt(
                 )
             }
             val shareTitle = stringResource(R.string.text_share_encrypted)
-            OutlinedButton(
+            SecondaryAction(
+                stringResource(R.string.text_share),
                 onClick = { ShareOut.text(ctx, result!!, shareTitle) },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.text_share)) }
-            Button(
+            )
+            // Done sits in the app bar; the next text is its own row (5.1.0, U4).
+            ListDivider()
+            RowAction(
+                stringResource(R.string.text_encrypt_another),
                 onClick = { result = null; input = ""; recipients = emptyList(); passphrase = null; stage = EncStage.FORM },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.text_encrypt_another)) }
-            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.files_action_done)) }
+            )
             return@Column
         }
 
@@ -209,7 +232,7 @@ internal fun TextEncrypt(
                         error = context.getString(R.string.text_oom_encrypt)
                         stage = EncStage.FORM
                     } catch (e: Exception) {
-                        error = e.message ?: context.getString(R.string.files_encrypt_failed)
+                        error = UserMessage.text(context, e, R.string.text_encrypt_failed)
                         stage = EncStage.FORM
                     }
                 }
@@ -255,6 +278,8 @@ internal fun TextDecrypt(
     var binary by remember { mutableStateOf<ByteArray?>(null) }
     var passphrase by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<String?>(null) }
+    // The verdict on the text's signature, when it carried one (L-1).
+    var signature by remember { mutableStateOf<TextDecryptor.SignatureCheck?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -262,7 +287,7 @@ internal fun TextDecrypt(
     fun startDecrypt() = decryptTextInto(
         context, input, vault, scope,
         setStage = { stage = it }, setBinary = { binary = it },
-        setResult = { result = it }, setError = { error = it },
+        setResult = { text, check -> result = text; signature = check }, setError = { error = it },
     )
     var autoStarted by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -286,23 +311,48 @@ internal fun TextDecrypt(
         )
     }
 
-    AgeScreen(title = stringResource(R.string.text_decrypt), modifier = modifier, onBack = onClose) { padding ->
+    AgeScreen(
+        title = stringResource(R.string.text_decrypt),
+        modifier = modifier,
+        onBack = onClose,
+        actions = { if (stage == DecStage.RESULT && result != null) DoneAction(onClose) },
+    ) { padding ->
     Column(
         Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (stage == DecStage.RESULT && result != null) {
+            val check = signature
+            // A failed signature never sits under a neutral result (L-3).
+            if (check != null && check.failed) DecryptedHeadline(signatureFailed = true)
             CopyableResult(label = stringResource(R.string.text_decrypted), value = result!!, mono = false)
-            OutlinedButton(onClick = { confirmShare = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.text_share))
+            ListDivider()
+            if (check != null) {
+                // Shown even when it failed: the plaintext is already on screen (L-1).
+                SectionHeader(stringResource(R.string.text_signature))
+                SignatureVerdictPanel(textVerdict(context, check))
+                textVerdictNote(context, check)?.let { note ->
+                    Text(
+                        note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                ListDivider()
             }
-            Button(
-                onClick = {
-                    result = null; input = ""; binary = null; passphrase = ""; stage = DecStage.FORM
-                },
+            SecondaryAction(
+                stringResource(R.string.text_share),
+                onClick = { confirmShare = true },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.files_decrypt_another)) }
-            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.files_action_done)) }
+            )
+            // Done sits in the app bar; the next text is its own row (5.1.0, U4).
+            ListDivider()
+            RowAction(
+                stringResource(R.string.text_decrypt_another),
+                onClick = {
+                    result = null; signature = null; input = ""; binary = null; passphrase = ""; stage = DecStage.FORM
+                },
+            )
             return@Column
         }
 
@@ -314,6 +364,23 @@ internal fun TextDecrypt(
             enabled = stage != DecStage.NEED_PASSPHRASE,
             modifier = Modifier.fillMaxWidth(),
         )
+        // Reads the clipboard only when tapped, and replaces whatever is in the field. Hidden
+        // once the text is decrypted, and while a passphrase is asked for this text.
+        if (stage == DecStage.FORM || stage == DecStage.WORKING) {
+            SecondaryAction(
+                text = stringResource(R.string.text_paste),
+                enabled = stage == DecStage.FORM,
+                onClick = {
+                    val clipboard = context.getSystemService(ClipboardManager::class.java)
+                    val clip = runCatching { clipboard?.primaryClip }.getOrNull()
+                    val pasted = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+                    if (!pasted.isNullOrEmpty()) {
+                        input = ShareSniff.extractArmor(pasted)
+                        error = null
+                    }
+                },
+            )
+        }
 
         if (stage == DecStage.NEED_PASSPHRASE) {
             Text(
@@ -348,20 +415,23 @@ internal fun TextDecrypt(
                     error = null
                     stage = DecStage.WORKING
                     val p = passphrase
+                    val known = vault.identities.toList()
+                    val signers = vault.signers.toList()
                     scope.launch {
                         try {
-                            val plain = withContext(Dispatchers.Default) {
-                                FileEncryptor.decryptWithPassphrase(bin, p)
+                            // Guarded against a work factor that won't fit in memory (L-2), and a
+                            // signed bundle inside is checked (L-1).
+                            val outcome = withContext(Dispatchers.Default) {
+                                TextDecryptor.decrypt(bin, emptyList(), p, known, signers)
                             }
-                            result = String(plain, Charsets.UTF_8)
+                            result = String(outcome.plaintext, Charsets.UTF_8)
+                            signature = outcome.signature
                             stage = DecStage.RESULT
-                        } catch (e: WrongPassphraseException) {
-                            error = e.message; stage = DecStage.NEED_PASSPHRASE
                         } catch (e: OutOfMemoryError) {
                             error = context.getString(R.string.text_oom_derive)
                             stage = DecStage.NEED_PASSPHRASE
                         } catch (e: Exception) {
-                            error = e.message ?: context.getString(R.string.files_decrypt_failed); stage = DecStage.NEED_PASSPHRASE
+                            error = UserMessage.text(context, e, R.string.text_decrypt_failed); stage = DecStage.NEED_PASSPHRASE
                         }
                     }
                 },
@@ -391,7 +461,7 @@ private fun decryptTextInto(
     scope: kotlinx.coroutines.CoroutineScope,
     setStage: (DecStage) -> Unit,
     setBinary: (ByteArray) -> Unit,
-    setResult: (String) -> Unit,
+    setResult: (String, TextDecryptor.SignatureCheck?) -> Unit,
     setError: (String?) -> Unit,
 ) {
     if (input.isBlank()) { setError(context.getString(R.string.text_paste_first)); return }
@@ -403,11 +473,14 @@ private fun decryptTextInto(
             val bin = withContext(Dispatchers.Default) { FileEncryptor.toBinary(raw) }
             setBinary(bin)
             val ids = vault.identities.mapNotNull { runCatching { it.toAgeIdentity() }.getOrNull() }
+            val known = vault.identities.toList()
+            val signers = vault.signers.toList()
             try {
-                val plain = withContext(Dispatchers.Default) {
-                    FileEncryptor.decryptWithIdentities(bin, ids)
+                // Checks a signature stanza or signed bundle as the file decrypt does (L-1).
+                val outcome = withContext(Dispatchers.Default) {
+                    TextDecryptor.decrypt(bin, ids, null, known, signers)
                 }
-                setResult(String(plain, Charsets.UTF_8))
+                setResult(String(outcome.plaintext, Charsets.UTF_8), outcome.signature)
                 setStage(DecStage.RESULT)
             } catch (e: NoMatchingVaultIdentityException) {
                 setStage(DecStage.NEED_PASSPHRASE)
@@ -415,7 +488,7 @@ private fun decryptTextInto(
         } catch (e: OutOfMemoryError) {
             setError(context.getString(R.string.text_oom_decrypt)); setStage(DecStage.FORM)
         } catch (e: Exception) {
-            setError(e.message ?: context.getString(R.string.text_not_armored))
+            setError(UserMessage.textUnlessCancelled(context, e, R.string.text_not_armored))
             setStage(DecStage.FORM)
         }
     }
@@ -447,12 +520,13 @@ private fun CopyableResult(label: String, value: String, mono: Boolean) {
             modifier = Modifier.fillMaxWidth().padding(16.dp),
         )
     }
-    Button(
+    // Copying the result is what the screen is for, so it is the filled button.
+    PrimaryAction(
+        stringResource(if (copied) R.string.action_copied else R.string.action_copy),
         // Android 13+ confirms the copy itself; only older versions get our own "Copied".
         onClick = { ClipboardGuard.copySensitive(context, value); copied = showOwnCopyConfirmation },
         modifier = Modifier.fillMaxWidth(),
-    ) { Text(stringResource(if (copied) R.string.action_copied else R.string.action_copy)) }
-    ListDivider()
+    )
 }
 
 @Composable

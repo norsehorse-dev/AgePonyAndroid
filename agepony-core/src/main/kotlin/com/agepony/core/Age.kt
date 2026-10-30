@@ -24,11 +24,23 @@ import java.security.SecureRandom
 object Age {
     private const val FILE_KEY_SIZE = 16
 
+    /**
+     * Most stanzas addressed to one hardware key that a decrypt will try (5.1.0, L-7). A valid
+     * file has one per recipient; more than this is a crafted header. Same value as iOS.
+     */
+    const val MAX_STANZAS_PER_HARDWARE_IDENTITY = 4
+
     // Marker that begins the header MAC line: newline, three dashes, space.
     private val MAC_MARKER = "\n--- ".toByteArray(Charsets.US_ASCII)
 
     class NoMatchingIdentityException : Exception(
         "no identity could decrypt any stanza in the header"
+    )
+
+    /** Recipients with different labels (quantum-safe and classic) in one file. An IllegalArgumentException as before. */
+    class MismatchedRecipientLabelsException : IllegalArgumentException(
+        "recipients disagree on labels: all recipients must share the same labels " +
+            "(e.g. a post-quantum recipient cannot be combined with a non-post-quantum one)"
     )
 
     /**
@@ -188,7 +200,10 @@ object Age {
      */
     private fun requireScryptAlone(stanzas: List<Stanza>, identities: List<AgeIdentity>) {
         if (stanzas.size > 1 && stanzas.any { it.type == "scrypt" } && identities.any { it is ScryptIdentity }) {
-            throw AgeHeader.HeaderException("an scrypt recipient must be the only one in the file")
+            throw AgeHeader.HeaderException(
+                "an scrypt recipient must be the only one in the file",
+                AgeHeader.HeaderException.Reason.SCRYPT_NOT_ALONE,
+            )
         }
     }
 
@@ -206,25 +221,45 @@ object Age {
 
     /**
      * Find the file key. Software identities go first across every stanza, so a file that also
-     * has a software recipient never waits on (or fails because of) a hardware key. Tag
+     * has a software recipient never waits on (or fails because of) a hardware key. Hardware
      * identities go last, and an error from one (a cancelled prompt, a key the OS invalidated) is
      * held back while the rest are tried; it only surfaces if nothing else opened the file.
+     *
+     * Keys in the phone's own hardware are tried before external ones (a YubiKey), so a working
+     * Keystore key never asks for a tap and a dead one doesn't hide it (5.1.0, M-4). Each hardware
+     * identity is bounded (5.1.0, L-7): once it throws it is not asked again for this file, and
+     * it is asked to open at most [MAX_STANZAS_PER_HARDWARE_IDENTITY] of the stanzas addressed
+     * to it. Mirrors iOS `Age.unwrapFileKey`.
      */
-    private fun unwrapFileKey(stanzas: List<Stanza>, identities: List<AgeIdentity>): ByteArray {
-        val (hardware, software) = identities.partition { it is HardwareIdentity }
+    internal fun unwrapFileKey(stanzas: List<Stanza>, identities: List<AgeIdentity>): ByteArray {
+        val (hardwareIds, software) = identities.partition { it is HardwareIdentity }
         for (stanza in stanzas) {
             for (id in software) id.unwrap(stanza)?.let { return checkFileKey(it) }
         }
+        val hardware = hardwareIds.map { it as HardwareIdentity }
+        val onDevice = hardware.filter { !it.isExternalDevice }
+        val external = hardware.filter { it.isExternalDevice }
         var firstError: Exception? = null
-        for (stanza in stanzas) {
-            for (id in hardware) {
-                val key = try {
-                    id.unwrap(stanza)
-                } catch (e: Exception) {
-                    if (firstError == null) firstError = e
-                    null
+        for (group in listOf(onDevice, external)) {
+            val tries = IntArray(group.size)
+            val failed = BooleanArray(group.size)
+            for (stanza in stanzas) {
+                for ((i, id) in group.withIndex()) {
+                    if (failed[i] || !id.matches(stanza)) continue
+                    // A matching tag can be made from the public key, so a crafted header can
+                    // address any number of stanzas to one key (5.1.0, L-7).
+                    if (tries[i] >= MAX_STANZAS_PER_HARDWARE_IDENTITY) continue
+                    tries[i]++
+                    val key = try {
+                        id.unwrap(stanza)
+                    } catch (e: Exception) {
+                        // A cancelled prompt or a lost key: don't ask it again for this file (5.1.0, L-7).
+                        if (firstError == null) firstError = e
+                        failed[i] = true
+                        null
+                    }
+                    if (key != null) return checkFileKey(key)
                 }
-                if (key != null) return checkFileKey(key)
             }
         }
         throw firstError ?: NoMatchingIdentityException()
@@ -240,10 +275,7 @@ object Age {
         val first = labelsOf(to.first())
         for (r in to) {
             if (labelsOf(r) != first) {
-                throw IllegalArgumentException(
-                    "recipients disagree on labels: all recipients must share the same labels " +
-                        "(e.g. a post-quantum recipient cannot be combined with a non-post-quantum one)"
-                )
+                throw MismatchedRecipientLabelsException()
             }
         }
     }
@@ -271,12 +303,12 @@ object Age {
 
         while (true) {
             val b = input.read()
-            if (b < 0) throw AgeHeader.HeaderException("unexpected EOF while reading header")
+            if (b < 0) throw AgeHeader.HeaderException("unexpected EOF while reading header", AgeHeader.HeaderException.Reason.TRUNCATED)
             buf.write(b)
 
             if (sawMacMarker && b == '\n'.code) return buf.toByteArray()
             if (buf.size() >= AgeHeader.MAX_HEADER_SIZE) {
-                throw AgeHeader.HeaderException("header exceeds ${AgeHeader.MAX_HEADER_SIZE} bytes")
+                throw AgeHeader.HeaderException("header exceeds ${AgeHeader.MAX_HEADER_SIZE} bytes", AgeHeader.HeaderException.Reason.TOO_LARGE)
             }
             if (sawMacMarker) continue
 

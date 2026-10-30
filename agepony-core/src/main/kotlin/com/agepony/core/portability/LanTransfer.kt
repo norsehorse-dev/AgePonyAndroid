@@ -50,7 +50,13 @@ object LanTransfer {
     private const val CHUNK = 64 * 1024
     private const val PREFIX = "AGEPONY:XFER1/"
 
-    class LanTransferException(message: String) : Exception(message)
+    /** [reason] is what the app shows; the message stays internal (5.1.0, UI plan U5). */
+    class LanTransferException(
+        message: String,
+        val reason: LanTransferException.Reason = LanTransferException.Reason.PROTOCOL,
+    ) : Exception(message) {
+        enum class Reason { NOT_AN_INVITE, DAMAGED_INVITE, PROTOCOL, WRONG_TOKEN, TOO_LARGE, CLOSED, REFUSED, UNREACHABLE }
+    }
 
     /**
      * What the receiver's QR code carries. Encoded upper-case in the QR alphanumeric character
@@ -71,11 +77,11 @@ object LanTransfer {
 
             fun decode(s: String): Invite {
                 val t = s.trim().uppercase()
-                if (!t.startsWith(PREFIX)) throw LanTransferException("That isn't an AgePony receive code.")
+                if (!t.startsWith(PREFIX)) throw LanTransferException("That isn't an AgePony receive code.", LanTransferException.Reason.NOT_AN_INVITE)
                 val parts = t.removePrefix(PREFIX).split("/")
-                if (parts.size != 4) throw LanTransferException("That receive code is damaged.")
-                val token = unhex(parts[1]) ?: throw LanTransferException("That receive code is damaged.")
-                val port = parts[2].toIntOrNull() ?: throw LanTransferException("That receive code is damaged.")
+                if (parts.size != 4) throw LanTransferException("That receive code is damaged.", LanTransferException.Reason.DAMAGED_INVITE)
+                val token = unhex(parts[1]) ?: throw LanTransferException("That receive code is damaged.", LanTransferException.Reason.DAMAGED_INVITE)
+                val port = parts[2].toIntOrNull() ?: throw LanTransferException("That receive code is damaged.", LanTransferException.Reason.DAMAGED_INVITE)
                 val hosts = parts[3].split("+").filter { it.isNotBlank() }
                 return Invite(parts[0].lowercase(), token, port, hosts)
             }
@@ -305,13 +311,13 @@ object LanTransfer {
         if (hello.first != HELLO) throw LanTransferException("expected HELLO")
         val handle = parseHelloHandle(hello.second)
         if (!MessageDigest.isEqual(handle.toByteArray(Charsets.US_ASCII), hex(token).toByteArray(Charsets.US_ASCII))) {
-            throw LanTransferException("wrong token")
+            throw LanTransferException("wrong token", LanTransferException.Reason.WRONG_TOKEN)
         }
         onAuthenticated()
         val begin = readFrame(input, 64) ?: throw LanTransferException("no FILE_BEGIN")
         if (begin.first != FILE_BEGIN || begin.second.size != 8) throw LanTransferException("expected FILE_BEGIN")
         val size = begin.second.fold(0L) { acc, b -> (acc shl 8) or (b.toLong() and 0xff) }
-        if (size < 0 || size > maxBytes) throw LanTransferException("transfer too large")
+        if (size < 0 || size > maxBytes) throw LanTransferException("transfer too large", LanTransferException.Reason.TOO_LARGE)
         val body = ByteArrayOutputStream(size.toInt())
         while (true) {
             val f = readFrame(input, CHUNK) ?: throw LanTransferException("truncated")
@@ -350,7 +356,7 @@ object LanTransfer {
             Socket().apply { connect(InetSocketAddress(host, port), 5_000) }
         },
     ) {
-        if (sealed.size > MAX_BYTES) throw LanTransferException("Transfer is too large to send directly.")
+        if (sealed.size > MAX_BYTES) throw LanTransferException("Transfer is too large to send directly.", LanTransferException.Reason.TOO_LARGE)
         var lastError: Exception? = null
         for (host in invite.hosts) {
             val socket = try {
@@ -375,16 +381,17 @@ object LanTransfer {
                 frame(out, FILE_END, MessageDigest.getInstance("SHA-256").digest(sealed))
                 frame(out, DONE, ByteArray(0))
                 out.flush()
-                val ack = readFrame(input, 16) ?: throw LanTransferException("The other phone closed the connection.")
+                val ack = readFrame(input, 16) ?: throw LanTransferException("The other phone closed the connection.", LanTransferException.Reason.CLOSED)
                 if (ack.first != ACK || ack.second.firstOrNull() != 1.toByte()) {
-                    throw LanTransferException("The other phone refused the transfer. Start Receive keys again and rescan.")
+                    throw LanTransferException("The other phone refused the transfer. Start Receive keys again and rescan.", LanTransferException.Reason.REFUSED)
                 }
                 return
             }
         }
         throw LanTransferException(
             "Couldn't reach the other phone. Put both on the same Wi-Fi (or one on the other's hotspot)." +
-                (lastError?.message?.let { " ($it)" } ?: "")
+                (lastError?.message?.let { " ($it)" } ?: ""),
+            LanTransferException.Reason.UNREACHABLE,
         )
     }
 

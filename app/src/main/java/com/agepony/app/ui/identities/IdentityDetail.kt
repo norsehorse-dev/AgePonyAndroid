@@ -1,14 +1,14 @@
 package com.agepony.app.ui.identities
 
+import com.agepony.app.vault.LockMode
+import com.agepony.app.ui.security.rememberSensitiveConfirm
 import android.view.WindowManager
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -21,19 +21,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.security.BiometricGate
-import com.agepony.app.security.BiometricGateException
-import com.agepony.app.security.PasswordCheck
-import com.agepony.app.security.UnlockAttempts
 import com.agepony.app.ui.portability.PaperBackupScreen
 import com.agepony.app.vault.KeyPortability
 import com.agepony.app.vault.isDeviceBound
@@ -46,15 +40,13 @@ import com.agepony.app.vault.isPostQuantum
 import com.agepony.app.vault.isPrivateKeyExportable
 import com.agepony.app.vault.privateDisplayString
 import com.agepony.app.vault.publicDisplayString
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 import androidx.compose.foundation.layout.fillMaxSize
 import com.agepony.app.ui.components.AgeScreen
 import com.agepony.app.ui.components.ListDivider
 import com.agepony.app.ui.components.QuietAction
+import com.agepony.app.ui.components.ValueRow
 import androidx.compose.ui.res.stringResource
 import com.agepony.app.R
 import androidx.annotation.StringRes
@@ -80,23 +72,34 @@ fun IdentityDetail(
     }
 
     val activity = LocalContext.current as FragmentActivity
-    val scope = rememberCoroutineScope()
 
     var revealed by remember(identityId) { mutableStateOf(false) }
     var activeId by remember { mutableStateOf(vault.activeIdentityId) }
     var renaming by remember { mutableStateOf(false) }
     var renameDraft by remember { mutableStateOf("") }
     var confirmingDelete by remember { mutableStateOf(false) }
-    var revealError by remember { mutableStateOf<String?>(null) }
-    var showPasswordReauth by remember(identityId) { mutableStateOf(false) }
-    // Reveal is a defense-in-depth re-auth. Prefer biometric/device credential; on a
-    // vault with neither (password-only, or an emulator with no lock), fall back to the
-    // app password so reveal still requires something. With no gate at all, reveal directly.
-    val canBioConfirm = remember(identityId) { BiometricGate.canAuthenticate(activity) }
-    val passwordEnrolled = vault.passwordKeyBlobExists()
+    // Reveal is a defense-in-depth re-auth, the same owner check as sending keys or printing a
+    // backup (5.1.0): the biometric or device credential, or the app password where the vault's
+    // lock calls for it (a password-only vault, or Biometrics only after a biometric was added
+    // or removed, or while none can run). Refused on a phone with a screen lock where no check
+    // can run; straight through only with no screen lock and no app password.
+    val confirmOwner = rememberSensitiveConfirm(vault)
     val isPin = vault.unlockSecretKind == "pin"
 
-    AgeScreen(title = stringResource(R.string.identity_title), modifier = modifier, onBack = onBack) { padding ->
+    AgeScreen(
+        title = stringResource(R.string.identity_title),
+        modifier = modifier,
+        onBack = onBack,
+        // Rename is an app bar action, as on iOS, not a button squeezed beside the name (5.1.0, U4).
+        actions = {
+            if (identity != null) {
+                TextButton(onClick = {
+                    renameDraft = identity.name
+                    renaming = true
+                }) { Text(stringResource(R.string.identities_rename)) }
+            }
+        },
+    ) { padding ->
     Column(modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
         if (identity == null) {
             Text(
@@ -111,35 +114,21 @@ fun IdentityDetail(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = identity.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = {
-                    renameDraft = identity.name
-                    renaming = true
-                }) { Text(stringResource(R.string.identities_rename)) }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(
-                        R.string.identities_type_created,
-                        stringResource(typeLabel(identity.type)),
-                        DateFormat.getDateInstance().format(Date(identity.createdAt)),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
+            // Name, type and date as rows of a details list (5.1.0, U4).
+            Column {
+                ValueRow(stringResource(R.string.identities_row_name), identity.name)
+                ListDivider()
+                ValueRow(stringResource(R.string.identities_row_type), stringResource(typeLabel(identity.type)))
                 if (identity.type.isPostQuantum) {
-                    PostQuantumBadge(modifier = Modifier.padding(start = 8.dp))
+                    PostQuantumBadge(modifier = Modifier.padding(bottom = 8.dp))
                 }
+                ListDivider()
+                ValueRow(
+                    stringResource(R.string.identities_row_created),
+                    DateFormat.getDateInstance().format(Date(identity.createdAt)),
+                )
+                ListDivider()
             }
-
-            ListDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             KeyBlock(label = stringResource(R.string.identities_key_public), value = identity.publicDisplayString())
             Text(
@@ -174,49 +163,39 @@ fun IdentityDetail(
                     }
                 }
             }
-            if (revealed) {
+            if (revealed && exportable) {
                 KeyBlock(
                     label = stringResource(R.string.identities_key_private),
                     value = identity.privateDisplayString(LocalContext.current),
-                    isSensitive = exportable,
-                    copyable = exportable,
+                    isSensitive = true,
+                    copyable = true,
                 )
+            } else if (revealed) {
+                // A key that never leaves its hardware has a sentence here, not key material,
+                // so it is set in the UI font (5.1.0, U4).
+                Column {
+                    Text(
+                        stringResource(R.string.identities_key_private),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                    Text(
+                        identity.privateDisplayString(LocalContext.current),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
             } else {
                 OutlinedButton(
                     onClick = {
-                        when {
-                            canBioConfirm -> scope.launch {
-                                try {
-                                    BiometricGate.confirm(
-                                        activity,
-                                        title = activity.getString(R.string.identities_reveal_private),
-                                        subtitle = activity.getString(R.string.identities_reveal_prompt_subtitle),
-                                    )
-                                    revealed = true
-                                } catch (e: BiometricGateException) {
-                                    if (e.code != androidx.biometric.BiometricPrompt.ERROR_USER_CANCELED &&
-                                        e.code != androidx.biometric.BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                                    ) {
-                                        revealError = e.message
-                                    }
-                                }
-                            }
-                            passwordEnrolled -> showPasswordReauth = true
-                            else -> revealed = true
-                        }
+                        confirmOwner(activity.getString(R.string.identities_reveal_private)) { revealed = true }
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.identities_reveal_private))
                 }
                 Text(
-                    text = when {
-                        canBioConfirm -> stringResource(R.string.identities_reveal_needs_biometric)
-                        passwordEnrolled -> stringResource(
-                            if (isPin) R.string.identities_reveal_needs_pin else R.string.identities_reveal_needs_password
-                        )
-                        else -> stringResource(R.string.identities_reveal_no_lock)
-                    },
+                    text = stringResource(revealHint(vault, activity, isPin)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -311,49 +290,6 @@ fun IdentityDetail(
             },
         )
     }
-
-    if (showPasswordReauth) {
-        ReauthPasswordDialog(
-            isPin = isPin,
-            onDismiss = { showPasswordReauth = false },
-            onSubmit = { chars ->
-                showPasswordReauth = false
-                scope.launch {
-                    // Go through the vault's check so wrong guesses count toward the unlock
-                    // backoff and a lockout is honored here too.
-                    val result = try {
-                        withContext(Dispatchers.IO) { vault.verifyAppPassword(chars) }
-                    } catch (e: Exception) {
-                        revealError = e.message ?: activity.getString(
-                            if (isPin) R.string.identities_error_check_pin else R.string.identities_error_check_password
-                        )
-                        null
-                    } finally {
-                        chars.fill(' ')
-                    }
-                    when (result) {
-                        PasswordCheck.Ok -> revealed = true
-                        PasswordCheck.Wrong -> revealError = activity.getString(
-                            if (isPin) R.string.identities_error_wrong_pin else R.string.identities_error_wrong_password
-                        )
-                        is PasswordCheck.LockedOut -> revealError = UnlockAttempts.lockoutMessage(activity, result.remainingMillis)
-                        null -> Unit
-                    }
-                }
-            },
-        )
-    }
-
-    if (revealError != null) {
-        AlertDialog(
-            onDismissRequest = { revealError = null },
-            title = { Text(stringResource(R.string.identities_reveal_failed_title)) },
-            text = { Text(revealError ?: "") },
-            confirmButton = {
-                TextButton(onClick = { revealError = null }) { Text(stringResource(R.string.identities_ok)) }
-            },
-        )
-    }
 }
 
 @StringRes
@@ -371,42 +307,22 @@ private fun typeLabel(t: StoredIdentityType): Int = when (t) {
 }
 
 /**
- * Password/PIN re-auth for revealing a private key when no biometric or device
- * credential is available. Verifies against the real password blob only (never the
- * duress blob), so the duress secret does not reveal or wipe here.
+ * What the reveal button will ask for, following the same order as the owner check
+ * ([com.agepony.app.security.OwnerCheckPolicy.route]). In Biometrics only mode the hint names
+ * the biometric, never the device credential (5.1.0, iOS E6).
  */
-@Composable
-private fun ReauthPasswordDialog(
-    isPin: Boolean,
-    onDismiss: () -> Unit,
-    onSubmit: (CharArray) -> Unit,
-) {
-    var value by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(stringResource(if (isPin) R.string.identities_confirm_pin else R.string.identities_confirm_password))
-        },
-        text = {
-            OutlinedTextField(
-                value = value,
-                onValueChange = { value = it },
-                singleLine = true,
-                label = {
-                    Text(stringResource(if (isPin) R.string.identities_pin_label else R.string.identities_password_label))
-                },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onSubmit(value.toCharArray()) }, enabled = value.isNotEmpty()) {
-                Text(stringResource(R.string.action_reveal))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-    )
+@StringRes
+private fun revealHint(vault: Vault, activity: FragmentActivity, isPin: Boolean): Int {
+    val hasPassword = vault.passwordKeyBlobExists()
+    val passwordHint = if (isPin) R.string.identities_reveal_needs_pin else R.string.identities_reveal_needs_password
+    return when {
+        hasPassword && vault.passwordIsOnlyUnlock() -> passwordHint
+        vault.lockMode == LockMode.BIOMETRIC_ONLY && !vault.duressBlobExists() ->
+            if (isPin) R.string.identities_reveal_needs_biometric_only_pin
+            else R.string.identities_reveal_needs_biometric_only_password
+        BiometricGate.canAuthenticateDefault(activity) -> R.string.identities_reveal_needs_biometric
+        hasPassword -> passwordHint
+        BiometricGate.isDeviceSecure(activity) -> R.string.identities_reveal_needs_screen_lock
+        else -> R.string.identities_reveal_no_lock
+    }
 }

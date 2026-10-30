@@ -67,7 +67,7 @@
     <!-- Sign a file -->
     <string name="sign_sk_pin_needed">This security key needs a PIN. Enter it below and sign again.</string>
     <string name="sign_sk_pin_wrong">Incorrect PIN. Try again.</string>
-    <string name="sign_failed">Signing failed.</string>
+    <string name="sign_failed">Couldn\'t sign the file.</string>
     <string name="sign_intro">Produces a detached signature saved as its own small file next to the original. Send both; the file itself is not changed or encrypted.</string>
     <string name="sign_no_keys">No signing keys in your vault yet. Add an SSH key, a hardware key, or a security key under Identities first.</string>
     <string name="sign_with">Sign with</string>
@@ -78,18 +78,13 @@
     <string name="sign_working">Signing…</string>
     <string name="sign_done_title">Signed</string>
     <string name="sign_done_body">Send the signature file along with the original. Signatures are scoped to AgePony\'s namespace; to check one on the command line:</string>
-    <string name="sign_another">Sign another</string>
-    <string name="sign_type_ssh_ed25519">SSH Ed25519 · in-app key</string>
-    <string name="sign_type_ssh_rsa">SSH RSA · in-app key</string>
-    <string name="sign_type_hardware">Hardware key · signs in the device keystore</string>
-    <string name="sign_type_sk_ed25519">Security key · Ed25519 over NFC</string>
-    <string name="sign_type_sk_p256">Security key · ECDSA P-256 over NFC</string>
+    <string name="sign_another">Sign another file</string>
 
     <!-- Trusted signers -->
-    <string name="sign_signers_none_in_file">No allowed_signers entries found in that file.</string>
+    <string name="sign_signers_none_in_file">No signers found in that file.</string>
     <!-- %1$s: the error detail -->
-    <string name="sign_signers_import_failed">Import failed: %1$s</string>
-    <string name="sign_signers_export_failed">Export failed: %1$s</string>
+    <string name="sign_signers_import_failed">Couldn\'t import that signers file.</string>
+    <string name="sign_signers_export_failed">Couldn\'t export the trusted signers.</string>
     <plurals name="sign_signers_imported_sentence">
         <item quantity="one">Imported %1$d signer.</item>
         <item quantity="other">Imported %1$d signers.</item>
@@ -103,19 +98,20 @@
         <item quantity="other">%1$d were not imported.</item>
     </plurals>
     <string name="sign_signers_nothing_imported">Nothing imported.</string>
-    <string name="sign_signers_intro">Signatures from these keys verify with the name you gave them. The list imports from and exports to the OpenSSH allowed_signers format.</string>
-    <string name="sign_signers_empty">No trusted signers yet. Add one below, or from a valid-but-unknown verify result.</string>
+    <string name="sign_signers_intro">Signatures from these keys verify with the name you gave them. The list imports from and exports to an OpenSSH signers file (allowed_signers), the one ssh-keygen -Y verify reads.</string>
+    <string name="sign_signers_empty_title">No trusted signers yet</string>
+    <string name="sign_signers_empty">A trusted signer is someone else\'s public key that you\'ve checked, so their signatures show their name. Add one below, import a signers file, or add the signer from a verify result.</string>
     <string name="sign_signers_paste">Paste a public key…</string>
-    <string name="sign_signers_import">Import allowed_signers…</string>
+    <string name="sign_signers_import">Import a signers file…</string>
     <string name="sign_signers_promote">Promote a saved recipient…</string>
-    <string name="sign_signers_export">Export allowed_signers…</string>
+    <string name="sign_signers_export">Export as a signers file…</string>
     <string name="sign_signers_not_ssh_line">That doesn\'t look like an SSH public key line.</string>
     <!-- %1$s: the signer name -->
     <string name="sign_signers_added">Added \"%1$s\".</string>
     <string name="sign_signers_already_listed">That key is already on the list.</string>
     <string name="sign_signers_recipient_unreadable">Couldn\'t read that recipient\'s key.</string>
     <string name="sign_signer_delete_body">Signatures from this key will verify as valid but unknown instead of carrying this name.</string>
-    <string name="sign_signers_import_title">Import allowed_signers</string>
+    <string name="sign_signers_import_title">Import signers</string>
     <string name="sign_signers_review_intro">Tick the signers to trust. Files signed by a trusted signer show as signed by that name.</string>
     <string name="sign_signers_unreadable_key">(unreadable key)</string>
     <string name="sign_signers_review_present">Already on your list.</string>
@@ -143,24 +139,46 @@
     <string name="sign_verify_signed_by">Signed by %1$s</string>
     <string name="sign_verify_signed_by_known_key">Signed by a known key</string>
     <string name="sign_verify_untrusted_title">Valid signature, but not trusted</string>
-    <!-- %1$s: signer name; %2$s: why the entry rejects it, a lowercase clause -->
-    <string name="sign_verify_untrusted_detail">The key belongs to \"%1$s\" on your trusted signers list, but %2$s.</string>
-    <string name="sign_verify_untrusted_default_reason">that entry does not allow this signature</string>
+    <!-- %1$s: signer name; %2$s: why the entry rejects it, one of the sign_entry_ sentences -->
+    <string name="sign_verify_untrusted_detail">The key belongs to \"%1$s\" on your trusted signers list. %2$s</string>
+    <string name="sign_verify_untrusted_default_reason">Its entry doesn\'t allow this signature.</string>
     <string name="sign_verify_unknown_title">Valid signature, signer not in your vault</string>
     <string name="sign_verify_unknown_detail">The math checks out, but this key isn\'t one of yours and isn\'t on your trusted signers list. If you know whose it is, add it so future signatures carry their name.</string>
     <string name="sign_verify_invalid_title">Signature invalid</string>
-    <string name="sign_verify_failed">Verification failed.</string>
+    <string name="sign_verify_failed">The signature doesn\'t match this file.</string>
+    <!-- Why a signature failed (5.1.0, U5). Whole sentences, shown under the verdict. -->
+    <string name="sign_reason_malformed">The signature is damaged or isn\'t an SSH signature.</string>
+    <string name="sign_reason_unchecked">The signature couldn\'t be checked.</string>
+    <!-- %1$s: the namespace the signature was made under -->
+    <string name="sign_reason_namespace">This signature was made for something else (namespace %1$s).</string>
+    <string name="sign_reason_rsa_key">The signer\'s RSA key isn\'t one AgePony accepts: it\'s too small, too large or has an unusual exponent.</string>
+    <string name="sign_reason_no_touch">The signature was made without touching the security key, so it doesn\'t count.</string>
+    <string name="sign_reason_mismatch">The signature doesn\'t match this file.</string>
+    <!-- Why a trusted signer entry refuses a valid signature (5.1.0, U5). Whole sentences. -->
+    <string name="sign_entry_options_unreadable">Its entry has options AgePony can\'t read.</string>
+    <!-- %1$s: the option names, as written in the entry -->
+    <string name="sign_entry_options_unsupported">Its entry has options AgePony doesn\'t support: %1$s.</string>
+    <string name="sign_entry_cert_authority">Its entry is a certificate authority, which AgePony doesn\'t support.</string>
+    <!-- %1$s: a date and time -->
+    <string name="sign_entry_not_yet_valid">Its entry isn\'t valid until %1$s.</string>
+    <!-- %1$s: a date and time -->
+    <string name="sign_entry_expired">Its entry expired on %1$s.</string>
+    <!-- %1$s: the namespace the signature was made under -->
+    <string name="sign_entry_namespace">Its entry doesn\'t allow the namespace \"%1$s\".</string>
+    <string name="sign_entry_needs_touch">Its entry requires a touch on the security key.</string>
+    <string name="sign_entry_needs_verify">Its entry requires a PIN or biometric check on the security key.</string>
+    <string name="sign_entry_refuses">Its entry doesn\'t allow this signature.</string>
     <!-- %1$s: the name just given -->
     <string name="sign_verify_added_signer">Added to trusted signers as \"%1$s\".</string>
     <string name="sign_verify_add_signer">Add this signer…</string>
-    <string name="sign_verify_another">Verify another</string>
+    <string name="sign_verify_another">Verify another file</string>
     <string name="sign_verify_add_signer_title">Add trusted signer</string>
     <string name="sign_verify_add_signer_body">Name the person or system this key belongs to.</string>
 
     <!-- Notes -->
     <string name="notes_new">New note</string>
     <string name="notes_empty_title">No notes yet</string>
-    <string name="notes_empty_body">Tap Add to write one. Each note is encrypted with its own passphrase.</string>
+    <string name="notes_empty_body">A note is text kept encrypted with its own passphrase, apart from your keys. Only someone who knows the passphrase can read it.</string>
     <string name="notes_untitled">Untitled</string>
     <!-- %1$s: relative time, such as "5 minutes ago" -->
     <string name="notes_edited">Edited %1$s</string>
@@ -220,7 +238,6 @@
     <!-- Security prompts -->
     <string name="security_yubikey_title">YubiKey</string>
     <string name="security_yubikey_pin_title">YubiKey PIN</string>
-    <string name="security_yubikey_pin_body">This key needs its PIV PIN. You\'ll tap the YubiKey right after.</string>
     <string name="security_continue">Continue</string>
     <string name="security_ok">OK</string>
     <string name="security_confirm_pin">Confirm your PIN</string>
@@ -240,4 +257,30 @@
 
     <!-- Share sheet -->
     <string name="app_share_replace_unavailable">The app you selected this in only lets AgePony read the text, not change it. Copy the result and paste it back over your selection.</string>
+    <!-- 5.1.0: Biometrics only lock screen and in-app checks (iOS E6, M-3, H-1) -->
+    <string name="app_locked_biometric_only_pin">Unlock your vault with biometrics or your PIN.</string>
+    <string name="app_locked_biometric_only_password">Unlock your vault with biometrics or your password.</string>
+    <string name="app_locked_screen_lock_note">The phone\'s screen lock doesn\'t open AgePony.</string>
+    <string name="app_use_biometrics">Use biometrics</string>
+    <string name="app_use_fingerprint">Use fingerprint</string>
+    <string name="app_biometric_refresh_title">Turn biometric unlock back on?</string>
+    <string name="app_biometric_refresh_body">A fingerprint or face was added or removed, so biometrics stopped opening AgePony. Confirm with biometrics now to unlock with them again. Until then, only your app password or PIN opens the vault.</string>
+    <string name="app_biometric_refresh_confirm">Turn on</string>
+    <string name="app_biometric_refresh_later">Not now</string>
+    <string name="security_biometric_unavailable">Biometrics aren\'t available right now.</string>
+    <string name="security_biometric_changed">A fingerprint or face was added or removed on this phone.</string>
+    <string name="security_biometric_changed_note_pin">A fingerprint or face was added or removed on this phone since the vault was locked to biometrics, so AgePony asks for your PIN here instead. If you didn\'t change this yourself, check your phone\'s security settings for a fingerprint or face you didn\'t add before you enter your PIN.</string>
+    <string name="security_biometric_changed_note_password">A fingerprint or face was added or removed on this phone since the vault was locked to biometrics, so AgePony asks for your password here instead. If you didn\'t change this yourself, check your phone\'s security settings for a fingerprint or face you didn\'t add before you enter your password.</string>
+    <string name="security_biometric_unavailable_note_pin">Biometrics aren\'t available right now, so AgePony asks for your PIN instead. The phone\'s screen lock is never used for this.</string>
+    <string name="security_biometric_unavailable_note_password">Biometrics aren\'t available right now, so AgePony asks for your password instead. The phone\'s screen lock is never used for this.</string>
+    <string name="security_owner_check_unavailable">AgePony can\'t confirm it\'s you right now, because neither biometrics nor the screen lock can be used. Try again in a moment.</string>
+    <!-- 5.1.0: Text decrypt paste and signature checks (iOS L-1, L-3) -->
+    <string name="text_paste">Paste</string>
+    <string name="text_signature">Signature</string>
+    <string name="text_bundle_damaged">The text decrypted, but the signed bundle inside it is damaged.</string>
+    <string name="files_decrypt_done_signature_failed">Decrypted, signature failed</string>
+    <string name="app_secret_type">Type</string>
+    <string name="sign_verify_key_type_label">Key type</string>
+    <string name="sign_verify_fingerprint_label">Fingerprint</string>
+    <string name="text_decrypt_another">Decrypt another</string>
 </resources>

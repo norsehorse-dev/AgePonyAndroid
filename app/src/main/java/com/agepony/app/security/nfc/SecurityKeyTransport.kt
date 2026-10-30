@@ -4,6 +4,7 @@ import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
 import androidx.fragment.app.FragmentActivity
+import com.agepony.app.R
 import com.agepony.core.fido.Ctap2
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.ByteArrayOutputStream
@@ -34,7 +35,21 @@ private const val MAX_KEEPALIVE_NANOS = 120_000_000_000L
  * (key agreement + PIN token + command) requires to share a session.
  */
 class SecurityKeyTransport(private val activity: FragmentActivity) {
-    class NfcException(message: String, cause: Throwable? = null) : Exception(message, cause)
+    /**
+     * The NFC exchange failed. [reason] and [sw] (an ISO status word, 0 when none) are what the
+     * app shows; the message is internal (5.1.0, UI plan U5).
+     */
+    class NfcException(
+        message: String,
+        cause: Throwable? = null,
+        val reason: NfcException.Reason = NfcException.Reason.COMMUNICATION,
+        val sw: Int = 0,
+    ) : Exception(message, cause) {
+        enum class Reason {
+            NO_NFC, NFC_OFF, NOT_ISO_DEP, READER_FAILED, COMMUNICATION, SELECT_FAILED,
+            TOO_LARGE, TIMED_OUT, CHAINING, TRANSPORT, HOLD_AGAIN,
+        }
+    }
 
     private val adapter: NfcAdapter? = NfcAdapter.getDefaultAdapter(activity)
 
@@ -45,18 +60,18 @@ class SecurityKeyTransport(private val activity: FragmentActivity) {
      * session. Reader mode is torn down when [block] returns or throws.
      */
     suspend fun <T> withSecurityKey(timeoutMs: Long = 60_000, block: suspend (Session) -> T): T {
-        val nfc = adapter ?: throw NfcException("this device has no NFC")
-        if (!nfc.isEnabled) throw NfcException("NFC is turned off")
+        val nfc = adapter ?: throw NfcException("this device has no NFC", reason = NfcException.Reason.NO_NFC)
+        if (!nfc.isEnabled) throw NfcException("NFC is turned off", reason = NfcException.Reason.NFC_OFF)
         val tag = awaitTag(nfc, timeoutMs)
-        val isoDep = IsoDep.get(tag) ?: throw NfcException("tag does not support ISO-DEP")
+        val isoDep = IsoDep.get(tag) ?: throw NfcException("tag does not support ISO-DEP", reason = NfcException.Reason.NOT_ISO_DEP)
         try {
             isoDep.connect()
             isoDep.timeout = 7_000
-            val session = Session(isoDep)
+            val session = Session(isoDep, activity.getString(R.string.core_nfc_hold_key_again))
             session.selectApplet()
             return block(session)
         } catch (e: IOException) {
-            throw NfcException("NFC communication failed: ${e.message}", e)
+            throw NfcException("NFC communication failed", e)
         } finally {
             runCatching { isoDep.close() }
             runCatching { nfc.disableReaderMode(activity) }
@@ -77,21 +92,24 @@ class SecurityKeyTransport(private val activity: FragmentActivity) {
             try {
                 nfc.enableReaderMode(activity, callback, flags, options)
             } catch (e: Exception) {
-                cont.resumeWithException(NfcException("could not start NFC reader: ${e.message}", e))
+                cont.resumeWithException(NfcException("could not start NFC reader", e, NfcException.Reason.READER_FAILED))
             }
             cont.invokeOnCancellation { runCatching { nfc.disableReaderMode(activity) } }
         }
 
-    /** A live ISO-DEP session with the FIDO applet selected. */
-    class Session(private val isoDep: IsoDep) {
+    /**
+     * A live ISO-DEP session with the FIDO applet selected. [holdAgainMessage] is what a lost
+     * answer to a clientPIN request says (5.1.0, L-8).
+     */
+    class Session(private val isoDep: IsoDep, private val holdAgainMessage: String) {
         private val fidoAid = byteArrayOf(
             0xA0.toByte(), 0x00, 0x00, 0x06, 0x47, 0x2F, 0x00, 0x01
         )
 
         fun selectApplet() {
             val select = buildApdu(0x00, 0xA4, 0x04, 0x00, fidoAid, le = 256)
-            val (data, sw) = transceiveRetry(select)
-            if (sw != 0x9000) throw NfcException("applet select failed: SW=%04x".format(sw))
+            val (data, sw) = transceiveRetry(select, NfcResendPolicy.mayResend(select))
+            if (sw != 0x9000) throw NfcException("applet select failed: SW=%04x".format(sw), reason = NfcException.Reason.SELECT_FAILED, sw = sw)
             if (data.isEmpty()) { /* some keys return no FCI; acceptable */ }
         }
 
@@ -101,7 +119,9 @@ class SecurityKeyTransport(private val activity: FragmentActivity) {
          */
         fun ctap(frame: ByteArray): ByteArray {
             val msg = buildApdu(0x80, 0x10, 0x00, 0x00, frame, le = 65536)
-            var (data, sw) = transceiveRetry(msg)
+            // Never resend clientPIN: a lost answer may already have spent a PIN try (5.1.0, L-8).
+            val resendable = NfcResendPolicy.mayResendCtap(frame)
+            var (data, sw) = transceiveRetry(msg, resendable, isPinCheck = !resendable)
             val acc = ByteArrayOutputStream()
             acc.write(data)
             // Bounds against a hostile or broken authenticator (audit L-11): a key that answers
@@ -111,7 +131,7 @@ class SecurityKeyTransport(private val activity: FragmentActivity) {
             var chained = 0
             while (true) {
                 if (acc.size() > MAX_RESPONSE_BYTES) {
-                    throw NfcException("security key response is too large")
+                    throw NfcException("security key response is too large", reason = NfcException.Reason.TOO_LARGE)
                 }
                 when {
                     sw == 0x9000 -> {
@@ -130,41 +150,48 @@ class SecurityKeyTransport(private val activity: FragmentActivity) {
                     sw == 0x9100 -> {
                         // keepalive: poll for the result
                         if (System.nanoTime() - keepaliveDeadline > 0) {
-                            throw NfcException("security key did not answer in time")
+                            throw NfcException("security key did not answer in time", reason = NfcException.Reason.TIMED_OUT)
                         }
                         val poll = buildApdu(0x80, 0x11, 0x00, 0x00, ByteArray(0), le = 65536)
-                        val r = transceiveRetry(poll); data = r.first; sw = r.second
+                        val r = transceiveRetry(poll, mayResend = true); data = r.first; sw = r.second
                         acc.reset(); acc.write(data)
                     }
                     sw shr 8 == 0x61 -> {
                         // ISO chaining: GET RESPONSE for the remaining (sw and 0xff) bytes
                         if (++chained > MAX_CHAINED_RESPONSES) {
-                            throw NfcException("security key kept chaining its response")
+                            throw NfcException("security key kept chaining its response", reason = NfcException.Reason.CHAINING)
                         }
                         val remaining = sw and 0xff
                         val get = byteArrayOf(0x00, 0xC0.toByte(), 0x00, 0x00, remaining.toByte())
-                        val r = transceiveRetry(get); sw = r.second
+                        // GET RESPONSE moves the card on to the next chunk: not safe to resend.
+                        val r = transceiveRetry(get, NfcResendPolicy.mayResend(get)); sw = r.second
                         acc.write(r.first)
                     }
-                    else -> throw NfcException("CTAP transport error: SW=%04x".format(sw))
+                    else -> throw NfcException("CTAP transport error: SW=%04x".format(sw), reason = NfcException.Reason.TRANSPORT, sw = sw)
                 }
             }
         }
 
-        /** One transient retry on a dropped transceive, then give up. */
-        private fun transceiveRetry(apdu: ByteArray): Pair<ByteArray, Int> = try {
+        /**
+         * One transient retry on a dropped transceive, then give up. Only when [mayResend]: a
+         * command that isn't safe to run twice fails at once (5.1.0, L-8), and a clientPIN
+         * request asks the user to hold the key again.
+         */
+        private fun transceiveRetry(apdu: ByteArray, mayResend: Boolean, isPinCheck: Boolean = false): Pair<ByteArray, Int> = try {
             split(isoDep.transceive(apdu))
         } catch (e: IOException) {
+            if (isPinCheck) throw NfcException(holdAgainMessage, e, NfcException.Reason.HOLD_AGAIN)
+            if (!mayResend) throw NfcException("transceive failed", e)
             if (!isoDep.isConnected) runCatching { isoDep.connect() }
             try {
                 split(isoDep.transceive(apdu))
             } catch (e2: IOException) {
-                throw NfcException("transceive failed after retry: ${e2.message}", e2)
+                throw NfcException("transceive failed after retry", e2)
             }
         }
 
         private fun split(response: ByteArray): Pair<ByteArray, Int> {
-            if (response.size < 2) throw NfcException("APDU response too short")
+            if (response.size < 2) throw NfcException("APDU response too short", reason = NfcException.Reason.TRANSPORT)
             val sw = ((response[response.size - 2].toInt() and 0xff) shl 8) or
                 (response[response.size - 1].toInt() and 0xff)
             return response.copyOfRange(0, response.size - 2) to sw

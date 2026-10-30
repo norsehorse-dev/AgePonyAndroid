@@ -1,6 +1,10 @@
 package com.agepony.app.vault
 
+import com.agepony.app.security.piv.YubiKeyBroker
+import com.agepony.core.piv.YubiKeyIdentityFile
+import com.agepony.core.piv.YubiKeyPinPolicy
 import com.agepony.core.recipients.HybridIdentity
+import com.agepony.core.recipients.YubiKeyStub
 import com.agepony.core.recipients.SSHEd25519Identity
 import com.agepony.core.recipients.X25519Identity
 import com.agepony.core.signing.SSHSig
@@ -14,7 +18,8 @@ import java.util.UUID
 // post-quantum (AGE-SECRET-KEY-PQ-), ssh-ed25519, and ssh-rsa are supported.
 //
 
-class IdentityImportException(val kind: Kind, message: String) : Exception(message) {
+/** [kind] is what the app shows; the message is internal and never shown (5.1.0, UI plan U5). */
+class IdentityImportException(val kind: Kind, message: String, cause: Throwable? = null) : Exception(message, cause) {
     enum class Kind { PASSPHRASE_REQUIRED, WRONG_PASSPHRASE, UNSUPPORTED, MALFORMED }
 }
 
@@ -24,16 +29,16 @@ object IdentityImport {
      * Import an age secret key string. Handles both the classical `AGE-SECRET-KEY-1…`
      * and the post-quantum `AGE-SECRET-KEY-PQ-1…` forms, routing on the prefix.
      */
-    fun fromAgeSecretKey(secret: String, name: String): StoredIdentity {
+    fun fromAgeSecretKey(secret: String, name: String, names: DefaultKeyNames): StoredIdentity {
         val t = secret.trim()
         return if (t.uppercase().startsWith("AGE-SECRET-KEY-PQ-")) {
-            fromAgePqSecretKey(t, name)
+            fromAgePqSecretKey(t, name, names)
         } else {
-            fromAgeClassicSecretKey(t, name)
+            fromAgeClassicSecretKey(t, name, names)
         }
     }
 
-    private fun fromAgeClassicSecretKey(t: String, name: String): StoredIdentity {
+    private fun fromAgeClassicSecretKey(t: String, name: String, names: DefaultKeyNames): StoredIdentity {
         val identity = try {
             X25519Identity(t)
         } catch (e: Exception) {
@@ -44,7 +49,7 @@ object IdentityImport {
         }
         return StoredIdentity(
             id = UUID.randomUUID().toString(),
-            name = name.trim().ifBlank { "age identity" },
+            name = name.trim().ifBlank { names.identity(StoredIdentityType.X25519) },
             type = StoredIdentityType.X25519,
             publicKeyB64 = b64e(identity.publicKey),
             privateKeyB64 = b64e(identity.privateKey),
@@ -53,7 +58,7 @@ object IdentityImport {
     }
 
     /** Import a post-quantum `AGE-SECRET-KEY-PQ-1…` private key string. */
-    private fun fromAgePqSecretKey(t: String, name: String): StoredIdentity {
+    private fun fromAgePqSecretKey(t: String, name: String, names: DefaultKeyNames): StoredIdentity {
         val identity = try {
             HybridIdentity(t)
         } catch (e: Exception) {
@@ -64,7 +69,7 @@ object IdentityImport {
         }
         return StoredIdentity(
             id = UUID.randomUUID().toString(),
-            name = name.trim().ifBlank { "quantum-safe identity" },
+            name = name.trim().ifBlank { names.identity(StoredIdentityType.MLKEM768X25519) },
             type = StoredIdentityType.MLKEM768X25519,
             publicKeyB64 = b64e(identity.publicKey),
             privateKeyB64 = b64e(identity.seed),
@@ -72,8 +77,49 @@ object IdentityImport {
         )
     }
 
+    /** True when [text] is an age-plugin-yubikey identity file or a bare AGE-PLUGIN-YUBIKEY-1 line. */
+    fun isYubiKeyIdentity(text: String): Boolean = YubiKeyIdentityFile.contains(text)
+
+    /**
+     * Import an age-plugin-yubikey identity (5.0.0; PIN policy 5.1.0 item 1). A full identity
+     * file carries the public key in its `Recipient:` comment, which saves a tap, and the slot's
+     * PIN policy in its `PIN policy:` comment. Without the recipient line, [readKey] taps the
+     * YubiKey for the public key and GET METADATA; the policy that tap reads wins when the key
+     * answers. [defaultName] names the key from its serial when [name] is blank.
+     */
+    fun fromYubiKey(
+        text: String,
+        name: String,
+        defaultName: (serial: Long) -> String,
+        readKey: (YubiKeyStub) -> Pair<ByteArray, YubiKeyPinPolicy> = YubiKeyBroker::readPublicKeyAndPinPolicy,
+    ): StoredIdentity {
+        val file = try {
+            YubiKeyIdentityFile.parse(text)
+        } catch (e: Exception) {
+            throw IdentityImportException(
+                IdentityImportException.Kind.MALFORMED,
+                "Not a valid AGE-PLUGIN-YUBIKEY-1… identity."
+            )
+        }
+        val fromFile = file.publicKey
+        val (publicKey, policy) = if (fromFile != null) {
+            fromFile to file.pinPolicy
+        } else {
+            val (key, tapped) = readKey(file.stub)
+            key to (if (tapped != YubiKeyPinPolicy.UNKNOWN) tapped else file.pinPolicy)
+        }
+        return StoredIdentity(
+            id = UUID.randomUUID().toString(),
+            name = name.trim().ifBlank { defaultName(file.stub.serial) },
+            type = StoredIdentityType.YUBIKEY_PIV,
+            publicKeyB64 = b64e(publicKey),
+            privateKeyB64 = b64e(file.stub.toBytes()),
+            createdAt = System.currentTimeMillis(),
+        ).withYubiKeyPinPolicy(policy)
+    }
+
     /** Import an OpenSSH private key PEM (ed25519 and rsa). */
-    fun fromOpenSSHPem(pem: String, passphrase: String?, name: String): StoredIdentity {
+    fun fromOpenSSHPem(pem: String, passphrase: String?, name: String, names: DefaultKeyNames): StoredIdentity {
         val parsed = try {
             OpenSSHPrivateKey.parse(pem.trim(), passphrase?.ifBlank { null })
         } catch (e: Exception) {
@@ -90,12 +136,13 @@ object IdentityImport {
                 )
 
                 m.contains("unsupported", ignoreCase = true) -> IdentityImportException(
-                    IdentityImportException.Kind.UNSUPPORTED, m
+                    IdentityImportException.Kind.UNSUPPORTED, m, e
                 )
 
                 else -> IdentityImportException(
                     IdentityImportException.Kind.MALFORMED,
-                    "Couldn't read that OpenSSH key ($m)."
+                    "Couldn't read that OpenSSH key ($m).",
+                    e,
                 )
             }
         }
@@ -104,7 +151,7 @@ object IdentityImport {
         // caps) and throw IllegalArgumentException as well as their own exceptions; anything
         // thrown past the parse still has to reach the user as a readable import error.
         return try {
-            storedFromParsed(parsed, pem, passphrase, name)
+            storedFromParsed(parsed, pem, passphrase, name, names)
         } catch (e: IdentityImportException) {
             throw e
         } catch (e: Exception) {
@@ -120,13 +167,14 @@ object IdentityImport {
         pem: String,
         passphrase: String?,
         name: String,
+        names: DefaultKeyNames,
     ): StoredIdentity {
         return when (parsed) {
             is OpenSSHPrivateKey.Ed25519 -> {
                 val identity = SSHEd25519Identity(parsed)
                 StoredIdentity(
                     id = UUID.randomUUID().toString(),
-                    name = name.trim().ifBlank { "SSH Ed25519" },
+                    name = name.trim().ifBlank { names.identity(StoredIdentityType.SSH_ED25519) },
                     type = StoredIdentityType.SSH_ED25519,
                     publicKeyB64 = b64e(identity.edPublicKey),
                     privateKeyB64 = b64e(identity.edSeed),
@@ -153,7 +201,7 @@ object IdentityImport {
                 val line = if (c.isEmpty()) "ssh-rsa $wireB64" else "ssh-rsa $wireB64 $c"
                 StoredIdentity(
                     id = UUID.randomUUID().toString(),
-                    name = name.trim().ifBlank { "SSH RSA" },
+                    name = name.trim().ifBlank { names.identity(StoredIdentityType.SSH_RSA) },
                     type = StoredIdentityType.SSH_RSA,
                     publicKeyB64 = b64e(line.toByteArray(Charsets.UTF_8)),
                     privateKeyB64 = b64e(normalizedPem.toByteArray(Charsets.UTF_8)),

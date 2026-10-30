@@ -9,6 +9,7 @@
 
 package com.agepony.app.ui.settings
 
+import com.agepony.app.ui.components.EmptyState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.R
@@ -67,11 +67,9 @@ fun RecentlyDeletedScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier =
         )
 
         if (isEmpty) {
-            Text(
-                stringResource(R.string.settings_trash_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 24.dp),
+            EmptyState(
+                title = stringResource(R.string.settings_trash_empty_state_title),
+                body = stringResource(R.string.settings_trash_empty),
             )
             return@Column
         }
@@ -158,9 +156,11 @@ private fun TrashRow(
     onRestore: () -> Unit,
     onPurge: () -> Unit,
 ) {
+    // The actions sit under the name, so a long translated name or label never squeezes the
+    // row (5.1.0, U4). Both stay visible, as on iOS.
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         KeyAvatar(seed = seed, name = name)
@@ -170,11 +170,12 @@ private fun TrashRow(
                 relativeAge(deletedAt),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontFamily = FontFamily.Default,
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuietAction(text = stringResource(R.string.settings_trash_restore), onClick = onRestore)
+                QuietAction(text = stringResource(R.string.action_delete), onClick = onPurge, destructive = true)
+            }
         }
-        TextButton(onClick = onRestore) { Text(stringResource(R.string.settings_trash_restore)) }
-        TextButton(onClick = onPurge) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
     }
 }
 

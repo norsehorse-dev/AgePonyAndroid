@@ -1,5 +1,6 @@
 package com.agepony.app.ui.passphrase
 
+import com.agepony.app.ui.UserMessage
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -13,13 +14,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,9 +37,7 @@ import com.agepony.app.share.ShareOut
 import com.agepony.app.share.ShareSniff
 import com.agepony.app.ui.files.DecryptFlow
 import com.agepony.app.vault.FileEncryptor
-import com.agepony.app.vault.ScryptMemoryException
 import com.agepony.app.vault.Vault
-import com.agepony.app.vault.WrongPassphraseException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,6 +47,10 @@ import androidx.compose.ui.res.stringResource
 import com.agepony.app.R
 import com.agepony.app.ui.components.AgeScreen
 import com.agepony.app.ui.components.ErrorText
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.PrimaryAction
+import com.agepony.app.ui.components.RowAction
+import com.agepony.app.ui.components.SecondaryAction
 import com.agepony.app.ui.components.SectionHeader
 import com.agepony.app.ui.components.showOwnCopyConfirmation
 import com.agepony.app.ui.theme.mono
@@ -129,16 +130,24 @@ private fun PassphraseText(vault: Vault, initialText: String) {
                 )
             }
             // Android 13+ confirms the copy itself; only older versions get our own "Copied".
-            Button(
+            PrimaryAction(
+                stringResource(if (copied) R.string.action_copied else R.string.action_copy),
                 onClick = { ClipboardGuard.copySensitive(context, result!!); copied = showOwnCopyConfirmation },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(if (copied) R.string.action_copied else R.string.action_copy)) }
+            )
             if (!resultIsPlaintext) {
-                OutlinedButton(onClick = { ShareOut.text(context, result!!, context.getString(R.string.app_passphrase_share_chooser)) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.app_share_ellipsis))
-                }
+                SecondaryAction(
+                    stringResource(R.string.app_share_ellipsis),
+                    onClick = { ShareOut.text(context, result!!, context.getString(R.string.app_passphrase_share_chooser)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
-            TextButton(onClick = { result = null; input = ""; passphrase = ""; confirm = "" }) { Text(stringResource(R.string.app_start_over)) }
+            // The next text is its own row, as on the other done screens (5.1.0, U4).
+            ListDivider()
+            RowAction(
+                stringResource(R.string.app_start_over),
+                onClick = { result = null; input = ""; passphrase = ""; confirm = "" },
+            )
             return@Column
         }
 
@@ -183,15 +192,13 @@ private fun PassphraseText(vault: Vault, initialText: String) {
                             }
                             result = String(out, Charsets.UTF_8); resultIsPlaintext = false
                         }
-                    } catch (e: WrongPassphraseException) {
-                        error = e.message
-                    } catch (e: ScryptMemoryException) {
-                        error = e.message
                     } catch (e: OutOfMemoryError) {
                         error = context.getString(R.string.app_passphrase_oom)
                     } catch (e: Exception) {
-                        error = e.message ?: context.getString(
-                            if (decrypting) R.string.app_decrypt_failed else R.string.app_encrypt_failed
+                        // Wrong passphrase and scrypt memory each have their own sentence (U5).
+                        error = UserMessage.text(
+                            context, e,
+                            if (decrypting) R.string.app_decrypt_failed else R.string.app_encrypt_failed,
                         )
                     } finally {
                         busy = false

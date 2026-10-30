@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -45,10 +44,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
 import com.agepony.app.security.BiometricGate
 import com.agepony.app.security.PasswordVault
 import com.agepony.app.security.UnlockAttempts
 import com.agepony.app.ui.passphrase.PassphraseOnlyScreen
+import com.agepony.app.ui.components.ChoiceField
+import com.agepony.app.ui.components.PrimaryAction
+import com.agepony.app.ui.components.SecondaryAction
 import com.agepony.app.vault.LockMode
 import com.agepony.app.vault.VaultViewModel
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -82,6 +85,13 @@ import androidx.compose.foundation.verticalScroll
 //     exists AND no password is set: the deliberate "no lock at all" mode. No lock
 //     plus a password is password-only (audit H-4).
 //
+// Biometrics only (5.1.0, iOS E6): the biometric prompt starts by itself when the screen
+// shows, with no way to the device credential. When the biometric can't open the vault (a
+// fingerprint or face added or removed, none enrolled, a lockout) the password field comes up
+// at once with a sentence saying why, and the prompt stops starting by itself until the next
+// successful unlock. After a password unlock in that state, the unlocked app offers to turn
+// biometric unlock back on.
+//
 @Composable
 fun VaultGate(
     vm: VaultViewModel,
@@ -109,8 +119,33 @@ fun VaultGate(
         !vm.provisioned -> WelcomeScreen(vm, activity)
         !vm.vault.isUnlocked && passphraseOnly -> passphraseOnlyContent { passphraseOnly = false }
         !vm.vault.isUnlocked -> LockedScreen(vm, activity, onPassphraseOnly = { passphraseOnly = true })
-        else -> unlockedContent()
+        else -> {
+            unlockedContent()
+            if (vm.biometricOnlyNeedsRefresh && vm.lockMode == LockMode.BIOMETRIC_ONLY) {
+                BiometricRefreshDialog(vm, activity)
+            }
+        }
     }
+}
+
+/** Biometrics only, opened with the password after the mode's key stopped working (E6). */
+@Composable
+private fun BiometricRefreshDialog(vm: VaultViewModel, activity: FragmentActivity) {
+    AlertDialog(
+        onDismissRequest = { vm.dismissBiometricOnlyRefresh() },
+        title = { Text(stringResource(R.string.app_biometric_refresh_title)) },
+        text = { Text(stringResource(R.string.app_biometric_refresh_body)) },
+        confirmButton = {
+            TextButton(onClick = { vm.restoreBiometricOnly(activity) }, enabled = !vm.isBusy) {
+                Text(stringResource(R.string.app_biometric_refresh_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { vm.dismissBiometricOnlyRefresh() }) {
+                Text(stringResource(R.string.app_biometric_refresh_later))
+            }
+        },
+    )
 }
 
 @Composable
@@ -211,7 +246,32 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
     val hardwareUnlock = !vm.duressEnrolled
     // With an OS gate, that gate leads and the password field is opt-in; a no-lock
     // (OFF) or PIN-only vault shows the password field straight away.
-    var showPasswordField by remember { mutableStateOf(vm.lockMode == LockMode.OFF || !hardwareUnlock) }
+    var showPasswordField by remember {
+        mutableStateOf(vm.lockMode == LockMode.OFF || !hardwareUnlock || vm.biometricOnlyProblem != null)
+    }
+    val biometricOnly = hardwareUnlock && vm.lockMode == LockMode.BIOMETRIC_ONLY
+    // Biometrics only: when the biometric can't open the vault, the password comes up at once (E6).
+    LaunchedEffect(vm.biometricOnlyProblem) {
+        if (vm.biometricOnlyProblem != null) showPasswordField = true
+    }
+    // Biometrics only: start the prompt by itself once the activity is in front, unless the last
+    // try already said the biometric can't open the vault.
+    var autoStarted by remember { mutableStateOf(false) }
+    LaunchedEffect(biometricOnly) {
+        if (!biometricOnly || autoStarted || vm.biometricOnlyProblem != null) return@LaunchedEffect
+        var waited = 0
+        while (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && waited < 600) {
+            delay(50)
+            waited++
+        }
+        if (activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+            !vm.isBusy && !vm.vault.isUnlocked && vm.biometricOnlyProblem == null
+        ) {
+            autoStarted = true
+            vm.unlock(activity)
+        }
+    }
+    val fingerprintOnly = remember { BiometricGate.fingerprintOnlyHardware(activity) }
     // Failed-attempt backoff (audit M-1): count down while a wait is running.
     var lockoutSeconds by remember { mutableStateOf(0L) }
     var confirmLegacyOpen by remember { mutableStateOf(false) }
@@ -258,6 +318,9 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                         if (isPin) R.string.app_locked_enter_pin else R.string.app_locked_enter_password
                     )
                     vm.lockMode == LockMode.BIOMETRIC -> stringResource(R.string.app_locked_biometric)
+                    vm.lockMode == LockMode.BIOMETRIC_ONLY -> stringResource(
+                        if (isPin) R.string.app_locked_biometric_only_pin else R.string.app_locked_biometric_only_password
+                    )
                     vm.lockMode == LockMode.DEVICE_CREDENTIAL ->
                         stringResource(R.string.app_locked_device_credential)
                     else -> stringResource(
@@ -295,6 +358,10 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text(stringResource(R.string.app_unlock)) }
+                    LockMode.BIOMETRIC_ONLY ->
+                        Button(onClick = { vm.unlock(activity) }, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(if (fingerprintOnly) R.string.app_use_fingerprint else R.string.app_use_biometrics))
+                        }
                     LockMode.OFF -> Unit
                 }
 
@@ -327,19 +394,30 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                             WindowInsetsControllerCompat(activity.window, view)
                                 .show(WindowInsetsCompat.Type.ime())
                         }
-                        Button(
-                            onClick = {
-                                val chars = secret.toCharArray()
-                                secret = ""
-                                vm.unlockWithPassword(chars)
-                            },
-                            enabled = secret.isNotEmpty() && lockoutSeconds == 0L,
-                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                        ) {
-                            Text(
-                                stringResource(
-                                    if (isPin) R.string.app_unlock_with_pin else R.string.app_unlock_with_password
-                                )
+                        // One filled button per screen (5.1.0, U4): with an OS gate button above,
+                        // the password button is the outlined one.
+                        val unlockLabel = stringResource(
+                            if (isPin) R.string.app_unlock_with_pin else R.string.app_unlock_with_password
+                        )
+                        val submitSecret: () -> Unit = {
+                            val chars = secret.toCharArray()
+                            secret = ""
+                            vm.unlockWithPassword(chars)
+                        }
+                        val submitEnabled = secret.isNotEmpty() && lockoutSeconds == 0L
+                        if (hardwareUnlock && vm.lockMode != LockMode.OFF) {
+                            SecondaryAction(
+                                text = unlockLabel,
+                                onClick = submitSecret,
+                                enabled = submitEnabled,
+                                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                            )
+                        } else {
+                            PrimaryAction(
+                                text = unlockLabel,
+                                onClick = submitSecret,
+                                enabled = submitEnabled,
+                                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                             )
                         }
                         if (lockoutSeconds > 0L) {
@@ -415,6 +493,16 @@ private fun LockedScreen(vm: VaultViewModel, activity: FragmentActivity, onPassp
                 }
             }
 
+            if (biometricOnly) {
+                Text(
+                    stringResource(R.string.app_locked_screen_lock_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+            }
+
             if (!vm.isBusy) {
                 TextButton(onClick = onPassphraseOnly, modifier = Modifier.padding(top = 24.dp)) {
                     Text(stringResource(R.string.app_passphrase_only_entry))
@@ -466,20 +554,15 @@ private fun CreateSecretDialog(
                     stringResource(R.string.app_create_secret_body),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Row(modifier = Modifier.padding(top = 8.dp)) {
-                    TextButton(onClick = { kind = "password" }) {
-                        Text(
-                            stringResource(R.string.app_password),
-                            color = if (!isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    TextButton(onClick = { kind = "pin" }) {
-                        Text(
-                            stringResource(R.string.app_pin),
-                            color = if (isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                // A menu, not two text buttons posing as segments (5.1.0, U4).
+                ChoiceField(
+                    label = stringResource(R.string.app_secret_type),
+                    selected = kind,
+                    options = listOf("password", "pin"),
+                    optionLabel = { stringResource(if (it == "pin") R.string.app_pin else R.string.app_password) },
+                    onSelect = { kind = it },
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                )
                 val kb = KeyboardOptions(
                     keyboardType = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password
                 )

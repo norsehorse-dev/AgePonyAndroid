@@ -1,5 +1,7 @@
 package com.agepony.app.ui.files
 
+import com.agepony.app.R
+import com.agepony.app.vault.ShownMessageException
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -69,7 +71,7 @@ object SafIo {
 
     fun openInput(context: Context, uri: Uri): InputStream =
         context.contentResolver.openInputStream(uri)
-            ?: throw IllegalStateException("Couldn't open the file.")
+            ?: throw java.io.FileNotFoundException("provider returned no input stream")
 
     /**
      * Open for writing, truncating first. Some providers hand back an append-style stream for
@@ -83,7 +85,7 @@ object SafIo {
         }
         return truncating
             ?: context.contentResolver.openOutputStream(uri)
-            ?: throw IllegalStateException("Couldn't open the destination.")
+            ?: throw java.io.FileNotFoundException("provider returned no output stream")
     }
 
     /** Create [displayName] inside a tree the user granted, returning the new document's uri. */
@@ -93,7 +95,7 @@ object SafIo {
             DocumentsContract.getTreeDocumentId(treeUri),
         )
         return DocumentsContract.createDocument(context.contentResolver, parent, mime, displayName)
-            ?: throw IllegalStateException("Couldn't create '$displayName' in that folder.")
+            ?: throw ShownMessageException(context.getString(R.string.files_create_in_folder_failed, displayName))
     }
 
     /**
@@ -155,15 +157,12 @@ object SafIo {
         }
     }
 
-    fun humanSize(bytes: Long): String {
-        // Callers leave the size out when a provider reports none; 0 here is a real zero.
-        if (bytes <= 0) return "0 B"
-        val units = arrayOf("B", "KB", "MB", "GB")
-        var b = bytes.toDouble()
-        var i = 0
-        while (b >= 1024 && i < units.size - 1) { b /= 1024; i++ }
-        return if (i == 0) "$bytes B" else String.format("%.1f %s", b, units[i])
-    }
+    /**
+     * A size in the user's locale and units, from the system formatter. Callers leave the size
+     * out when a provider reports none, so 0 here is a real zero.
+     */
+    fun humanSize(context: Context, bytes: Long): String =
+        android.text.format.Formatter.formatShortFileSize(context, bytes.coerceAtLeast(0L))
 }
 
 /**

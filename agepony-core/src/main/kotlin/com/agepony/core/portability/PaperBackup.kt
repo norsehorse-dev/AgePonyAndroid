@@ -18,7 +18,14 @@ object PaperBackup {
     /** age's own default work factor; about 256 MB and a second or so to restore on a phone. */
     const val DEFAULT_WORK_FACTOR = 18
 
-    class PaperBackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
+    /** [reason] is what the app shows; the message stays internal (5.1.0, UI plan U5). */
+    class PaperBackupException(
+        message: String,
+        cause: Throwable? = null,
+        val reason: PaperBackupException.Reason = PaperBackupException.Reason.DAMAGED,
+    ) : Exception(message, cause) {
+        enum class Reason { NOT_SEALED, DAMAGED, WRONG_PASSPHRASE }
+    }
 
     /** Passphrase-protected, armored age text of [identityFile]. */
     fun seal(identityFile: String, passphrase: String, workFactor: Int = DEFAULT_WORK_FACTOR): String {
@@ -33,7 +40,7 @@ object PaperBackup {
     /** Recover the identity file text from a sealed page. */
     fun open(armored: String, passphrase: String): String {
         val start = armored.indexOf("-----BEGIN AGE ENCRYPTED FILE-----")
-        if (start < 0) throw PaperBackupException("This isn't a passphrase-protected AgePony backup.")
+        if (start < 0) throw PaperBackupException("This isn't a passphrase-protected AgePony backup.", reason = PaperBackupException.Reason.NOT_SEALED)
         val binary = try {
             Armor.decode(armored.substring(start))
         } catch (e: Exception) {
@@ -42,7 +49,7 @@ object PaperBackup {
         val plain = try {
             Age.decrypt(binary, listOf(ScryptIdentity(passphrase)))
         } catch (e: Age.NoMatchingIdentityException) {
-            throw PaperBackupException("Wrong passphrase.", e)
+            throw PaperBackupException("Wrong passphrase.", e, PaperBackupException.Reason.WRONG_PASSPHRASE)
         }
         return String(plain, Charsets.UTF_8)
     }

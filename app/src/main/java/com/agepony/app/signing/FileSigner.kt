@@ -27,7 +27,13 @@ import java.io.InputStream
 class FileSigner(
     private val activity: FragmentActivity,
 ) {
-    class FileSignerException(message: String, cause: Throwable? = null) : Exception(message, cause)
+    /** [reason] is what the app shows; the message is internal (5.1.0, UI plan U5). */
+    class FileSignerException(
+        val reason: FileSignerException.Reason,
+        cause: Throwable? = null,
+    ) : Exception(reason.name, cause) {
+        enum class Reason { X25519_CANNOT_SIGN, QUANTUM_SAFE_CANNOT_SIGN, DECRYPT_ONLY_KEY, SECURITY_KEY_NOT_HERE, KEY_DAMAGED }
+    }
 
     suspend fun sign(
         identity: StoredIdentity,
@@ -39,10 +45,10 @@ class FileSigner(
             SSHSigner.signEd25519(b64d(identity.privateKeyB64), b64d(identity.publicKeyB64), message, namespace)
 
         StoredIdentityType.X25519 ->
-            throw FileSignerException("age X25519 identities can't sign; choose an SSH key, hardware key, or security key")
+            throw FileSignerException(FileSignerException.Reason.X25519_CANNOT_SIGN)
 
         StoredIdentityType.MLKEM768X25519 ->
-            throw FileSignerException("quantum-safe identities are for encryption, not signing; choose an SSH key, hardware key, or security key")
+            throw FileSignerException(FileSignerException.Reason.QUANTUM_SAFE_CANNOT_SIGN)
 
         StoredIdentityType.SSH_RSA -> {
             // The vault stores the decrypted, cipher=none PEM (see IdentityImport), so no
@@ -52,7 +58,7 @@ class FileSigner(
 
         StoredIdentityType.HARDWARE_KEY -> {
             val alias = identity.keystoreAlias
-                ?: throw FileSignerException("hardware identity is missing its keystore alias")
+                ?: throw FileSignerException(FileSignerException.Reason.KEY_DAMAGED)
             if (HardwareKeyService.isUserAuthRequired(alias)) {
                 HardwareKeyService.signAuthenticated(
                     activity = activity,
@@ -71,7 +77,7 @@ class FileSigner(
             SecurityKeyService(activity).signSSHSIG(identity, message, namespace, pin)
 
         StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ, StoredIdentityType.YUBIKEY_PIV ->
-            throw FileSignerException("hardware decryption keys can't sign; choose an SSH key or hardware signing key")
+            throw FileSignerException(FileSignerException.Reason.DECRYPT_ONLY_KEY)
     }
 
     /**
@@ -97,7 +103,7 @@ class FileSigner(
 
         StoredIdentityType.HARDWARE_KEY -> {
             val alias = identity.keystoreAlias
-                ?: throw FileSignerException("hardware identity is missing its keystore alias")
+                ?: throw FileSignerException(FileSignerException.Reason.KEY_DAMAGED)
             withContext(Dispatchers.Main) {
                 if (HardwareKeyService.isUserAuthRequired(alias)) {
                     HardwareKeyService.signAuthenticatedHashed(
@@ -115,16 +121,16 @@ class FileSigner(
         }
 
         StoredIdentityType.SK_ED25519, StoredIdentityType.SK_ECDSA_P256 ->
-            throw FileSignerException("security keys sign from the Sign tab; they can't sign inside this flow")
+            throw FileSignerException(FileSignerException.Reason.SECURITY_KEY_NOT_HERE)
 
         StoredIdentityType.X25519 ->
-            throw FileSignerException("age X25519 identities can't sign; choose an SSH key or hardware key")
+            throw FileSignerException(FileSignerException.Reason.X25519_CANNOT_SIGN)
 
         StoredIdentityType.MLKEM768X25519 ->
-            throw FileSignerException("quantum-safe identities are for encryption, not signing; choose an SSH key or hardware key")
+            throw FileSignerException(FileSignerException.Reason.QUANTUM_SAFE_CANNOT_SIGN)
 
         StoredIdentityType.HARDWARE_TAG, StoredIdentityType.HARDWARE_TAG_PQ, StoredIdentityType.YUBIKEY_PIV ->
-            throw FileSignerException("hardware decryption keys can't sign; choose an SSH key or hardware signing key")
+            throw FileSignerException(FileSignerException.Reason.DECRYPT_ONLY_KEY)
     }
 
     /**
@@ -162,10 +168,10 @@ class FileSigner(
         val key = try {
             OpenSSHPrivateKey.parse(pem)
         } catch (e: Exception) {
-            throw FileSignerException("couldn't read the stored RSA key: ${e.message}", e)
+            throw FileSignerException(FileSignerException.Reason.KEY_DAMAGED, e)
         }
         return key as? OpenSSHPrivateKey.RSA
-            ?: throw FileSignerException("stored ssh-rsa identity did not parse as RSA")
+            ?: throw FileSignerException(FileSignerException.Reason.KEY_DAMAGED)
     }
 
     companion object {

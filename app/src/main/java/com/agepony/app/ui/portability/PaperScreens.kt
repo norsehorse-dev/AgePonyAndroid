@@ -1,5 +1,8 @@
 package com.agepony.app.ui.portability
 
+import com.agepony.app.vault.ShownMessageException
+import com.agepony.app.vault.DefaultKeyNames
+import com.agepony.app.ui.UserMessage
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Paint
@@ -111,7 +114,7 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
                 withContext(Dispatchers.IO) { SafIo.openOutput(context, uri).use { it.write(bytes) } }
                 done = true
             } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.identities_paper_error_save)
+                error = UserMessage.text(context, e, R.string.identities_paper_error_save)
             } finally {
                 bytes.fill(0)
                 busy = false
@@ -229,7 +232,7 @@ fun PaperBackupScreen(vault: Vault, identity: StoredIdentity, onBack: () -> Unit
                             vault.autoLockSuppressed = true
                             save.launch("agepony-backup-${safeFileName(identity.name)}-${LocalDate.now()}.pdf")
                         } catch (e: Exception) {
-                            error = e.message ?: context.getString(R.string.identities_paper_error_build)
+                            error = UserMessage.text(context, e, R.string.identities_paper_error_build)
                             busy = false
                         }
                     }
@@ -267,7 +270,7 @@ private fun safeFileName(name: String): String =
 /** Lay out the A4 page: what it is, which key, the QR, the text, how to restore. */
 private fun buildPaperPdf(context: Context, identity: StoredIdentity, passphrase: String?): ByteArray {
     val line = KeyPortability.identityLine(identity)
-        ?: throw IllegalArgumentException(context.getString(R.string.identities_paper_error_not_age))
+        ?: throw ShownMessageException(context.getString(R.string.identities_paper_error_not_age))
     val identityFile = KeyTransfer.identityFile(listOf(line), includePublicKey = false)
     val payload = if (passphrase != null) PaperBackup.seal(identityFile, passphrase) else line.secretKey
 
@@ -353,7 +356,7 @@ fun PaperRestoreScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mo
         if (PaperBackup.isSealed(text)) {
             stage = RestoreStage.PASSPHRASE
         } else {
-            found = KeyPortability.identitiesFromText(text)
+            found = KeyPortability.identitiesFromText(text, DefaultKeyNames.from(activity))
             if (found.isEmpty()) { error = activity.getString(R.string.identities_paper_error_no_key); stage = RestoreStage.INPUT }
             else stage = RestoreStage.PREVIEW
         }
@@ -397,13 +400,13 @@ fun PaperRestoreScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mo
                     scope.launch {
                         try {
                             val identityFile = withContext(Dispatchers.Default) { PaperBackup.open(text, pass) }
-                            found = KeyPortability.identitiesFromText(identityFile)
+                            found = KeyPortability.identitiesFromText(identityFile, DefaultKeyNames.from(activity))
                             stage = if (found.isEmpty()) RestoreStage.INPUT else RestoreStage.PREVIEW
                             if (found.isEmpty()) error = activity.getString(R.string.identities_paper_error_empty)
                         } catch (e: OutOfMemoryError) {
                             error = activity.getString(R.string.identities_paper_error_memory)
                         } catch (e: Exception) {
-                            error = e.message ?: activity.getString(R.string.identities_paper_error_open)
+                            error = UserMessage.text(activity, e, R.string.identities_paper_error_open)
                         } finally {
                             busy = false
                         }

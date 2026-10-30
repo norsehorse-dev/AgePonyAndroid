@@ -1,5 +1,6 @@
 package com.agepony.app.vault
 
+import com.agepony.core.piv.YubiKeyPinPolicy
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -117,8 +118,23 @@ data class StoredIdentity(
      * private key. Null for software identities whose private material is in privateKeyB64.
      */
     val keystoreAlias: String? = null,
-    val createdAt: Long
+    val createdAt: Long,
+    /**
+     * YUBIKEY_PIV only (5.1.0 item 1): the slot's PIN policy as iOS writes it, "required" or
+     * "notRequired". Null (and any value this version doesn't know) means unknown, so the PIN is
+     * asked for first. Kept as a string so a value from a newer version can't fail the vault;
+     * read it through [yubiKeyPinPolicy].
+     */
+    val pinPolicy: String? = null
 )
+
+/** The stored PIN policy of a YubiKey identity; unknown for a missing or unrecognised value. */
+val StoredIdentity.yubiKeyPinPolicy: YubiKeyPinPolicy
+    get() = if (type == StoredIdentityType.YUBIKEY_PIV) YubiKeyPinPolicy.fromRaw(pinPolicy) else YubiKeyPinPolicy.UNKNOWN
+
+/** The record with [policy] stored, or the field dropped when it is unknown. */
+fun StoredIdentity.withYubiKeyPinPolicy(policy: YubiKeyPinPolicy): StoredIdentity =
+    copy(pinPolicy = if (policy == YubiKeyPinPolicy.UNKNOWN) null else policy.raw)
 
 @Serializable
 data class StoredRecipient(

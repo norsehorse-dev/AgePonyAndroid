@@ -14,14 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.annotation.StringRes
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.agepony.app.R
 import androidx.compose.ui.text.style.TextAlign
@@ -57,35 +49,30 @@ import androidx.compose.foundation.layout.systemBarsPadding
 // OnboardingView paged TabView.
 //
 
+// No hero icon on the slides (5.1.0, U4): the title and text carry the page, as on iOS.
 private data class OnboardingPage(
-    val icon: ImageVector,
     @StringRes val title: Int,
     @StringRes val body: Int,
 )
 
 private fun onboardingPages(): List<OnboardingPage> = listOf(
     OnboardingPage(
-        icon = Icons.Filled.Lock,
         title = R.string.app_welcome_title,
         body = R.string.app_onboarding_welcome_body,
     ),
     OnboardingPage(
-        icon = Icons.Filled.Person,
         title = R.string.app_onboarding_identity_title,
         body = R.string.app_onboarding_identity_body,
     ),
     OnboardingPage(
-        icon = Icons.AutoMirrored.Filled.Send,
         title = R.string.app_onboarding_recipients_title,
         body = R.string.app_onboarding_recipients_body,
     ),
     OnboardingPage(
-        icon = Icons.Filled.Create,
         title = R.string.app_onboarding_files_title,
         body = R.string.app_onboarding_files_body,
     ),
     OnboardingPage(
-        icon = Icons.Filled.Info,
         title = R.string.app_onboarding_private_title,
         body = R.string.app_onboarding_private_body,
     ),
@@ -169,32 +156,17 @@ private fun PageContent(page: OnboardingPage) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = page.icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(48.dp),
-            )
-        }
-        Spacer(Modifier.height(32.dp))
         Text(
             text = stringResource(page.title),
             style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))
         Text(
             text = stringResource(page.body),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
     }

@@ -30,7 +30,17 @@ object AgePayload {
     const val CT_CHUNK_SIZE = CHUNK_SIZE + 16     // 65552 ciphertext bytes per full chunk
     private const val PAYLOAD_INFO = "payload"
 
-    class PayloadException(message: String, cause: Throwable? = null) : Exception(message, cause)
+    /**
+     * The payload can't be used. [reason] is what the app shows; the message stays internal
+     * (5.1.0, UI plan U5). AUTH_FAILED means a chunk failed its authentication tag.
+     */
+    class PayloadException(
+        message: String,
+        cause: Throwable? = null,
+        val reason: PayloadException.Reason = PayloadException.Reason.DAMAGED,
+    ) : Exception(message, cause) {
+        enum class Reason { DAMAGED, AUTH_FAILED }
+    }
 
     /**
      * Encrypt `plaintext` using the given `fileKey`. Returns `nonce || encrypted_chunks`.
@@ -82,7 +92,7 @@ object AgePayload {
                     payloadBytes.copyOfRange(pos, pos + take)
                 )
             } catch (e: Exception) {
-                throw PayloadException("chunk $counter authentication failed (isLast=$isLast)", e)
+                throw PayloadException("chunk $counter authentication failed (isLast=$isLast)", e, PayloadException.Reason.AUTH_FAILED)
             }
             checkNotEmptyFinal(counter, isLast, pt)
             out.write(pt)
@@ -206,7 +216,7 @@ object AgePayload {
         val pt = try {
             ChaChaPoly.decrypt(payloadKey, chunkNonce, ctChunk)
         } catch (e: Exception) {
-            throw PayloadException("chunk $counter authentication failed (isLast=$isLast)", e)
+            throw PayloadException("chunk $counter authentication failed (isLast=$isLast)", e, PayloadException.Reason.AUTH_FAILED)
         }
         checkNotEmptyFinal(counter, isLast, pt)
         out.write(pt)

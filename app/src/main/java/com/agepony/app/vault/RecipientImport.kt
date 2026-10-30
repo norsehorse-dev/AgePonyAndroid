@@ -24,7 +24,23 @@ import java.io.InputStream
 // shape the hydration layer expects.
 //
 
-class RecipientImportException(message: String) : Exception(message)
+/**
+ * A recipient couldn't be read or fetched. [reason] is what the app shows, with [subject] (the
+ * GitHub user) and [httpStatus] where they help; the message is internal (5.1.0, UI plan U5).
+ * [cause] is the parser or network error, read by the message mapper only for its type.
+ */
+class RecipientImportException(
+    val reason: RecipientImportException.Reason,
+    val subject: String? = null,
+    val httpStatus: Int = 0,
+    cause: Throwable? = null,
+) : Exception(reason.name, cause) {
+    enum class Reason {
+        EMPTY, BAD_QUANTUM_SAFE, BAD_HARDWARE_TAG, BAD_YUBIKEY, BAD_AGE, BAD_SSH, BAD_SSH_ED25519,
+        UNRECOGNIZED, INVALID_USERNAME, NO_KEYS, NO_USABLE_KEYS, HTTP_ERROR, EMPTY_RESPONSE,
+        NETWORK, TOO_LARGE,
+    }
+}
 
 data class RecipientCandidate(
     val type: StoredRecipientType,
@@ -38,9 +54,9 @@ data class RecipientCandidate(
 object RecipientImport {
 
     /** Parse a single pasted blob (age1pq… / age1… recipient or one-line OpenSSH public key). */
-    fun parsePastedText(raw: String): RecipientCandidate {
+    fun parsePastedText(raw: String, names: DefaultKeyNames): RecipientCandidate {
         val t = raw.trim()
-        if (t.isEmpty()) throw RecipientImportException("Nothing to parse.")
+        if (t.isEmpty()) throw RecipientImportException(RecipientImportException.Reason.EMPTY)
 
         // Post-quantum recipients must be checked before "age1" — their HRP is "age1pq",
         // so they also start with "age1" and would otherwise route to the X25519 parser.
@@ -48,7 +64,7 @@ object RecipientImport {
             val recipient = try {
                 HybridRecipient(t)
             } catch (e: Exception) {
-                throw RecipientImportException("Not a valid quantum-safe age recipient (${e.message}).")
+                throw RecipientImportException(RecipientImportException.Reason.BAD_QUANTUM_SAFE, cause = e)
             }
             return RecipientCandidate(
                 type = StoredRecipientType.MLKEM768X25519,
@@ -65,7 +81,7 @@ object RecipientImport {
             val recipient = try {
                 TagRecipient(t)
             } catch (e: Exception) {
-                throw RecipientImportException("Not a valid age hardware-key recipient (${e.message}).")
+                throw RecipientImportException(RecipientImportException.Reason.BAD_HARDWARE_TAG, cause = e)
             }
             return RecipientCandidate(
                 type = if (recipient.hybrid) StoredRecipientType.TAG_PQ else StoredRecipientType.TAG,
@@ -83,7 +99,7 @@ object RecipientImport {
             val recipient = try {
                 P256Recipient(t)
             } catch (e: Exception) {
-                throw RecipientImportException("Not a valid YubiKey recipient (${e.message}).")
+                throw RecipientImportException(RecipientImportException.Reason.BAD_YUBIKEY, cause = e)
             }
             return RecipientCandidate(
                 type = StoredRecipientType.YUBIKEY_P256,
@@ -99,7 +115,7 @@ object RecipientImport {
             val recipient = try {
                 X25519Recipient(t)
             } catch (e: Exception) {
-                throw RecipientImportException("Not a valid age recipient (${e.message}).")
+                throw RecipientImportException(RecipientImportException.Reason.BAD_AGE, cause = e)
             }
             return RecipientCandidate(
                 type = StoredRecipientType.X25519,
@@ -112,25 +128,22 @@ object RecipientImport {
         }
 
         if (t.startsWith("ssh-ed25519 ") || t.startsWith("ssh-rsa ")) {
-            return sshCandidate(t, StoredRecipientSource.PASTE_SSH, null)
+            return sshCandidate(t, StoredRecipientSource.PASTE_SSH, null, names)
         }
 
-        throw RecipientImportException(
-            "Expected an age1… / age1pq… / age1tag1… / age1yubikey1… recipient or an ssh-ed25519 / ssh-rsa line."
-        )
+        throw RecipientImportException(RecipientImportException.Reason.UNRECOGNIZED)
     }
 
     /** Fetch https://github.com/<username>.keys and return every parsable recipient. */
     suspend fun fetchFromGitHub(
         username: String,
         proxyConfig: ProxyConfig = ProxyConfig.DIRECT,
+        names: DefaultKeyNames,
     ): List<RecipientCandidate> =
         withContext(Dispatchers.IO) {
             val user = username.trim()
             if (!isValidGitHubUsername(user)) {
-                throw RecipientImportException(
-                    "GitHub usernames are 1 to 39 letters (A to Z), digits and hyphens, and don't start with a hyphen."
-                )
+                throw RecipientImportException(RecipientImportException.Reason.INVALID_USERNAME)
             }
 
             val text = httpGet("https://github.com/$user.keys", proxyConfig)
@@ -140,21 +153,25 @@ object RecipientImport {
             val raw = lines.mapNotNull { line ->
                 if (!line.startsWith("ssh-ed25519 ") && !line.startsWith("ssh-rsa ")) return@mapNotNull null
                 try {
-                    sshCandidate(line, StoredRecipientSource.GITHUB, metadata, comment = "from $metadata")
+                    // The comment matches iOS, so a key moved between the two reads the same.
+                    sshCandidate(line, StoredRecipientSource.GITHUB, metadata, names, comment = "from $metadata")
                 } catch (_: Exception) {
                     null
                 }
             }
             if (raw.isEmpty()) {
+                // Found none (U5): say whether the account has no keys at all or none AgePony takes.
                 throw RecipientImportException(
-                    "GitHub returned no ed25519 or RSA public keys for that user."
+                    if (lines.isEmpty()) RecipientImportException.Reason.NO_KEYS
+                    else RecipientImportException.Reason.NO_USABLE_KEYS,
+                    subject = user,
                 )
             }
             // Name them: bare username for a single key, numbered when several.
             if (raw.size == 1) {
                 listOf(raw[0].copy(defaultName = user))
             } else {
-                raw.mapIndexed { i, c -> c.copy(defaultName = "$user (key ${i + 1})") }
+                raw.mapIndexed { i, c -> c.copy(defaultName = names.gitHubKey(user, i + 1)) }
             }
         }
 
@@ -202,12 +219,13 @@ object RecipientImport {
         line: String,
         source: StoredRecipientSource,
         metadata: String?,
+        names: DefaultKeyNames,
         comment: String? = trailingComment(line),
     ): RecipientCandidate {
         val parsed = try {
             OpenSSHPublicKey.parse(line)
         } catch (e: Exception) {
-            throw RecipientImportException("Couldn't parse that SSH key (${e.message}).")
+            throw RecipientImportException(RecipientImportException.Reason.BAD_SSH, cause = e)
         }
         if (parsed is OpenSSHPublicKey.Ed25519) {
             // The line parser only checks the length; a 32-byte value that isn't a curve point
@@ -215,7 +233,7 @@ object RecipientImport {
             try {
                 SSHEd25519Recipient(parsed.publicKey)
             } catch (e: Exception) {
-                throw RecipientImportException("That ssh-ed25519 key isn't a valid public key (${e.message}).")
+                throw RecipientImportException(RecipientImportException.Reason.BAD_SSH_ED25519, cause = e)
             }
         }
         return when (parsed) {
@@ -223,7 +241,7 @@ object RecipientImport {
                 type = StoredRecipientType.SSH_ED25519,
                 publicKeyB64 = b64e(parsed.publicKey),
                 sshComment = comment,
-                defaultName = comment?.takeIf { it.isNotBlank() } ?: "SSH Ed25519",
+                defaultName = comment?.takeIf { it.isNotBlank() } ?: names.sshRecipient(rsa = false),
                 source = source,
                 sourceMetadata = metadata,
             )
@@ -232,7 +250,7 @@ object RecipientImport {
                 type = StoredRecipientType.SSH_RSA,
                 publicKeyB64 = b64e(line.trim().toByteArray(Charsets.UTF_8)),
                 sshComment = comment,
-                defaultName = comment?.takeIf { it.isNotBlank() } ?: "SSH RSA",
+                defaultName = comment?.takeIf { it.isNotBlank() } ?: names.sshRecipient(rsa = true),
                 source = source,
                 sourceMetadata = metadata,
             )
@@ -261,10 +279,10 @@ object RecipientImport {
                 .build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    throw RecipientImportException("GitHub returned HTTP ${response.code}.")
+                    throw RecipientImportException(RecipientImportException.Reason.HTTP_ERROR, httpStatus = response.code)
                 }
                 val body = response.body
-                    ?: throw RecipientImportException("GitHub returned an empty response.")
+                    ?: throw RecipientImportException(RecipientImportException.Reason.EMPTY_RESPONSE)
                 // Read through a cap rather than string(), which buffers whatever arrives: a
                 // hostile proxy or endpoint could otherwise send an endless body.
                 if (body.contentLength() > MAX_GITHUB_KEYS_BYTES) throw tooLarge()
@@ -274,13 +292,11 @@ object RecipientImport {
         } catch (e: RecipientImportException) {
             throw e
         } catch (e: Exception) {
-            throw RecipientImportException("Network error: ${e.message}")
+            throw RecipientImportException(RecipientImportException.Reason.NETWORK, cause = e)
         }
     }
 
-    private fun tooLarge() = RecipientImportException(
-        "GitHub's response is larger than ${MAX_GITHUB_KEYS_BYTES / 1024} KiB, which isn't a normal key list. Nothing was imported."
-    )
+    private fun tooLarge() = RecipientImportException(RecipientImportException.Reason.TOO_LARGE)
 
     /** Read [input] to the end, failing once more than [max] bytes arrive. */
     private fun readCapped(input: InputStream, max: Int): ByteArray {

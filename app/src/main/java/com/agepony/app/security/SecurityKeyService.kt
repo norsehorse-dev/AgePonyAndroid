@@ -30,7 +30,18 @@ class SecurityKeyService(
     private val activity: FragmentActivity,
     private val pinProvider: PinProvider? = null,
 ) {
-    class SecurityKeyException(message: String, cause: Throwable? = null) : Exception(message, cause)
+    /**
+     * The security key exchange failed. [reason] and [ctapCode] are what the app shows; the
+     * message is internal (5.1.0, UI plan U5).
+     */
+    class SecurityKeyException(
+        message: String,
+        cause: Throwable? = null,
+        val reason: SecurityKeyException.Reason = SecurityKeyException.Reason.BAD_ANSWER,
+        val ctapCode: Int? = null,
+    ) : Exception(message, cause) {
+        enum class Reason { BAD_ANSWER, NO_PIN_SET, KEY_ERROR }
+    }
     class PinRequiredException(message: String = "security key requires a PIN") : Exception(message)
     class WrongPinException(message: String = "Incorrect PIN.") : Exception(message)
 
@@ -229,10 +240,8 @@ class SecurityKeyService(
         // 0x35 = CTAP2_ERR_PIN_NOT_SET: the key demands user verification but has no PIN
         // enrolled, so there is nothing to verify against. The user has to set a PIN on the
         // key itself first (e.g. in the browser's security-key settings).
-        0x35 -> SecurityKeyException(
-            "This security key has no PIN set. Set a FIDO2 PIN on the key first, then try again."
-        )
-        else -> SecurityKeyException("security key error: 0x%02x".format(e.code), e)
+        0x35 -> SecurityKeyException("no PIN set", e, SecurityKeyException.Reason.NO_PIN_SET, e.code)
+        else -> SecurityKeyException("security key error: 0x%02x".format(e.code), e, SecurityKeyException.Reason.KEY_ERROR, e.code)
     }
 
     private fun parseSkEd25519(wire: ByteArray): Pair<ByteArray, String> {

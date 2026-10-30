@@ -6,7 +6,7 @@
     <string name="identities_tab_recipients">Recipients</string>
     <string name="identities_recently_deleted">Recently deleted</string>
     <string name="identities_empty_title">No identities yet</string>
-    <string name="identities_empty_body">An identity is your own key pair: files encrypted to it open only with it. Tap Add to generate a new one or import a key you already have.</string>
+    <string name="identities_empty_body">An identity is your own key pair: files encrypted to it open only with it. Generate a new one or import a key you already have.</string>
     <string name="identities_active">Active</string>
     <string name="identities_import_title">Import identity</string>
     <string name="identities_generate_title">Generate identity</string>
@@ -38,6 +38,10 @@
     <string name="identities_default_name_hardware_decrypt">hardware decryption key</string>
     <string name="identities_default_name_security">security key</string>
     <string name="identities_default_name_yubikey">YubiKey %1$s</string>
+    <string name="identities_default_name_yubikey_plain">YubiKey</string>
+    <string name="identities_default_name_ssh_rsa">SSH RSA</string>
+    <string name="identities_default_name_github_key">%1$s (key %2$d)</string>
+    <string name="identities_default_name_restored">Restored key %1$d</string>
     <string name="identities_gen_x25519_body">Creates a fresh age X25519 key pair, stored in your vault.</string>
     <string name="identities_gen_hybrid_body">Creates a fresh MLKEM768-X25519 hybrid key pair, safe against future quantum computers and compatible with age 1.3.0 and later. Files encrypted to it can use only quantum-safe recipients (it can\'t be mixed with a classical key).</string>
     <string name="identities_gen_ssh_body">Creates a fresh SSH Ed25519 key pair, stored in your vault. Use it to sign files (including encrypt-and-sign). It can also receive files as an ssh-ed25519 recipient.</string>
@@ -72,7 +76,6 @@
     <!-- Identity detail -->
     <string name="identities_not_found">Identity not found.</string>
     <string name="identities_rename">Rename</string>
-    <string name="identities_type_created">%1$s, created %2$s</string>
     <string name="identities_key_public">Public</string>
     <string name="identities_key_private">Private</string>
     <string name="identities_public_hint">Safe to share. Anyone with this can encrypt to you.</string>
@@ -81,6 +84,9 @@
     <string name="identities_reveal_private">Reveal private key</string>
     <string name="identities_reveal_prompt_subtitle">Confirm it\'s you</string>
     <string name="identities_reveal_needs_biometric">Revealing the private key requires your biometric or device credential.</string>
+    <string name="identities_reveal_needs_biometric_only_password">Revealing the private key requires your biometric, or your password when biometrics can\'t be used.</string>
+    <string name="identities_reveal_needs_biometric_only_pin">Revealing the private key requires your biometric, or your PIN when biometrics can\'t be used.</string>
+    <string name="identities_reveal_needs_screen_lock">Revealing the private key requires your screen lock.</string>
     <string name="identities_reveal_needs_password">Revealing the private key requires your password.</string>
     <string name="identities_reveal_needs_pin">Revealing the private key requires your PIN.</string>
     <string name="identities_reveal_no_lock">Your vault has no lock set, so the private key can be revealed directly.</string>
@@ -117,10 +123,8 @@
 
     <!-- Recipients -->
     <string name="identities_recipients_empty_title">No recipients yet</string>
-    <string name="identities_recipients_empty_body">A recipient is someone else\'s public key, so you can encrypt files to them. Tap Add to paste one, scan a QR code or fetch keys from GitHub.</string>
+    <string name="identities_recipients_empty_body">A recipient is someone else\'s public key, so you can encrypt files to them. Paste one, scan a QR code or fetch keys from GitHub.</string>
     <string name="identities_recipient_not_found">Recipient not found.</string>
-    <string name="identities_recipient_meta">%1$s, %2$s</string>
-    <string name="identities_recipient_meta_extra">%1$s, %2$s, %3$s</string>
     <string name="identities_public_key">Public key</string>
     <string name="identities_recipient_delete_button">Delete recipient</string>
     <string name="identities_recipient_delete_note">Recipients are public keys, so you can add this one again later.</string>
@@ -151,9 +155,6 @@
     <string name="identities_source_scanned">Scanned</string>
     <string name="identities_source_github">GitHub</string>
     <string name="identities_source_identity">Your identity</string>
-    <string name="identities_source_pasted_inline">pasted</string>
-    <string name="identities_source_scanned_inline">scanned</string>
-    <string name="identities_source_identity_inline">your identity</string>
     <string name="identities_rsa_too_small">Too small to encrypt to, %1$d bits minimum.</string>
     <string name="identities_rsa_too_small_bits">Too small to encrypt to (%1$d bits), %2$d bits minimum.</string>
     <string name="identities_rsa_too_small_advice">Too small to encrypt to, %1$d bits minimum. Files can\'t be encrypted to this key; ask for a larger or an Ed25519 key.</string>
@@ -161,7 +162,10 @@
 
     <!-- Key transfer (receive and send) -->
     <string name="identities_transfer_error_open">Couldn\'t open that transfer.</string>
-    <string name="identities_transfer_error_arrived">A transfer arrived but couldn\'t be opened: %1$s</string>
+    <!-- %1$s: why, a whole sentence -->
+    <string name="identities_transfer_error_arrived">A transfer arrived but couldn\'t be opened. %1$s</string>
+    <string name="identities_transfer_error_send_again">Send it again.</string>
+    <string name="identities_github_fetch_failed">Couldn\'t fetch keys from GitHub.</string>
     <string name="identities_transfer_error_read_file">Couldn\'t read that file.</string>
     <string name="identities_transfer_receive_title">Receive keys</string>
     <string name="identities_transfer_receive_intro">On the other phone, open AgePony, go to Settings, then Send keys to another device, and scan this code. Keep this screen open: with both phones on the same Wi-Fi, the keys arrive here directly in a few seconds.</string>
@@ -187,9 +191,12 @@
     <string name="identities_transfer_already_trusted">Already trusted on this phone, skipped.</string>
     <string name="identities_transfer_identity_name_clash">You already have an identity named \"%1$s\" with a different key.</string>
     <string name="identities_transfer_recipient_name_clash">You already have a recipient named \"%1$s\" with a different key.</string>
-    <string name="identities_transfer_signer_name_clash">Same name as %1$s, with a different key.</string>
+    <string name="identities_transfer_signer_name_clash_signer">You already have a trusted signer with this name and a different key.</string>
+    <string name="identities_transfer_signer_name_clash_identity">One of your identities has this name with a different key.</string>
     <string name="identities_transfer_not_imported">%1$s Not imported.</string>
     <string name="identities_transfer_type_key">%1$s · %2$s</string>
+    <!-- One option in a key picker menu (5.1.0 item 3): the key's name, its type, and a short form of its public key -->
+    <string name="identities_picker_menu_line">%1$s · %2$s · %3$s</string>
     <string name="identities_transfer_unreadable_key">(unreadable key)</string>
     <string name="identities_transfer_not_active_note">Imported identities are not made your active identity. Choose one in Settings if you want it.</string>
     <string name="identities_transfer_signers_note">Files signed by a trusted signer show as signed by that name. None are trusted unless you tick them.</string>
@@ -261,7 +268,7 @@
     <string name="identities_paper_pdf_name">Name: %1$s</string>
     <string name="identities_paper_pdf_created">Created: %1$s</string>
     <string name="identities_paper_pdf_protected">Protected with a passphrase (age scrypt). The passphrase is not on this page.</string>
-    <string name="identities_paper_pdf_unprotected">UNPROTECTED: this page is the private key.</string>
+    <string name="identities_paper_pdf_unprotected">Not protected: this page is the private key.</string>
     <string name="identities_paper_pdf_public_key">Public key (to check which key this is):</string>
     <string name="identities_paper_pdf_backup_text">Backup text (an armored age file):</string>
     <string name="identities_paper_pdf_secret_key">Secret key:</string>
@@ -281,4 +288,10 @@
     <string name="identities_paper_found">Found</string>
     <string name="identities_paper_add_to_vault">Add to vault</string>
     <string name="identities_paper_already_in_vault">That key is already in your vault.</string>
+    <string name="identities_row_name">Name</string>
+    <string name="identities_row_type">Type</string>
+    <string name="identities_row_created">Created</string>
+    <string name="identities_row_source">Source</string>
+    <string name="identities_row_origin">Origin</string>
+    <string name="identities_row_comment">Comment</string>
 </resources>

@@ -21,7 +21,16 @@ import java.util.concurrent.TimeUnit
  * foreground activity, and the ECDH retries once the user has confirmed.
  */
 object HardwareAuthBroker {
-    class AuthCancelled(message: String) : Exception(message)
+    /**
+     * The hardware key's user check didn't pass. [reason] is what the app shows, and [cause] the
+     * prompt's own error when there was one; the message is internal (5.1.0, UI plan U5).
+     */
+    class AuthCancelled(
+        val reason: AuthCancelled.Reason,
+        cause: Throwable? = null,
+    ) : Exception(reason.name, cause) {
+        enum class Reason { APP_NOT_OPEN, CANCELLED, TIMED_OUT, FAILED }
+    }
 
     @Volatile private var current: WeakReference<FragmentActivity>? = null
 
@@ -35,12 +44,12 @@ object HardwareAuthBroker {
      */
     fun awaitAuthentication(@StringRes title: Int, @StringRes subtitle: Int?) {
         check(Looper.myLooper() != Looper.getMainLooper()) { "awaitAuthentication must not run on the main thread" }
-        val activity = current?.get() ?: throw AuthCancelled("AgePony needs to be open to use this hardware key.")
+        val activity = current?.get() ?: throw AuthCancelled(AuthCancelled.Reason.APP_NOT_OPEN)
         val latch = CountDownLatch(1)
         var failure: Throwable? = null // published to the waiting thread by the latch
         Handler(Looper.getMainLooper()).post {
             if (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                failure = AuthCancelled("AgePony needs to be open to use this hardware key.")
+                failure = AuthCancelled(AuthCancelled.Reason.APP_NOT_OPEN)
                 latch.countDown()
                 return@post
             }
@@ -54,11 +63,15 @@ object HardwareAuthBroker {
             // Runs even if the scope was cancelled before the body started, so the worker
             // thread is never left waiting on a prompt that will not appear.
             job.invokeOnCompletion { cause ->
-                if (cause != null && failure == null) failure = AuthCancelled("Authentication cancelled.")
+                if (cause != null && failure == null) failure = AuthCancelled(AuthCancelled.Reason.CANCELLED)
                 latch.countDown()
             }
         }
-        if (!latch.await(3, TimeUnit.MINUTES)) throw AuthCancelled("Timed out waiting for authentication.")
-        failure?.let { throw AuthCancelled(it.message ?: "Authentication cancelled.") }
+        if (!latch.await(3, TimeUnit.MINUTES)) throw AuthCancelled(AuthCancelled.Reason.TIMED_OUT)
+        failure?.let { f ->
+            if (f is AuthCancelled) throw f
+            // Keep the prompt's error as the cause, so its code reaches the message, not its text.
+            throw AuthCancelled(AuthCancelled.Reason.FAILED, f)
+        }
     }
 }

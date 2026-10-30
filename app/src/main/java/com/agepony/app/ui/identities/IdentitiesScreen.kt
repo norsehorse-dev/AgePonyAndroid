@@ -1,5 +1,7 @@
 package com.agepony.app.ui.identities
 
+import com.agepony.app.vault.DefaultKeyNames
+import com.agepony.app.ui.UserMessage
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,12 +16,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +30,6 @@ import com.agepony.app.ui.settings.RecentlyDeletedScreen
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -46,7 +45,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.agepony.app.vault.IdentityImport
-import com.agepony.app.vault.IdentityImportException
 import com.agepony.app.vault.StoredIdentity
 import com.agepony.app.vault.StoredIdentityType
 import com.agepony.app.vault.Vault
@@ -74,6 +72,12 @@ import com.agepony.app.ui.components.AgeScreen
 import com.agepony.app.ui.components.EmptyState
 import com.agepony.app.ui.components.ErrorText
 import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.NavRow
+import com.agepony.app.ui.components.QuietAction
+import com.agepony.app.ui.components.OneLineValue
+import com.agepony.app.ui.components.ScreenPadding
+import com.agepony.app.ui.components.StatusText
+import androidx.compose.material.icons.filled.CheckCircle
 import com.agepony.app.ui.components.SwitchRow
 import com.agepony.app.ui.components.VerdictPanel
 import com.agepony.app.ui.theme.AgeStatus
@@ -88,7 +92,7 @@ import androidx.annotation.StringRes
 // sub-navigation, held as plain state (no nav library).
 //
 
-private enum class IdSegment(@StringRes val label: Int) {
+private enum class IdSegment(@param:StringRes val label: Int) {
     IDENTITIES(R.string.identities_tab_mine),
     RECIPIENTS(R.string.identities_tab_recipients),
 }
@@ -156,10 +160,12 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
                     IdSegment.IDENTITIES -> IdentityList(
                         vault = vault,
                         onOpen = { detailId = it; mode = PaneMode.DETAIL },
+                        onAdd = { mode = PaneMode.ADD },
                     )
                     IdSegment.RECIPIENTS -> RecipientList(
                         vault = vault,
                         onOpen = { detailId = it; mode = PaneMode.DETAIL },
+                        onAdd = { mode = PaneMode.ADD },
                     )
                 }
             }
@@ -203,12 +209,15 @@ fun IdentitiesScreen(vault: Vault, modifier: Modifier = Modifier) {
 private fun IdentityList(
     vault: Vault,
     onOpen: (String) -> Unit,
+    onAdd: () -> Unit,
 ) {
-    // Add and Recently deleted live in the app bar.
+    // Add and Recently deleted live in the app bar; the empty state offers Add too.
     if (vault.identities.isEmpty()) {
         EmptyState(
             title = stringResource(R.string.identities_empty_title),
             body = stringResource(R.string.identities_empty_body),
+            actionLabel = stringResource(R.string.action_add_identity),
+            onAction = onAdd,
         )
     } else {
         LazyColumn(Modifier.fillMaxSize()) {
@@ -237,27 +246,27 @@ private fun IdentityRow(identity: StoredIdentity, isActive: Boolean, onClick: ()
         KeyAvatar(seed = identity.publicKeyB64, name = identity.name)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(identity.name, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    identity.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
                 if (identity.type.isPostQuantum) {
                     PostQuantumBadge(modifier = Modifier.padding(start = 8.dp))
                 }
                 if (isActive) {
-                    Text(
-                        stringResource(R.string.identities_active),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // Icon plus word, in the selection color (5.1.0, U4).
+                    StatusText(
+                        text = stringResource(R.string.identities_active),
+                        color = MaterialTheme.colorScheme.primary,
+                        icon = Icons.Filled.CheckCircle,
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 }
             }
-            Text(
-                text = identity.publicDisplayString(),
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            OneLineValue(identity.publicDisplayString())
         }
     }
 }
@@ -294,27 +303,21 @@ private fun AddIdentityFlow(
     AgeScreen(title = title, modifier = modifier, onBack = { back() }) { padding ->
     Box(Modifier.fillMaxSize().padding(padding)) {
     when (stage) {
+        // A list of the two ways in, as on iOS (5.1.0, U4). Back is the app bar arrow.
         AddIdentityStage.CHOICE -> Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .verticalScroll(rememberScrollState()),
         ) {
             Text(
                 stringResource(R.string.identities_add_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 16.dp),
             )
-            Button(
-                onClick = { stage = AddIdentityStage.GENERATE },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.identities_generate_new)) }
-            OutlinedButton(
-                onClick = { stage = AddIdentityStage.IMPORT },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.identities_import_existing)) }
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
+            NavRow(stringResource(R.string.identities_generate_new), onClick = { stage = AddIdentityStage.GENERATE })
+            ListDivider(Modifier.padding(start = ScreenPadding))
+            NavRow(stringResource(R.string.identities_import_existing), onClick = { stage = AddIdentityStage.IMPORT })
         }
 
         AddIdentityStage.GENERATE -> GenerateIdentity(
@@ -331,7 +334,7 @@ private fun AddIdentityFlow(
 }
 
 /** Kinds of key the Generate step can create; [title] is the app bar title for its form. */
-private enum class GenKeyType(@StringRes val title: Int) {
+private enum class GenKeyType(@param:StringRes val title: Int) {
     X25519(R.string.identities_gen_title_x25519),
     QUANTUM_SAFE(R.string.identities_gen_title_quantum_safe),
     HARDWARE_DECRYPT(R.string.identities_gen_title_hardware_decrypt),
@@ -361,37 +364,30 @@ private fun GenerateIdentity(
 }
 
 @Composable
-private fun GenerateTypeChooser(onPick: (GenKeyType) -> Unit, onCancel: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
+private fun GenerateTypeChooser(onPick: (GenKeyType) -> Unit, @Suppress("UNUSED_PARAMETER") onCancel: () -> Unit) {
+    // The kinds of key are a list of rows, not a stack of buttons (5.1.0, U4). Back is the app
+    // bar arrow, which steps back to the add choice.
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Text(
             stringResource(R.string.identities_gen_chooser_intro),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 16.dp),
         )
-        Button(onClick = { onPick(GenKeyType.X25519) }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.identities_gen_option_x25519))
-        }
-        OutlinedButton(onClick = { onPick(GenKeyType.QUANTUM_SAFE) }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.identities_gen_option_quantum_safe))
-        }
-        if (HardwareTagKeyService.isSupported) {
-            OutlinedButton(onClick = { onPick(GenKeyType.HARDWARE_DECRYPT) }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.identities_gen_option_hardware_decrypt))
+        val options = buildList {
+            add(GenKeyType.X25519 to R.string.identities_gen_option_x25519)
+            add(GenKeyType.QUANTUM_SAFE to R.string.identities_gen_option_quantum_safe)
+            if (HardwareTagKeyService.isSupported) {
+                add(GenKeyType.HARDWARE_DECRYPT to R.string.identities_gen_option_hardware_decrypt)
             }
+            add(GenKeyType.SSH_ED25519 to R.string.identities_gen_option_ssh)
+            add(GenKeyType.HARDWARE to R.string.identities_gen_option_hardware)
+            add(GenKeyType.SECURITY to R.string.identities_gen_option_security)
         }
-        OutlinedButton(onClick = { onPick(GenKeyType.SSH_ED25519) }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.identities_gen_option_ssh))
+        options.forEachIndexed { index, (type, label) ->
+            if (index > 0) ListDivider(Modifier.padding(start = ScreenPadding))
+            NavRow(stringResource(label), onClick = { onPick(type) })
         }
-        OutlinedButton(onClick = { onPick(GenKeyType.HARDWARE) }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.identities_gen_option_hardware))
-        }
-        OutlinedButton(onClick = { onPick(GenKeyType.SECURITY) }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.identities_gen_option_security))
-        }
-        TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
     }
 }
 
@@ -552,7 +548,8 @@ private fun GenerateEd25519(vault: Vault, onDone: () -> Unit) {
 private fun GenerateHardwareKey(vault: Vault, onDone: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     val defaultName = stringResource(R.string.identities_default_name_hardware)
-    val createFailed = stringResource(R.string.identities_error_hardware_create)
+    val context = LocalContext.current
+    val createFailedRes = R.string.identities_error_hardware_create
     var requireAuth by rememberSaveable { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -596,7 +593,7 @@ private fun GenerateHardwareKey(vault: Vault, onDone: () -> Unit) {
                             busy = false
                             onDone()
                         } catch (e: Exception) {
-                            error = e.message ?: createFailed
+                            error = UserMessage.textUnlessCancelled(context, e, createFailedRes)
                             busy = false
                         }
                     }
@@ -618,7 +615,8 @@ private fun GenerateHardwareDecryptKey(vault: Vault, onDone: () -> Unit) {
     var postQuantum by rememberSaveable { mutableStateOf(true) }
     var requireAuth by rememberSaveable { mutableStateOf(false) }
     val defaultName = stringResource(R.string.identities_default_name_hardware_decrypt)
-    val createFailed = stringResource(R.string.identities_error_hardware_create)
+    val context = LocalContext.current
+    val createFailedRes = R.string.identities_error_hardware_create
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -696,7 +694,7 @@ private fun GenerateHardwareDecryptKey(vault: Vault, onDone: () -> Unit) {
                             busy = false
                             onDone()
                         } catch (e: Exception) {
-                            error = e.message ?: createFailed
+                            error = UserMessage.textUnlessCancelled(context, e, createFailedRes)
                             busy = false
                         }
                     }
@@ -782,7 +780,7 @@ private fun GenerateSecurityKey(vault: Vault, onDone: () -> Unit) {
                             error = context.getString(R.string.identities_error_pin_wrong)
                             busy = false
                         } catch (e: Exception) {
-                            error = e.message ?: context.getString(R.string.identities_error_enroll_failed)
+                            error = UserMessage.textUnlessCancelled(context, e, R.string.identities_error_enroll_failed)
                             busy = false
                         }
                     }
@@ -842,7 +840,8 @@ private fun ImportIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
             modifier = Modifier.fillMaxWidth(),
         )
         if (error != null) ErrorText(error!!)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Stacked, full width, so long translated labels never squeeze (5.1.0, U4).
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             Button(
                 onClick = {
                     if (busy) return@Button
@@ -855,38 +854,30 @@ private fun ImportIdentity(vault: Vault, onDone: () -> Unit, onCancel: () -> Uni
                             val stored = withContext(Dispatchers.IO) {
                                 // Covers both AGE-SECRET-KEY-1… and AGE-SECRET-KEY-PQ-1…;
                                 // fromAgeSecretKey routes on the -PQ- marker.
-                                if (YubiKeyStub.isStub(txt)) {
-                                    val stub = YubiKeyStub.parse(txt)
-                                    val pub = YubiKeyBroker.readPublicKey(stub)
-                                    StoredIdentity(
-                                        id = java.util.UUID.randomUUID().toString(),
-                                        name = name.trim().ifBlank { context.getString(R.string.identities_default_name_yubikey, stub.serial.toString()) },
-                                        type = StoredIdentityType.YUBIKEY_PIV,
-                                        publicKeyB64 = b64e(pub),
-                                        privateKeyB64 = b64e(stub.toBytes()),
-                                        createdAt = System.currentTimeMillis(),
-                                    )
+                                // A bare stub or a full age-plugin-yubikey identity file; the
+                                // import reads the slot's PIN policy too (5.1.0 item 1).
+                                if (IdentityImport.isYubiKeyIdentity(txt)) {
+                                    IdentityImport.fromYubiKey(txt, name, defaultName = { serial ->
+                                        context.getString(R.string.identities_default_name_yubikey, serial.toString())
+                                    })
                                 } else if (txt.startsWith("AGE-SECRET-KEY-", ignoreCase = true)) {
-                                    IdentityImport.fromAgeSecretKey(txt, name)
+                                    IdentityImport.fromAgeSecretKey(txt, name, DefaultKeyNames.from(context))
                                 } else {
-                                    IdentityImport.fromOpenSSHPem(txt, passphrase, name)
+                                    IdentityImport.fromOpenSSHPem(txt, passphrase, name, DefaultKeyNames.from(context))
                                 }
                             }
                             vault.addIdentity(stored)
                             busy = false
                             onDone()
-                        } catch (e: IdentityImportException) {
-                            busy = false
-                            error = e.message
                         } catch (e: Exception) {
                             busy = false
-                            error = e.message ?: context.getString(R.string.identities_error_import_failed)
+                            error = UserMessage.textUnlessCancelled(context, e, R.string.identities_error_import_failed)
                         }
                     }
                 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(if (busy) R.string.identities_importing else R.string.identities_import)) }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_cancel)) }
+            QuietAction(stringResource(R.string.action_cancel), onClick = onCancel)
         }
     }
 }

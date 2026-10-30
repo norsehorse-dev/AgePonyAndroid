@@ -95,8 +95,6 @@
     <string name="settings_work_factor">Passphrase work factor</string>
     <string name="settings_work_factor_detail_default">2^%1$d: scrypt holds about %2$d MB while it derives the key, whatever the file size. This is age\'s default. The value is stored in the file, so any age tool can still open it.</string>
     <string name="settings_work_factor_detail_custom">2^%1$d: scrypt holds about %2$d MB while it derives the key, whatever the file size. age\'s default is 2^%3$d. The value is stored in the file, so any age tool can still open it.</string>
-    <string name="settings_work_factor_less">Less</string>
-    <string name="settings_work_factor_more">More</string>
 
     <!-- Auto-lock -->
     <string name="settings_section_autolock">Auto-lock</string>
@@ -191,7 +189,8 @@
 
     <!-- Recently deleted -->
     <string name="settings_trash_intro">Deleted identities and recipients wait here for %1$d days before they are removed for good. Restoring an identity brings its private key back intact.</string>
-    <string name="settings_trash_empty">Nothing here. Deleted items will show up on this screen.</string>
+    <string name="settings_trash_empty_state_title">Nothing recently deleted</string>
+    <string name="settings_trash_empty">Identities and recipients you delete show up here, where you can restore them.</string>
     <string name="settings_trash_identities">Identities</string>
     <string name="settings_trash_recipients">Recipients</string>
     <string name="settings_trash_empty_bin">Empty recycle bin</string>
@@ -268,4 +267,21 @@
     <string name="settings_dep_zxing">ZXing core (QR encoding and decoding)</string>
     <string name="settings_dep_desugar">Android core library desugaring (desugar_jdk_libs)</string>
     <string name="settings_dep_play_review">Google Play In-App Review (Play build only, not in the F-Droid build)</string>
+    <!-- 5.1.0: Biometrics only lock (iOS E6) and the first-password owner check (iOS H-1) -->
+    <string name="settings_lock_biometric_only">Biometrics only</string>
+    <string name="settings_lock_fingerprint_only">Fingerprint only</string>
+    <string name="settings_lock_biometric_only_detail_pin">Only biometrics or your PIN opens the vault. The phone\'s screen lock doesn\'t. If a fingerprint or face is added or removed, enter your PIN once and turn biometrics back on.</string>
+    <string name="settings_lock_biometric_only_detail_password">Only biometrics or your password opens the vault. The phone\'s screen lock doesn\'t. If a fingerprint or face is added or removed, enter your password once and turn biometrics back on.</string>
+    <string name="settings_lock_biometric_only_detail_none">Only biometrics or an app password opens the vault, never the phone\'s screen lock. Needs a password or PIN as the way back in.</string>
+    <string name="settings_biometric_only_dialog_body">Only biometrics or your app password or PIN will open the vault. The phone\'s screen lock won\'t. If a fingerprint or face is added or removed, biometrics stop opening the vault until you enter your password or PIN once.</string>
+    <string name="settings_biometric_only_dialog_needs_secret">Set a password or PIN first. It\'s the way back in.</string>
+    <string name="settings_biometric_only_turn_on">Turn on</string>
+    <string name="settings_biometric_only_set_secret">Set a password or PIN</string>
+    <string name="settings_confirm_set_secret">Confirm it\'s you to set a password or PIN</string>
+    <string name="settings_confirm_change_lock">Confirm it\'s you to change how AgePony locks</string>
+    <string name="settings_biometric_only_off_note">Biometric unlock is off until you confirm with biometrics again. Your app password or PIN opens the vault meanwhile.</string>
+    <string name="settings_biometric_only_turn_on_again">Turn on again</string>
+    <string name="settings_secret_type">Type</string>
+    <string name="settings_work_factor_option">2^%1$d, about %2$d MB</string>
+    <string name="settings_work_factor_option_default">2^%1$d, about %2$d MB (age default)</string>
 </resources>

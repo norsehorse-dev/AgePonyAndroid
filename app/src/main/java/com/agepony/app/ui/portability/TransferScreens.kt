@@ -1,5 +1,7 @@
 package com.agepony.app.ui.portability
 
+import com.agepony.app.vault.DefaultKeyNames
+import com.agepony.app.ui.UserMessage
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -38,7 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.layout.heightIn
+import com.agepony.app.ui.components.OneLineValue
 import androidx.compose.ui.unit.dp
 import com.agepony.app.net.LocalNetwork
 import com.agepony.app.security.ClipboardGuard
@@ -186,11 +189,11 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
         scope.launch {
             try {
                 val (inc, received) = withContext(Dispatchers.Default) {
-                    KeyPortability.readBundle(KeyTransfer.open(bytes, session)) to TransferCode.of(bytes)
+                    KeyPortability.readBundle(KeyTransfer.open(bytes, session), DefaultKeyNames.from(context)) to TransferCode.of(bytes)
                 }
                 showPreview(inc, received)
             } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.identities_transfer_error_open)
+                error = UserMessage.text(context, e, R.string.identities_transfer_error_open)
                 stage = ReceiveStage.WAITING
             }
         }
@@ -225,7 +228,7 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
                     LanTransfer.receive(s, token) { bytes ->
                         Log.i(XFER_TAG, "received ${bytes.size} bytes")
                         try {
-                            val inc = KeyPortability.readBundle(KeyTransfer.open(bytes, id))
+                            val inc = KeyPortability.readBundle(KeyTransfer.open(bytes, id), DefaultKeyNames.from(context))
                             val received = TransferCode.of(bytes)
                             Log.i(XFER_TAG, "opened: ${inc.identities.size} identities, ${inc.recipients.size} recipients, ${inc.signers.size} signers")
                             main.post {
@@ -239,7 +242,7 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
                             main.post {
                                 error = context.getString(
                                     R.string.identities_transfer_error_arrived,
-                                    e.message ?: e.javaClass.simpleName,
+                                    UserMessage.text(context, e, R.string.identities_transfer_error_send_again),
                                 )
                             }
                             false
@@ -439,7 +442,11 @@ fun ReceiveKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Mod
                             refused?.let { add(PreviewNote(stringResource(R.string.identities_transfer_not_imported, it), true)) }
                             signer.agePonyWarning(LocalContext.current)?.let { add(PreviewNote(it, true)) }
                             KeyPortability.nameClash(vault, signer)?.let {
-                                add(PreviewNote(stringResource(R.string.identities_transfer_signer_name_clash, it), true))
+                                val clash = when (it) {
+                                    KeyPortability.SignerNameClash.TRUSTED_SIGNER -> R.string.identities_transfer_signer_name_clash_signer
+                                    KeyPortability.SignerNameClash.IDENTITY -> R.string.identities_transfer_signer_name_clash_identity
+                                }
+                                add(PreviewNote(stringResource(clash), true))
                             }
                         }
                         PreviewRow(
@@ -579,7 +586,7 @@ fun SendKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Modifi
             recipientText = key.trim().lowercase()
             stage = SendStage.CONFIRM
         } catch (e: Exception) {
-            error = e.message ?: context.getString(R.string.identities_transfer_error_not_receiving_key)
+            error = UserMessage.text(context, e, R.string.identities_transfer_error_not_receiving_key)
             stage = SendStage.PICK
         }
     }
@@ -592,7 +599,7 @@ fun SendKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Modifi
                 withContext(Dispatchers.IO) { SafIo.openOutput(context, uri).use { it.write(bytes) } }
                 savedUri = uri
             } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.identities_transfer_error_save)
+                error = UserMessage.text(context, e, R.string.identities_transfer_error_save)
             }
         }
     }
@@ -699,12 +706,12 @@ fun SendKeysScreen(vault: Vault, onBack: () -> Unit, modifier: Modifier = Modifi
                                         stage = SendStage.SENT
                                     } catch (e: Exception) {
                                         // Direct delivery failed: keep the sealed transfer and offer the file route.
-                                        error = e.message ?: context.getString(R.string.identities_transfer_error_reach)
+                                        error = UserMessage.text(context, e, R.string.identities_transfer_error_reach)
                                         stage = SendStage.DONE
                                     }
                                 }
                             } catch (e: Exception) {
-                                error = e.message ?: context.getString(R.string.identities_transfer_error_build)
+                                error = UserMessage.text(context, e, R.string.identities_transfer_error_build)
                                 stage = SendStage.CONFIRM
                             }
                         }
@@ -821,17 +828,14 @@ private fun PreviewRow(
                 role = Role.Checkbox,
                 onValueChange = { onToggle() },
             )
+            .heightIn(min = 48.dp)
             .padding(vertical = 8.dp),
     ) {
         Checkbox(checked = checked && enabled, onCheckedChange = null, enabled = enabled)
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                detail,
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // Type and key on one line, cut in the middle (5.1.0, U4).
+            OneLineValue(detail)
             notes.forEach { n ->
                 Text(
                     n.text,

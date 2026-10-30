@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Error messages for ui/UserMessage.kt (5.1.0, UI plan U5). Each is a whole sentence. A code
+        in parentheses is only ever a status number for a report, never an exception's own text.
+    -->
+
+    <!-- General -->
+    <string name="error_cancelled">Cancelled.</string>
+    <!-- %1$s: a sentence already built from resources -->
+    <string name="error_passthrough">%1$s</string>
+    <string name="error_out_of_memory">There isn\'t enough memory free on this phone for this. Close other apps and try again.</string>
+    <string name="error_no_space">There isn\'t enough free storage on this phone.</string>
+    <string name="error_file_missing">The file isn\'t there any more, or AgePony can\'t open it. Pick it again.</string>
+    <string name="error_file_permission">AgePony isn\'t allowed to use that file any more. Pick it again.</string>
+    <string name="error_integrity">The data failed its integrity check. It was changed or damaged, or the key is wrong.</string>
+
+    <!-- Network -->
+    <string name="error_network_offline">There\'s no internet connection, or the server\'s name couldn\'t be found.</string>
+    <string name="error_network_timeout">The server took too long to answer.</string>
+    <string name="error_network_connect">Couldn\'t connect to the server. Check the connection and the proxy settings.</string>
+    <string name="error_network_tls">The secure connection to the server failed.</string>
+
+    <!-- Encrypt and decrypt -->
+    <string name="error_no_recipients">Choose at least one recipient.</string>
+    <string name="error_passphrase_with_recipients">A passphrase can\'t be combined with recipients in the same file.</string>
+    <string name="error_encrypt_failed">Couldn\'t encrypt.</string>
+    <string name="error_decrypt_failed">Couldn\'t decrypt.</string>
+    <string name="error_no_matching_identity">None of your identities can open this file.</string>
+    <string name="error_wrong_passphrase">Wrong passphrase, or this file isn\'t encrypted with a passphrase.</string>
+    <string name="error_mismatched_labels">Some of these recipients can\'t share a file with the others, such as quantum-safe and classic keys.</string>
+    <!-- %1$d: megabytes needed; %2$d: megabytes free -->
+    <string name="error_scrypt_memory_decrypt">Opening this file needs about %1$d MB to derive its passphrase key, and only about %2$d MB is free on this phone. The work factor was set when the file was made, so if you control the original, encrypt it again at a lower work factor.</string>
+    <!-- %1$d: work factor exponent; %2$d: megabytes needed; %3$d: megabytes free -->
+    <string name="error_scrypt_memory_encrypt">A passphrase at work factor 2^%1$d needs about %2$d MB, and only about %3$d MB is free on this phone. Lower the passphrase work factor in Settings, or encrypt to a recipient instead.</string>
+
+    <!-- age format -->
+    <string name="error_not_age_file">That isn\'t an age-encrypted file.</string>
+    <string name="error_header_damaged">The file\'s age header is damaged.</string>
+    <string name="error_header_too_large">The file\'s age header is too large to read.</string>
+    <string name="error_header_mac">The file\'s header failed its integrity check. It was changed or damaged.</string>
+    <string name="error_header_scrypt_not_alone">This file mixes a passphrase with other recipients, which age doesn\'t allow.</string>
+    <string name="error_file_truncated">The file is incomplete. It may have been cut off while copying.</string>
+    <string name="error_payload_auth">The encrypted contents failed their integrity check. The file was changed or damaged.</string>
+    <string name="error_payload_damaged">The encrypted contents are damaged or incomplete.</string>
+    <string name="error_armor_damaged">The armored text is damaged or incomplete.</string>
+    <string name="error_bech32">That isn\'t a valid age key. Check it for typos or a missing part.</string>
+    <string name="error_low_order">This file wasn\'t made for any of your keys, or it was tampered with.</string>
+    <string name="error_rsa_unwrap">The RSA key couldn\'t open this file.</string>
+    <string name="error_ssh_key_damaged">The SSH key is damaged or isn\'t in a format AgePony reads.</string>
+    <string name="error_ssh_key_decrypt">This SSH key couldn\'t be decrypted. It may be damaged.</string>
+    <string name="error_ssh_kdf">This SSH key\'s passphrase settings can\'t be used.</string>
+    <string name="error_diceware">The word list for passphrases couldn\'t be loaded.</string>
+    <string name="error_sign_failed">Couldn\'t make the signature.</string>
+    <string name="error_bundle_damaged">The signed bundle is damaged.</string>
+    <string name="error_tar_damaged">The bundle is damaged or incomplete.</string>
+
+    <!-- Stored keys and the vault -->
+    <string name="error_signing_only_key">Hardware signing keys and security keys can sign, but they can\'t decrypt or be encryption recipients.</string>
+    <string name="error_stored_key_damaged">This stored key is damaged.</string>
+    <string name="error_vault_key_missing">The vault\'s key in the Android Keystore is missing. This usually means AgePony was reinstalled or restored from a backup.</string>
+    <string name="error_password_device_key_missing">This phone\'s key for the app password is missing, so the password can\'t open the vault.</string>
+    <string name="error_password_data_damaged">The stored app password data is damaged.</string>
+
+    <!-- Importing identities -->
+    <string name="error_import_passphrase_required">This key is protected with a passphrase. Enter it and try again.</string>
+    <string name="error_import_wrong_passphrase">Wrong passphrase for this key.</string>
+    <string name="error_import_unsupported">AgePony can\'t import this kind of key. It takes age keys, SSH Ed25519 and RSA keys, and YubiKey identities.</string>
+    <string name="error_import_malformed">That isn\'t a key AgePony can read. Check that you copied all of it.</string>
+
+    <!-- Adding recipients -->
+    <string name="error_recipient_empty">Paste a recipient first.</string>
+    <string name="error_recipient_bad_quantum_safe">That isn\'t a valid quantum-safe age recipient.</string>
+    <string name="error_recipient_bad_tag">That isn\'t a valid age hardware key recipient.</string>
+    <string name="error_recipient_bad_yubikey">That isn\'t a valid YubiKey recipient.</string>
+    <string name="error_recipient_bad_age">That isn\'t a valid age recipient. Check it for typos or a missing part.</string>
+    <string name="error_recipient_bad_ssh">That isn\'t an SSH public key AgePony can use.</string>
+    <string name="error_recipient_bad_ssh_ed25519">That ssh-ed25519 key isn\'t a valid public key.</string>
+    <string name="error_recipient_unrecognized">That isn\'t a recipient AgePony recognizes. Paste an age1 recipient or an ssh-ed25519 or ssh-rsa line.</string>
+    <string name="error_github_username">GitHub usernames are 1 to 39 letters (A to Z), digits and hyphens, and don\'t start with a hyphen.</string>
+    <!-- %1$s: GitHub username. Shown when the account has no public keys at all. -->
+    <string name="error_github_no_keys">GitHub has no public keys for %1$s.</string>
+    <!-- %1$s: GitHub username -->
+    <string name="error_github_no_usable_keys">%1$s has keys on GitHub, but none AgePony can use. It takes ssh-ed25519 and ssh-rsa keys.</string>
+    <!-- %1$s: GitHub username -->
+    <string name="error_github_no_user">There\'s no GitHub account named %1$s.</string>
+    <!-- %1$d: HTTP status code -->
+    <string name="error_github_http">GitHub didn\'t return the keys (HTTP %1$d).</string>
+    <string name="error_github_empty">GitHub sent an empty answer. Try again.</string>
+    <string name="error_github_network">Couldn\'t reach GitHub. Check the connection and the proxy settings.</string>
+    <string name="error_github_too_large">GitHub\'s answer was too large to be a key list, so nothing was imported.</string>
+
+    <!-- Signing -->
+    <string name="error_sign_x25519">age identities can\'t sign. Choose an SSH key, a hardware signing key or a security key.</string>
+    <string name="error_sign_quantum_safe">Quantum-safe identities are for encryption, not signing. Choose an SSH key, a hardware signing key or a security key.</string>
+    <string name="error_sign_decrypt_only">Hardware decryption keys can\'t sign. Choose an SSH key or a hardware signing key.</string>
+    <string name="error_sign_security_key_here">A security key can\'t sign here. Sign the file from Sign a file instead.</string>
+    <string name="error_sign_key_damaged">This identity\'s stored key is damaged.</string>
+
+    <!-- Biometrics, screen lock and the Keystore -->
+    <string name="error_auth_failed">Authentication didn\'t succeed.</string>
+    <!-- %1$d: BiometricPrompt error code -->
+    <string name="error_auth_failed_code">Authentication didn\'t succeed (BiometricPrompt error %1$d).</string>
+    <string name="error_auth_no_result">Authentication didn\'t return a result. Try again.</string>
+    <string name="error_auth_timed_out">Timed out waiting for authentication.</string>
+    <string name="error_biometric_lockout">Biometrics are locked after too many tries. Wait a moment and try again.</string>
+    <string name="error_biometric_lockout_permanent">Biometrics are locked after too many tries. Unlock the phone with its PIN, pattern or password to turn them back on.</string>
+    <string name="error_biometric_none_enrolled">No fingerprint or face is set up on this phone.</string>
+    <string name="error_biometric_hardware">Biometrics aren\'t available on this phone right now.</string>
+    <string name="error_no_screen_lock">Set a screen lock on this phone to use this.</string>
+    <string name="error_security_update">A security update is needed before biometrics can be used.</string>
+    <string name="error_hardware_app_not_open">AgePony needs to be open to use this hardware key.</string>
+    <string name="error_key_invalidated">This key was invalidated because the phone\'s screen lock or biometrics changed. It can\'t be used any more.</string>
+    <string name="error_not_authenticated">Confirm it\'s you first, then try again.</string>
+    <string name="error_hardware_sign_failed">The hardware key couldn\'t sign.</string>
+    <string name="error_hardware_key_gone">This hardware key is gone from the phone\'s keystore, so it can\'t be used any more.</string>
+    <string name="error_hardware_decrypt_failed">The hardware key couldn\'t open this file.</string>
+    <!-- %1$d: Android Keystore numeric error code -->
+    <string name="error_keystore_code">The Android Keystore refused the operation (Keystore error %1$d).</string>
+
+    <!-- Security keys (FIDO2) over NFC -->
+    <string name="error_sk_pin_required">This security key needs its PIN.</string>
+    <string name="error_sk_wrong_pin">Wrong PIN.</string>
+    <string name="error_sk_no_pin_set">This security key has no PIN set. Set a FIDO2 PIN on the key first, then try again.</string>
+    <string name="error_sk_bad_answer">The security key\'s answer didn\'t make sense. Tap it again.</string>
+    <string name="error_sk_denied">The security key refused the request.</string>
+    <string name="error_sk_no_credential">This security key doesn\'t hold the key for this identity.</string>
+    <string name="error_sk_touch_timeout">The security key timed out waiting for a touch. Try again.</string>
+    <string name="error_sk_pin_blocked">The security key\'s PIN is blocked. Reset the key to use it again.</string>
+    <string name="error_sk_pin_auth_blocked">Too many wrong PINs. Take the key away, then tap it again.</string>
+    <!-- %1$s: CTAP status byte in hex, such as 0x2B -->
+    <string name="error_sk_code">The security key returned an error (CTAP %1$s).</string>
+    <string name="error_nfc_missing">This phone has no NFC.</string>
+    <string name="error_nfc_off">NFC is turned off. Turn it on in the phone\'s settings.</string>
+    <string name="error_nfc_not_security_key">That NFC tag isn\'t a security key.</string>
+    <string name="error_nfc_reader">Couldn\'t start the NFC reader. Try again.</string>
+    <string name="error_nfc_lost">The key moved away before the exchange finished. Hold it still and try again.</string>
+    <!-- %1$s: ISO status word in hex, such as 6A82 -->
+    <string name="error_nfc_no_fido">That key has no FIDO2 applet (status %1$s).</string>
+    <string name="error_nfc_bad_answer">The security key sent an answer AgePony can\'t use.</string>
+    <string name="error_nfc_timeout">The security key didn\'t answer in time. Tap it again.</string>
+    <!-- %1$s: ISO status word in hex -->
+    <string name="error_nfc_status">The NFC exchange failed (status %1$s).</string>
+
+    <!-- YubiKey (PIV) -->
+    <string name="error_piv_pin_required">This YubiKey key needs its PIN.</string>
+    <string name="error_piv_pin_blocked">The PIV PIN is blocked. Unblock it with the PUK in YubiKey Manager.</string>
+    <!-- %1$d: tries left before the PIN locks -->
+    <plurals name="error_piv_wrong_pin">
+        <item quantity="one">Wrong PIN. %1$d try left before it locks.</item>
+        <item quantity="other">Wrong PIN. %1$d tries left before it locks.</item>
+    </plurals>
+    <!-- %1$s: ISO status word in hex -->
+    <string name="error_piv_not_piv">That key has no PIV applet (status %1$s).</string>
+    <!-- %1$s: ISO status word in hex -->
+    <string name="error_piv_pin_check">The YubiKey couldn\'t check the PIN (status %1$s).</string>
+    <!-- %1$s: ISO status word in hex -->
+    <string name="error_piv_no_key_code">That YubiKey has no key in the slot this identity uses (status %1$s).</string>
+    <string name="error_piv_no_key">That YubiKey has no key in the slot this identity uses.</string>
+    <string name="error_piv_not_p256">The key in that slot isn\'t a P-256 key.</string>
+    <!-- %1$s: ISO status word in hex -->
+    <string name="error_piv_refused">The YubiKey refused the request (status %1$s).</string>
+    <string name="error_piv_bad_answer">The YubiKey\'s answer didn\'t make sense. Tap it again.</string>
+    <string name="error_piv_key_mismatch">The key in that slot isn\'t the one this identity points at.</string>
+    <!-- %1$s: serial of the YubiKey tapped; %2$s: serial of the one this identity is on -->
+    <string name="error_piv_wrong_yubikey">That\'s YubiKey %1$s. This identity is on YubiKey %2$s.</string>
+    <string name="error_piv_app_not_open">AgePony needs to be open to use a YubiKey.</string>
+    <string name="error_piv_not_smart_card">That NFC tag isn\'t a smart card.</string>
+    <string name="error_piv_moved_away">The YubiKey moved away too soon. Hold it still until it\'s done.</string>
+
+    <!-- Moving keys between phones and paper backups -->
+    <string name="error_transfer_not_transfer">That isn\'t an AgePony key transfer.</string>
+    <string name="error_transfer_too_many">That transfer has more keys than AgePony takes at once.</string>
+    <string name="error_transfer_newer">That transfer was made by a newer version of AgePony. Update AgePony on this phone.</string>
+    <string name="error_transfer_wrong_session">That transfer was sealed for a different receive session. Start Receive keys again and rescan.</string>
+    <string name="error_transfer_not_recipient">That isn\'t a receive key from another phone.</string>
+    <string name="error_lan_not_invite">That QR code isn\'t from Receive keys on another phone.</string>
+    <string name="error_lan_damaged_invite">That receive QR code is damaged. Scan it again.</string>
+    <string name="error_lan_protocol">The other phone sent something unexpected. Start the transfer again.</string>
+    <string name="error_lan_wrong_token">The other phone\'s code didn\'t match. Start Receive keys again and rescan.</string>
+    <string name="error_lan_too_large">The transfer is too large to send directly.</string>
+    <string name="error_lan_closed">The other phone closed the connection before the transfer finished.</string>
+    <string name="error_lan_refused">The other phone refused the transfer. Start Receive keys again and rescan.</string>
+    <string name="error_lan_unreachable">Couldn\'t reach the other phone. Put both on the same Wi-Fi, or one on the other\'s hotspot.</string>
+    <string name="error_paper_not_sealed">That isn\'t a passphrase-protected AgePony backup.</string>
+    <string name="error_paper_damaged">The backup is damaged or didn\'t scan completely.</string>
+    <string name="error_paper_wrong_passphrase">Wrong backup passphrase.</string>
+</resources>

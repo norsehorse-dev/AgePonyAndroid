@@ -1,7 +1,9 @@
 package com.agepony.app.signing
 
+import com.agepony.app.R
 import com.agepony.app.vault.StoredIdentity
 import com.agepony.app.vault.StoredIdentityType
+import com.agepony.app.vault.UiText
 import com.agepony.app.vault.StoredSigner
 import com.agepony.app.vault.b64d
 import com.agepony.core.signing.SSHSig
@@ -9,6 +11,9 @@ import com.agepony.core.signing.SSHSigVerifier
 import com.agepony.core.ssh.AllowedSigner
 import java.io.IOException
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 /**
  * Verifies a detached SSHSIG over a file and decides how much to trust the signer.
@@ -34,7 +39,8 @@ class FileVerifier {
         val trust: Trust,
         val keyType: String,
         val signerName: String?,
-        val reason: String?,
+        /** Why the signature failed, as a whole sentence from resources (5.1.0, UI plan U5). */
+        val reason: UiText?,
         /**
          * The signer's public-key wire blob, present when the signature verified. This is
          * what "add this signer" persists, so the added entry matches future signatures
@@ -46,8 +52,8 @@ class FileVerifier {
          * signature ([trust] is then [Trust.VALID_UNKNOWN]): the entry's name, for display.
          */
         val untrustedSignerName: String? = null,
-        /** Why the matching trusted-signer entry did not accept the signature, for display. */
-        val untrustedReason: String? = null,
+        /** Why the matching trusted-signer entry did not accept the signature, as a whole sentence. */
+        val untrustedReason: UiText? = null,
     )
 
     fun verify(
@@ -89,12 +95,12 @@ class FileVerifier {
         } catch (e: IOException) {
             throw e // could not read the signed file: not a verdict on the signature
         } catch (e: SSHSig.SSHSigFormatException) {
-            return Result(Trust.INVALID, "unknown", null, "malformed signature: ${e.message}")
+            return Result(Trust.INVALID, "unknown", null, UiText.res(R.string.sign_reason_malformed))
         } catch (e: Exception) {
-            return Result(Trust.INVALID, "unknown", null, "the signature couldn't be checked: ${e.message}")
+            return Result(Trust.INVALID, "unknown", null, UiText.res(R.string.sign_reason_unchecked))
         }
         if (!result.valid) {
-            return Result(Trust.INVALID, result.keyType, null, result.reason)
+            return Result(Trust.INVALID, result.keyType, null, failureReason(result))
         }
         if (ownMatch != null && ownMatch.hasWire(result.signerPublicWire)) {
             return Result(Trust.TRUSTED, result.keyType, ownMatch.name, null, result.signerPublicWire)
@@ -129,28 +135,42 @@ class FileVerifier {
         null
     }
 
-    /** Why [entry] does not accept the (valid) [result] at [at], in words for the verdict. */
-    private fun rejectionReason(entry: AllowedSigner, result: SSHSigVerifier.Result, at: Instant): String {
+    /** Why a signature that parsed failed, as a whole sentence. Stays clearly a failure (U5). */
+    private fun failureReason(result: SSHSigVerifier.Result): UiText = when (result.failure) {
+        SSHSigVerifier.Failure.NAMESPACE_MISMATCH -> UiText.res(R.string.sign_reason_namespace, result.namespace)
+        SSHSigVerifier.Failure.RSA_KEY_UNACCEPTABLE -> UiText.res(R.string.sign_reason_rsa_key)
+        SSHSigVerifier.Failure.NO_TOUCH -> UiText.res(R.string.sign_reason_no_touch)
+        SSHSigVerifier.Failure.SIGNATURE_MISMATCH, null -> UiText.res(R.string.sign_reason_mismatch)
+    }
+
+    /**
+     * Why [entry] does not accept the (valid) [result] at [at], as a whole sentence for the
+     * verdict (5.1.0, UI plan U5). The entry's own option text is data, shown as it is.
+     */
+    private fun rejectionReason(entry: AllowedSigner, result: SSHSigVerifier.Result, at: Instant): UiText {
         val opts = entry.parsedOptions()
-        val error = opts.error
+        val validAfter = opts.validAfter
+        val validBefore = opts.validBefore
         return when {
-            error != null -> "its trusted-signer entry has options AgePony can't read ($error)"
+            opts.error != null -> UiText.res(R.string.sign_entry_options_unreadable)
             opts.unknown.isNotEmpty() ->
-                "its trusted-signer entry has options AgePony doesn't support (${opts.unknown.joinToString(", ")})"
-            opts.certAuthority -> "its trusted-signer entry is a certificate authority, which AgePony doesn't support"
-            opts.validAfter?.let { at.isBefore(it) } == true ->
-                "its trusted-signer entry is not valid until ${opts.validAfter}"
-            opts.validBefore?.let { at.isAfter(it) } == true ->
-                "its trusted-signer entry expired on ${opts.validBefore}"
+                UiText.res(R.string.sign_entry_options_unsupported, opts.unknown.joinToString(", "))
+            opts.certAuthority -> UiText.res(R.string.sign_entry_cert_authority)
+            validAfter != null && at.isBefore(validAfter) ->
+                UiText.res(R.string.sign_entry_not_yet_valid, formatInstant(validAfter))
+            validBefore != null && at.isAfter(validBefore) ->
+                UiText.res(R.string.sign_entry_expired, formatInstant(validBefore))
             !entry.permitsAgePony(result.namespace, at) ->
-                "its trusted-signer entry doesn't allow the namespace \"${result.namespace}\""
-            result.userPresent == false && !opts.noTouchRequired ->
-                "its trusted-signer entry requires a touch on the security key"
-            opts.verifyRequired && result.userVerified == false ->
-                "its trusted-signer entry requires a PIN or biometric check on the security key"
-            else -> "its trusted-signer entry does not allow this signature"
+                UiText.res(R.string.sign_entry_namespace, result.namespace)
+            result.userPresent == false && !opts.noTouchRequired -> UiText.res(R.string.sign_entry_needs_touch)
+            opts.verifyRequired && result.userVerified == false -> UiText.res(R.string.sign_entry_needs_verify)
+            else -> UiText.res(R.string.sign_entry_refuses)
         }
     }
+
+    /** A date and time in the user's locale and zone. */
+    private fun formatInstant(at: Instant): String =
+        DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withZone(ZoneId.systemDefault()).format(at)
 
     /** The SSHSIG public-key wire for an identity, used to match the envelope's signer. */
     private fun publicWireOf(identity: StoredIdentity): ByteArray? = when (identity.type) {

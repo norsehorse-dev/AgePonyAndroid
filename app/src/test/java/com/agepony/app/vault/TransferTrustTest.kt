@@ -72,7 +72,7 @@ class TransferTrustTest {
         val wire = b64e(SSHSig.ed25519PublicWire(b64d(good.publicKeyB64)))
         val signer = StoredSigner("x", "alice", "ssh-ed25519", wire, null, StoredSignerSource.PASTE_KEY, 0L)
         val bundle = KeyPortability.buildBundle(listOf(good, forged), emptyList(), listOf(signer, signer.copy(keyType = "ssh-rsa")))
-        val inc = KeyPortability.readBundle(bundle)
+        val inc = KeyPortability.readBundle(bundle, TestKeyNames)
         assertEquals(listOf("good"), inc.identities.map { it.name })
         assertEquals(1, inc.signers.size)
     }

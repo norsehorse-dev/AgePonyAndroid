@@ -1,5 +1,6 @@
 package com.agepony.app.vault
 
+import com.agepony.app.ui.UserMessage
 import android.app.Application
 import android.os.Build
 import androidx.biometric.BiometricPrompt
@@ -36,6 +37,23 @@ import java.nio.CharBuffer
 // an optional erase (M-1); the background auto-lock moved to the process-level AutoLock
 // (H-3), so there is no lock timer here any more.
 //
+// 5.1.0: Biometrics only (iOS E6), a lock mode whose vault key sits under a BIOMETRIC_STRONG-only
+// Keystore key with the app password as the way back in; and the first app password needs a
+// recent owner check (iOS H-1, enforced in Vault.writePasswordKeyBlob).
+//
+
+/** Why Biometrics only can't open the vault right now, for the lock screen's sentence (E6). */
+enum class BiometricOnlyProblem {
+    /** A biometric was added or removed, so the mode's key no longer opens the vault. */
+    CHANGED,
+
+    /** No strong biometric can run (none enrolled, no hardware, or not available now). */
+    UNAVAILABLE,
+
+    /** Too many failed tries; the phone's screen lock turns biometrics back on. */
+    LOCKED_OUT,
+}
+
 class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     // One Vault per process: the share-sheet activity and the main one must never hold two
@@ -79,6 +97,22 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     var secretBelowMinimum by mutableStateOf(false)
         private set
 
+    /**
+     * Biometrics only: why the last biometric unlock couldn't run, so the lock screen shows the
+     * password field at once with a sentence, and stops starting the prompt by itself (E6).
+     * Cleared by any successful unlock.
+     */
+    var biometricOnlyProblem by mutableStateOf<BiometricOnlyProblem?>(null)
+        private set
+
+    /**
+     * Biometrics only: the vault was opened with the password because the mode's key stopped
+     * working (enrolment changed). The unlocked app offers to confirm a biometric and make a
+     * new key; until then only the password opens the vault (E6, M-3).
+     */
+    var biometricOnlyNeedsRefresh by mutableStateOf(false)
+        private set
+
     /** Create a brand-new vault: generate KEK, wrap a fresh VK, write the blob, seed empty vault. */
     fun bootstrap(activity: FragmentActivity) {
         if (isBusy) return
@@ -113,9 +147,9 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: BiometricGateException) {
                 error = if (e.code == BiometricPrompt.ERROR_USER_CANCELED ||
                     e.code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                ) null else (e.message ?: str(R.string.core_auth_failed))
+                ) null else (failureText(e, R.string.core_auth_failed))
             } catch (e: Exception) {
-                error = e.message ?: str(R.string.core_vault_create_failed)
+                error = failureText(e, R.string.core_vault_create_failed)
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -136,7 +170,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             error = null
             try {
                 PasswordVault.secretPolicyError(getApplication<Application>(), CharBuffer.wrap(secret), kind)?.let {
-                    throw IllegalStateException(it)
+                    throw ShownMessageException(it)
                 }
                 withContext(Dispatchers.IO) {
                     val vk = VaultCrypto.randomKey()
@@ -152,7 +186,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 provisioned = true
                 secretBelowMinimum = false
             } catch (e: Exception) {
-                error = e.message ?: str(R.string.core_vault_create_failed)
+                error = failureText(e, R.string.core_vault_create_failed)
             } finally {
                 secret.fill('\u0000')
                 syncSecretFlags()
@@ -184,7 +218,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 provisioned = true
             } catch (e: Exception) {
-                error = e.message ?: str(R.string.core_vault_create_failed)
+                error = failureText(e, R.string.core_vault_create_failed)
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -215,6 +249,154 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                     unlockWithPrompt(activity, deviceCredentialOnly = true)
                 }
             LockMode.BIOMETRIC -> unlockWithPrompt(activity, deviceCredentialOnly = false)
+            LockMode.BIOMETRIC_ONLY -> unlockBiometricOnly(activity)
+        }
+    }
+
+    /**
+     * Biometrics only (E6): a strong biometric alone opens the mode's own KEK. Anything that
+     * stops it (the key invalidated by a new or removed biometric, nothing enrolled, a lockout)
+     * is reported as a [BiometricOnlyProblem] and the lock screen turns to the password. A
+     * missing key here is never the orphaned-vault case: the password blob still opens it.
+     */
+    private fun unlockBiometricOnly(activity: FragmentActivity) {
+        viewModelScope.launch {
+            isBusy = true
+            error = null
+            try {
+                if (!vault.biometricOnlyKeyBlobExists()) {
+                    reportBiometricOnlyProblem(BiometricOnlyProblem.CHANGED)
+                    return@launch
+                }
+                if (!BiometricGate.hasBiometric(activity)) {
+                    reportBiometricOnlyProblem(BiometricOnlyProblem.UNAVAILABLE)
+                    return@launch
+                }
+                val blob = withContext(Dispatchers.IO) { vault.readBiometricOnlyKeyBlob() }
+                val iv = blob.copyOfRange(0, KeystoreMasterKey.IV_LEN)
+                val wrapped = blob.copyOfRange(KeystoreMasterKey.IV_LEN, blob.size)
+                val cipher = try {
+                    KeystoreMasterKey.unwrapCipherBiometricOnly(iv)
+                } catch (_: Exception) {
+                    // KeyPermanentlyInvalidatedException after an enrolment change, or the key gone.
+                    reportBiometricOnlyProblem(BiometricOnlyProblem.CHANGED)
+                    return@launch
+                }
+                val authed = BiometricGate.authenticate(
+                    activity,
+                    title = str(R.string.security_prompt_unlock_title),
+                    subtitle = str(R.string.security_confirm_subtitle),
+                    cryptoObject = BiometricPrompt.CryptoObject(cipher),
+                    biometricOnly = true,
+                )
+                withContext(Dispatchers.IO) {
+                    val vk = authed.doFinal(wrapped)
+                    try {
+                        vault.unlock(vk)
+                    } finally {
+                        vk.fill(0)
+                    }
+                }
+                biometricOnlyProblem = null
+                biometricOnlyNeedsRefresh = false
+            } catch (e: BiometricGateException) {
+                when {
+                    BiometricGate.isCancelCode(e.code) -> error = null
+                    e.code == BiometricPrompt.ERROR_LOCKOUT || e.code == BiometricPrompt.ERROR_LOCKOUT_PERMANENT ->
+                        reportBiometricOnlyProblem(BiometricOnlyProblem.LOCKED_OUT)
+                    BiometricGate.isUnavailableCode(e.code) -> reportBiometricOnlyProblem(BiometricOnlyProblem.UNAVAILABLE)
+                    else -> error = failureText(e, R.string.core_auth_failed)
+                }
+            } catch (e: Exception) {
+                // The biometric matched but the key wouldn't open the blob: treat as changed, so
+                // the password is offered rather than a dead end.
+                reportBiometricOnlyProblem(BiometricOnlyProblem.CHANGED)
+            } finally {
+                isBusy = false
+            }
+        }
+    }
+
+    private fun reportBiometricOnlyProblem(problem: BiometricOnlyProblem) {
+        biometricOnlyProblem = problem
+        error = str(
+            when (problem) {
+                BiometricOnlyProblem.CHANGED ->
+                    pick(R.string.core_biometric_changed_pin, R.string.core_biometric_changed_password)
+                BiometricOnlyProblem.UNAVAILABLE ->
+                    pick(R.string.core_biometric_unavailable_pin, R.string.core_biometric_unavailable_password)
+                BiometricOnlyProblem.LOCKED_OUT ->
+                    pick(R.string.core_biometric_lockout_pin, R.string.core_biometric_lockout_password)
+            }
+        )
+    }
+
+    /**
+     * Biometrics only, unlocked with the password after the mode's key stopped working: confirm a
+     * strong biometric now and wrap the vault key under a fresh Biometrics-only KEK, so the
+     * biometric opens the vault again. The password was just shown, as on iOS, where the next
+     * password unlock rewrites the Face ID only item (E6).
+     */
+    fun restoreBiometricOnly(activity: FragmentActivity) {
+        if (isBusy || vault.lockMode != LockMode.BIOMETRIC_ONLY) return
+        viewModelScope.launch {
+            isBusy = true
+            error = null
+            try {
+                if (!BiometricGate.hasBiometric(activity)) {
+                    throw ShownMessageException(str(R.string.core_biometric_only_no_biometric))
+                }
+                enrollBiometricOnlyKek(activity)
+                biometricOnlyNeedsRefresh = false
+                biometricOnlyProblem = null
+            } catch (e: BiometricGateException) {
+                error = if (BiometricGate.isCancelCode(e.code)) null else (failureText(e, R.string.core_auth_failed))
+            } catch (e: Exception) {
+                error = failureText(e, R.string.core_lock_change_failed)
+            } finally {
+                isBusy = false
+            }
+        }
+    }
+
+    /** Not now: keep the password as the only way in until the next password unlock asks again. */
+    fun dismissBiometricOnlyRefresh() {
+        biometricOnlyNeedsRefresh = false
+    }
+
+    /**
+     * Make a fresh Biometrics-only KEK and wrap the current VK under it, with one strong-biometric
+     * prompt, then write vault.key.bio. A device that refuses the key throws with the
+     * "wouldn't store" message and changes nothing else.
+     */
+    private suspend fun enrollBiometricOnlyKek(activity: FragmentActivity) {
+        val vk = vault.snapshotVaultKey()
+            ?: throw ShownMessageException(str(R.string.core_unlock_vault_first))
+        try {
+            val cipher = try {
+                withContext(Dispatchers.IO) { KeystoreMasterKey.generateBiometricOnly() }
+                KeystoreMasterKey.wrapCipherBiometricOnly()
+            } catch (e: Exception) {
+                // A Keystore code where Android gives one, never the exception's text (U5).
+                val code = UserMessage.keystoreCode(e)
+                throw ShownMessageException(
+                    if (code != null) str(R.string.core_biometric_only_refused_code, code)
+                    else str(R.string.core_biometric_only_refused)
+                )
+            }
+            val authed = BiometricGate.authenticate(
+                activity,
+                title = str(R.string.security_confirm_subtitle),
+                subtitle = str(R.string.core_prompt_biometric_only_subtitle),
+                cryptoObject = BiometricPrompt.CryptoObject(cipher),
+                biometricOnly = true,
+            )
+            withContext(Dispatchers.IO) {
+                val wrapped = authed.doFinal(vk)
+                vault.writeBiometricOnlyKeyBlob(authed.iv + wrapped)
+            }
+        } finally {
+            vk.fill(0)
         }
     }
 
@@ -247,12 +429,12 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: BiometricGateException) {
                 error = if (e.code == BiometricPrompt.ERROR_USER_CANCELED ||
                     e.code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                ) null else (e.message ?: str(R.string.core_auth_failed))
+                ) null else (failureText(e, R.string.core_auth_failed))
             } catch (e: KekUnavailableException) {
                 recoverOrphanedVault()
             } catch (e: Exception) {
                 // A KEK invalidated by new biometric enrollment lands here.
-                error = e.message ?: str(R.string.core_vault_unlock_failed)
+                error = failureText(e, R.string.core_vault_unlock_failed)
             } finally {
                 isBusy = false
             }
@@ -306,7 +488,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: KekUnavailableException) {
                 recoverOrphanedVault()
             } catch (e: Exception) {
-                error = e.message ?: str(R.string.core_vault_unlock_failed)
+                error = failureText(e, R.string.core_vault_unlock_failed)
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -332,7 +514,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: KekUnavailableException) {
                 recoverOrphanedVault()
             } catch (e: Exception) {
-                error = e.message ?: str(R.string.core_vault_unlock_failed)
+                error = failureText(e, R.string.core_vault_unlock_failed)
             } finally {
                 isBusy = false
             }
@@ -407,11 +589,19 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 when (outcome) {
                     is PasswordVault.Outcome.Real -> {
                         try {
-                            withContext(Dispatchers.IO) {
+                            val needsRefresh = withContext(Dispatchers.IO) {
                                 vault.unlock(outcome.vaultKey)
                                 vault.unlockAttempts.reset()
                                 afterPasswordUnlock(secret, outcome)
+                                // Biometrics only: offer a new key if the old one stopped working (E6).
+                                vault.lockMode == LockMode.BIOMETRIC_ONLY && (
+                                    !vault.biometricOnlyKeyBlobExists() ||
+                                        KeystoreMasterKey.biometricOnlyKeyState() !=
+                                        KeystoreMasterKey.BiometricOnlyKeyState.VALID
+                                    )
                             }
+                            biometricOnlyNeedsRefresh = needsRefresh
+                            biometricOnlyProblem = null
                         } finally {
                             outcome.wipe()
                         }
@@ -439,7 +629,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
             } catch (e: Exception) {
-                error = e.message ?: str(R.string.core_vault_unlock_failed)
+                error = failureText(e, R.string.core_vault_unlock_failed)
             } finally {
                 secret.fill('\u0000')
                 syncSecretFlags()
@@ -486,16 +676,21 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     private fun dropWrapsMadeRedundantByPassword() {
         if (!vault.passwordKeyBlobExists()) return
         if (vault.duressBlobExists()) {
+            // No lock as the mode first, so a crash part way never leaves a mode with no wrap.
+            if (vault.lockMode != LockMode.OFF) vault.lockMode = LockMode.OFF
             vault.deleteKeyBlob()
             runCatching { KeystoreMasterKey.delete() }
             vault.deletePlainKeyBlob()
             runCatching { KeystoreMasterKey.deletePlain() }
-            if (vault.lockMode != LockMode.OFF) vault.lockMode = LockMode.OFF
+            vault.deleteBiometricOnlyKeyBlob()
+            runCatching { KeystoreMasterKey.deleteBiometricOnly() }
         } else if (vault.lockMode == LockMode.OFF) {
             vault.deletePlainKeyBlob()
             runCatching { KeystoreMasterKey.deletePlain() }
             vault.deleteKeyBlob()
             runCatching { KeystoreMasterKey.delete() }
+            vault.deleteBiometricOnlyKeyBlob()
+            runCatching { KeystoreMasterKey.deleteBiometricOnly() }
         }
     }
 
@@ -522,24 +717,28 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
      * duress secret (checked against the duress blob), and in No lock mode the password
      * becomes the only way in: the plain blob and its KEK are deleted (audit H-4).
      */
-    fun enrollPassword(secret: CharArray, kind: String) {
-        if (isBusy) return
+    fun enrollPassword(secret: CharArray, kind: String, onSaved: (() -> Unit)? = null) {
+        if (isBusy) {
+            secret.fill('\u0000')
+            return
+        }
         viewModelScope.launch {
+            var saved = false
             isBusy = true
             error = null
             try {
                 PasswordVault.secretPolicyError(getApplication<Application>(), CharBuffer.wrap(secret), kind)?.let {
-                    throw IllegalStateException(it)
+                    throw ShownMessageException(it)
                 }
                 // The duress secret is typed on the same keyboard; a PIN pad can't enter a
                 // password-style decoy, so the kind can't change under it.
                 if (vault.duressBlobExists() && kind != (vault.unlockSecretKind ?: "password")) {
-                    throw IllegalStateException(
+                    throw ShownMessageException(
                         str(pick(R.string.core_remove_duress_first_pin, R.string.core_remove_duress_first_password))
                     )
                 }
                 val vk = vault.snapshotVaultKey()
-                    ?: throw IllegalStateException(str(R.string.core_unlock_vault_first))
+                    ?: throw ShownMessageException(str(R.string.core_unlock_vault_first))
                 try {
                     withContext(Dispatchers.IO) {
                         if (vault.duressBlobExists()) {
@@ -547,7 +746,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                             val clash = check is PasswordVault.Outcome.Duress
                             check.wipe()
                             if (clash) {
-                                throw IllegalStateException(str(pick(R.string.core_differs_from_duress_pin, R.string.core_differs_from_duress_password)))
+                                throw ShownMessageException(str(pick(R.string.core_differs_from_duress_pin, R.string.core_differs_from_duress_password)))
                             }
                         }
                         val blob = PasswordVault.wrapVaultKey(secret, vk)
@@ -557,13 +756,13 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                         val opens = check is PasswordVault.Outcome.Real && check.vaultKey.contentEquals(vk)
                         check.wipe()
                         if (!opens) {
-                            throw IllegalStateException(
+                            throw ShownMessageException(
                                 str(kindPick(kind, R.string.core_secret_set_device_failed_pin, R.string.core_secret_set_device_failed_password))
                             )
                         }
                         vault.writePasswordKeyBlob(blob)
                         if (!vault.readPasswordKeyBlob().contentEquals(blob)) {
-                            throw IllegalStateException(
+                            throw ShownMessageException(
                                 str(kindPick(kind, R.string.core_secret_save_failed_pin, R.string.core_secret_save_failed_password))
                             )
                         }
@@ -574,13 +773,16 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                     vk.fill(0)
                 }
                 secretBelowMinimum = false
+                saved = true
             } catch (e: Exception) {
-                error = e.message ?: str(kindPick(kind, R.string.core_secret_set_failed_pin, R.string.core_secret_set_failed_password))
+                error = failureText(e, kindPick(kind, R.string.core_secret_set_failed_pin, R.string.core_secret_set_failed_password))
             } finally {
                 secret.fill('\u0000')
                 syncSecretFlags()
                 isBusy = false
             }
+            // After isBusy is cleared, so a follow-up such as switching to Biometrics only can run.
+            if (saved) onSaved?.invoke()
         }
     }
 
@@ -605,26 +807,26 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             error = null
             try {
                 if (!vault.passwordKeyBlobExists()) {
-                    throw IllegalStateException(str(pick(R.string.core_duress_needs_secret_pin, R.string.core_duress_needs_secret_password)))
+                    throw ShownMessageException(str(pick(R.string.core_duress_needs_secret_pin, R.string.core_duress_needs_secret_password)))
                 }
                 PasswordVault.secretPolicyError(getApplication<Application>(), CharBuffer.wrap(secret), vault.unlockSecretKind ?: "password")?.let {
-                    throw IllegalStateException(it)
+                    throw ShownMessageException(it)
                 }
                 val vk = vault.snapshotVaultKey()
-                    ?: throw IllegalStateException(str(R.string.core_unlock_vault_first))
+                    ?: throw ShownMessageException(str(R.string.core_unlock_vault_first))
                 try {
                     withContext(Dispatchers.IO) {
                         if (current != null) {
                             verifyCurrentSecret(current, vk)
                         } else if (!vault.passwordIsOnlyUnlock()) {
-                            throw IllegalStateException(str(pick(R.string.core_enter_current_pin, R.string.core_enter_current_password)))
+                            throw ShownMessageException(str(pick(R.string.core_enter_current_pin, R.string.core_enter_current_password)))
                         }
                         val real = vault.readPasswordKeyBlob()
                         val check = PasswordVault.tryUnlock(secret, real, null)
                         val matchesReal = check is PasswordVault.Outcome.Real
                         check.wipe()
                         if (matchesReal) {
-                            throw IllegalStateException(str(pick(R.string.core_duress_differs_pin, R.string.core_duress_differs_password)))
+                            throw ShownMessageException(str(pick(R.string.core_duress_differs_pin, R.string.core_duress_differs_password)))
                         }
                         vault.writeDuressBlob(PasswordVault.duressBlob(secret))
                         dropWrapsMadeRedundantByPassword()
@@ -633,7 +835,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                     vk.fill(0)
                 }
             } catch (e: Exception) {
-                error = e.message ?: str(pick(R.string.core_duress_set_failed_pin, R.string.core_duress_set_failed_password))
+                error = failureText(e, pick(R.string.core_duress_set_failed_pin, R.string.core_duress_set_failed_password))
             } finally {
                 secret.fill('\u0000')
                 current?.fill('\u0000')
@@ -650,12 +852,12 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun verifyCurrentSecret(current: CharArray, vk: ByteArray) {
         val wait = vault.unlockAttempts.remainingLockoutMillis()
-        if (wait > 0L) throw IllegalStateException(UnlockAttempts.lockoutMessage(getApplication<Application>(), wait))
+        if (wait > 0L) throw ShownMessageException(UnlockAttempts.lockoutMessage(getApplication<Application>(), wait))
         vault.unlockAttempts.recordAttempt()
         val outcome = PasswordVault.tryUnlock(current, vault.readPasswordKeyBlob(), null)
         try {
             val ok = outcome is PasswordVault.Outcome.Real && outcome.vaultKey.contentEquals(vk)
-            if (!ok) throw IllegalStateException(str(pick(R.string.security_wrong_pin, R.string.security_wrong_password)))
+            if (!ok) throw ShownMessageException(str(pick(R.string.security_wrong_pin, R.string.security_wrong_password)))
             vault.unlockAttempts.reset()
             if ((outcome as PasswordVault.Outcome.Real).needsRewrap) {
                 runCatching {
@@ -685,7 +887,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             isBusy = true
             error = null
             try {
-                if (vault.passwordIsOnlyUnlock()) throw IllegalStateException(passwordOnlyMessage())
+                if (passwordRemovalRefused()) throw ShownMessageException(passwordOnlyMessage())
                 withContext(Dispatchers.IO) {
                     vault.deletePasswordKeyBlob()
                     vault.deleteDuressBlob()
@@ -694,7 +896,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 secretBelowMinimum = false
             } catch (e: Exception) {
-                error = e.message ?: str(pick(R.string.core_secret_remove_failed_pin, R.string.core_secret_remove_failed_password))
+                error = failureText(e, pick(R.string.core_secret_remove_failed_pin, R.string.core_secret_remove_failed_password))
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -702,9 +904,17 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Why the password can't be removed right now (audit L-16). */
+    /**
+     * True when the password can't be removed: it is the only way in (audit L-16), or the lock
+     * mode needs it as the way back in (Biometrics only, E6).
+     */
+    fun passwordRemovalRefused(): Boolean = vault.passwordIsOnlyUnlock() || vault.lockMode.needsAppPassword
+
+    /** Why the password can't be removed right now (audit L-16, E6). */
     fun passwordOnlyMessage(): String =
-        if (vault.duressBlobExists()) {
+        if (vault.lockMode.needsAppPassword && !vault.duressBlobExists()) {
+            str(pick(R.string.core_password_only_biometric_pin, R.string.core_password_only_biometric_password))
+        } else if (vault.duressBlobExists()) {
             str(pick(R.string.core_password_only_duress_pin, R.string.core_password_only_duress_password))
         } else {
             str(pick(R.string.core_password_only_pin, R.string.core_password_only_password))
@@ -722,7 +932,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 withContext(Dispatchers.IO) { vault.deleteDuressBlob() }
             } catch (e: Exception) {
-                error = e.message ?: str(pick(R.string.core_duress_remove_failed_pin, R.string.core_duress_remove_failed_password))
+                error = failureText(e, pick(R.string.core_duress_remove_failed_pin, R.string.core_duress_remove_failed_password))
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -749,7 +959,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                     is PasswordCheck.LockedOut -> error = UnlockAttempts.lockoutMessage(getApplication<Application>(), check.remainingMillis)
                 }
             } catch (e: Exception) {
-                error = e.message ?: str(pick(R.string.security_check_pin_failed, R.string.security_check_password_failed))
+                error = failureText(e, pick(R.string.security_check_pin_failed, R.string.security_check_password_failed))
             } finally {
                 secret.fill('\u0000')
                 isBusy = false
@@ -818,6 +1028,10 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     /** [pin] for [kind] "pin", otherwise [password]. */
     private fun kindPick(kind: String?, pin: Int, password: Int): Int = if (kind == "pin") pin else password
 
+    /** The sentence for [e] from resources, or [fallback] when the app doesn't know it (5.1.0, U5). */
+    private fun failureText(e: Throwable, fallback: Int): String =
+        UserMessage.text(getApplication<Application>(), e, fallback)
+
     /** A string resource in the app's current language. */
     private fun str(id: Int, vararg args: Any): String =
         if (args.isEmpty()) getApplication<Application>().getString(id)
@@ -845,6 +1059,10 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
      *   - DEVICE_CREDENTIAL, pre-30: gate the non-auth plain KEK behind a KeyguardManager
      *     confirm at unlock; requires a secure lock screen.
      *   - BIOMETRIC: use the auth KEK, enrolling one first if the vault has none.
+     *   - BIOMETRIC_ONLY (5.1.0, E6): needs an app password and a strong biometric enrolled. A
+     *     fresh BIOMETRIC_STRONG-only KEK wraps the VK, then the auth and plain wraps are
+     *     deleted, so the device credential opens nothing. Leaving it deletes its wrap after the
+     *     new mode's wrap exists. Settings asks for the app password before leaving (L-15).
      *
      * Refused while a duress secret is set: the vault is PIN-only then (audit H-1).
      */
@@ -861,7 +1079,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 when (target) {
                     LockMode.OFF ->
                         if (vault.passwordKeyBlobExists()) {
-                            if (!vault.isUnlocked) throw IllegalStateException(str(R.string.core_unlock_vault_first))
+                            if (!vault.isUnlocked) throw ShownMessageException(str(R.string.core_unlock_vault_first))
                             withContext(Dispatchers.IO) {
                                 vault.lockMode = LockMode.OFF
                                 dropWrapsMadeRedundantByPassword()
@@ -880,7 +1098,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                             }
                         } else {
                             if (!BiometricGate.isDeviceSecure(activity)) {
-                                throw IllegalStateException(str(R.string.core_set_device_lock_first))
+                                throw ShownMessageException(str(R.string.core_set_device_lock_first))
                             }
                             writePlainBlobFromCurrentVk()
                         }
@@ -894,16 +1112,52 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                             KeystoreMasterKey.deletePlain()
                         }
                     }
+                    LockMode.BIOMETRIC_ONLY -> {
+                        when (
+                            LockMode.refusalFor(
+                                target,
+                                duressSet = false, // refused above
+                                hasAppPassword = vault.passwordKeyBlobExists(),
+                                strongBiometricEnrolled = BiometricGate.hasBiometric(activity),
+                            )
+                        ) {
+                            LockMode.Refusal.NEEDS_APP_PASSWORD ->
+                                throw ShownMessageException(str(R.string.core_biometric_only_needs_secret))
+                            LockMode.Refusal.NO_STRONG_BIOMETRIC ->
+                                throw ShownMessageException(str(R.string.core_biometric_only_no_biometric))
+                            LockMode.Refusal.DURESS_SET, null -> Unit
+                        }
+                        // The new wrap first: a refusal or cancel here changes nothing (E6).
+                        enrollBiometricOnlyKek(activity)
+                        withContext(Dispatchers.IO) {
+                            vault.lockMode = LockMode.BIOMETRIC_ONLY
+                            // Then drop every wrap the device credential could open.
+                            vault.deleteKeyBlob()
+                            runCatching { KeystoreMasterKey.delete() }
+                            vault.deletePlainKeyBlob()
+                            runCatching { KeystoreMasterKey.deletePlain() }
+                        }
+                        biometricOnlyProblem = null
+                        biometricOnlyNeedsRefresh = false
+                    }
                 }
                 vault.lockMode = target
+                if (target != LockMode.BIOMETRIC_ONLY) {
+                    // Leaving Biometrics only: its wrap goes once the new mode's wrap exists.
+                    withContext(Dispatchers.IO) {
+                        vault.deleteBiometricOnlyKeyBlob()
+                        runCatching { KeystoreMasterKey.deleteBiometricOnly() }
+                    }
+                    biometricOnlyNeedsRefresh = false
+                }
                 lockMode = target
                 biometricEnabled = vault.biometricEnabled
             } catch (e: BiometricGateException) {
                 error = if (e.code == BiometricPrompt.ERROR_USER_CANCELED ||
                     e.code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                ) null else (e.message ?: str(R.string.core_auth_failed))
+                ) null else (failureText(e, R.string.core_auth_failed))
             } catch (e: Exception) {
-                error = e.message ?: str(R.string.core_lock_change_failed)
+                error = failureText(e, R.string.core_lock_change_failed)
             } finally {
                 syncSecretFlags()
                 isBusy = false
@@ -914,7 +1168,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     /** Wrap the current in-memory VK under a fresh non-auth plain KEK. */
     private suspend fun writePlainBlobFromCurrentVk() {
         val vk = vault.snapshotVaultKey()
-            ?: throw IllegalStateException(str(R.string.core_unlock_vault_first))
+            ?: throw ShownMessageException(str(R.string.core_unlock_vault_first))
         withContext(Dispatchers.IO) {
             KeystoreMasterKey.generatePlain()
             val cipher = KeystoreMasterKey.wrapCipherPlain()
@@ -931,7 +1185,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
      */
     private suspend fun enrollAuthKek(activity: FragmentActivity, deviceCredentialOnly: Boolean) {
         val vk = vault.snapshotVaultKey()
-            ?: throw IllegalStateException(str(R.string.core_unlock_vault_first))
+            ?: throw ShownMessageException(str(R.string.core_unlock_vault_first))
         KeystoreMasterKey.generate()
         val cipher = KeystoreMasterKey.wrapCipher()
         val authed = BiometricGate.authenticate(
@@ -973,6 +1227,8 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         KeystoreMasterKey.deletePlain()
         provisioned = false
         secretBelowMinimum = false
+        biometricOnlyProblem = null
+        biometricOnlyNeedsRefresh = false
         syncSecretFlags()
         error = null
     }

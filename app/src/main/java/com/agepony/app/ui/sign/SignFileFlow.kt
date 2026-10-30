@@ -1,5 +1,6 @@
 package com.agepony.app.ui.sign
 
+import com.agepony.app.ui.UserMessage
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,7 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,14 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.annotation.StringRes
 import androidx.compose.ui.platform.LocalContext
+import com.agepony.app.ui.files.KeyPickerText
 import androidx.compose.ui.res.stringResource
 import com.agepony.app.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import com.agepony.app.security.SecurityKeyService
@@ -51,13 +50,15 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.DoneAction
+import com.agepony.app.ui.components.OneLineValue
+import com.agepony.app.ui.components.RowAction
 import com.agepony.app.ui.components.ErrorText
 import com.agepony.app.ui.components.ListDivider
 import com.agepony.app.ui.components.RadioRow
 import com.agepony.app.ui.components.SectionHeader
 import com.agepony.app.ui.components.VerdictPanel
 import com.agepony.app.ui.theme.AgeStatus
-import com.agepony.app.ui.theme.mono
 
 //
 // Detached signing: pick a key, pick a file, save `<name>.sig` next to wherever
@@ -116,7 +117,7 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
                 error = context.getString(R.string.sign_sk_pin_wrong)
                 stage = SignStage.CONFIGURE
             } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.sign_failed)
+                error = UserMessage.textUnlessCancelled(context, e, R.string.sign_failed)
                 stage = SignStage.CONFIGURE
             }
         }
@@ -142,6 +143,7 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
         title = stringResource(R.string.files_sign),
         modifier = modifier,
         onBack = if (stage == SignStage.WORKING) null else onClose,
+        actions = { if (stage == SignStage.DONE) DoneAction(onClose) },
     ) { padding ->
     when (stage) {
         SignStage.CONFIGURE -> Column(
@@ -170,7 +172,7 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
                 signingIdentities.forEach { identity ->
                     RadioRow(
                         title = identity.name,
-                        subtitle = signingTypeLabelRes(identity.type)?.let { stringResource(it) },
+                        subtitle = KeyPickerText.subtitle(LocalContext.current, identity),
                         selected = identity.id == selectedId,
                         onClick = { selectedId = identity.id },
                     )
@@ -239,12 +241,7 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
                 color = AgeStatus.colors.success,
                 icon = Icons.Filled.CheckCircle,
             )
-            Text(
-                doneSigName,
-                style = MaterialTheme.typography.mono,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            OneLineValue(doneSigName, color = MaterialTheme.colorScheme.onSurface)
             Text(
                 stringResource(R.string.sign_done_body),
                 style = MaterialTheme.typography.bodyMedium,
@@ -258,27 +255,18 @@ fun SignFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Uni
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(
+            // Done sits in the app bar; the next file is its own row (5.1.0, U4).
+            ListDivider()
+            RowAction(
+                stringResource(R.string.sign_another),
                 onClick = {
                     source = null
                     doneSigName = ""
                     error = null
                     stage = SignStage.CONFIGURE
                 },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.sign_another)) }
-            OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.app_done)) }
+            )
         }
     }
     }
-}
-
-@StringRes
-private fun signingTypeLabelRes(type: StoredIdentityType): Int? = when (type) {
-    StoredIdentityType.SSH_ED25519 -> R.string.sign_type_ssh_ed25519
-    StoredIdentityType.SSH_RSA -> R.string.sign_type_ssh_rsa
-    StoredIdentityType.HARDWARE_KEY -> R.string.sign_type_hardware
-    StoredIdentityType.SK_ED25519 -> R.string.sign_type_sk_ed25519
-    StoredIdentityType.SK_ECDSA_P256 -> R.string.sign_type_sk_p256
-    else -> null
 }

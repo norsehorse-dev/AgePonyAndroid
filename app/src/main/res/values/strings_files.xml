@@ -11,8 +11,10 @@
     <string name="files_progress_bytes">%1$s of %2$s</string>
     <string name="files_passphrase">Passphrase</string>
     <string name="files_enter_passphrase">Enter the passphrase.</string>
-    <string name="files_encrypt_failed">Encrypt failed.</string>
-    <string name="files_decrypt_failed">Decrypt failed.</string>
+    <string name="files_encrypt_failed">Couldn\'t encrypt the file.</string>
+    <string name="files_decrypt_failed">Couldn\'t decrypt the file.</string>
+    <!-- %1$s: the file name -->
+    <string name="files_create_in_folder_failed">Couldn\'t create %1$s in that folder.</string>
     <string name="files_not_age_file">This doesn\'t look like an age file.</string>
     <string name="files_passphrase_only_scrypt">Passphrase only (scrypt)</string>
     <string name="files_recipients_none">None chosen yet</string>
@@ -20,7 +22,7 @@
     <string name="files_choose_recipients">Choose recipients</string>
     <string name="files_decrypt_action">Decrypt</string>
     <string name="files_decrypting">Decrypting…</string>
-    <string name="files_decrypt_another">Decrypt another</string>
+    <string name="files_decrypt_another">Decrypt another file</string>
     <string name="files_encrypting">Encrypting…</string>
 
     <!-- Encrypt a file -->
@@ -97,19 +99,19 @@
     <string name="files_decrypt_extracting">Extracting…</string>
     <string name="files_decrypt_extract">Extract files into a folder…</string>
     <string name="files_decrypt_bundle_empty">No files found in the bundle.</string>
-    <string name="files_decrypt_extract_failed">Extract failed: %1$s</string>
+    <string name="files_decrypt_extract_failed">Couldn\'t extract the files from the bundle.</string>
     <plurals name="files_decrypt_extracted">
         <item quantity="one">Extracted %1$d file to the folder.</item>
         <item quantity="other">Extracted %1$d files to the folder.</item>
     </plurals>
     <string name="files_decrypt_signed_by">Signed by %1$s</string>
     <string name="files_decrypt_signed_by_known">Signed by a known key</string>
-    <string name="files_decrypt_not_trusted">Valid signature from \"%1$s\", but not trusted: %2$s</string>
-    <string name="files_decrypt_not_trusted_default">Valid signature from \"%1$s\", but not trusted: its trusted-signer entry does not allow it</string>
+    <string name="files_decrypt_not_trusted">Valid signature from \"%1$s\", but not trusted. %2$s</string>
+    <string name="files_decrypt_not_trusted_default">Valid signature from \"%1$s\", but not trusted. Its entry doesn\'t allow this signature.</string>
     <string name="files_decrypt_valid_unknown">Valid signature (signer not in your vault)</string>
-    <string name="files_decrypt_invalid">Signature invalid: %1$s</string>
-    <string name="files_decrypt_invalid_default">Signature invalid: verification failed</string>
-    <string name="files_decrypt_unreadable">Signature present but unreadable: %1$s</string>
+    <string name="files_decrypt_invalid">Signature invalid. %1$s</string>
+    <string name="files_decrypt_invalid_default">Signature invalid. It doesn\'t match this file.</string>
+    <string name="files_decrypt_unreadable">A signature is attached but can\'t be read, so the signer can\'t be checked.</string>
     <string name="files_decrypt_saved_before_check">%1$s. The file was saved before the signature could be checked: treat its contents as untrusted.</string>
     <string name="files_decrypt_v1_stanza_note">Older signature format (v1): it covers the contents but not who the file was encrypted to.</string>
     <string name="files_decrypt_v1_bundle_note">Older signature format (v1): it covers the contents but not the file name.</string>
@@ -131,17 +133,17 @@
     </plurals>
     <string name="files_inspect_stanza_row">%1$d. %2$s</string>
     <string name="files_inspect_footer">Recipient stanzas are not secret: anyone holding the file can read them. They say which keys can open it, not what is inside.</string>
-    <string name="files_inspect_another">Inspect another</string>
+    <string name="files_inspect_another">Inspect another file</string>
     <string name="files_inspect_scrypt">Passphrase (scrypt)</string>
     <string name="files_inspect_scrypt_detail">Work factor 2^%1$d, about %2$d MB of memory to derive the key</string>
     <string name="files_inspect_scrypt_unreadable">Work factor not readable</string>
     <string name="files_inspect_x25519">age recipient (X25519)</string>
-    <string name="files_inspect_ephemeral_share">Ephemeral share %1$s</string>
+    <string name="files_inspect_ephemeral_share">Ephemeral share</string>
     <string name="files_inspect_mlkem">Post-quantum age recipient (ML-KEM-768 with X25519)</string>
-    <string name="files_inspect_encapsulation">Encapsulation %1$s</string>
+    <string name="files_inspect_encapsulation">Encapsulation</string>
     <string name="files_inspect_ssh_ed25519">SSH Ed25519 recipient</string>
     <string name="files_inspect_ssh_rsa">SSH RSA recipient</string>
-    <string name="files_inspect_key_tag">Key tag %1$s</string>
+    <string name="files_inspect_key_tag">Key tag</string>
     <string name="files_inspect_p256tag">Hardware-key recipient (age1tag, P-256)</string>
     <string name="files_inspect_mlkem_p256tag">Post-quantum hardware-key recipient (age1tagpq, ML-KEM-768 with P-256)</string>
     <string name="files_inspect_signature">AgePony signature (encrypted)</string>
@@ -172,15 +174,15 @@
         <item quantity="one">%1$d of %2$d file upgraded to quantum-safe.</item>
         <item quantity="other">%1$d of %2$d files upgraded to quantum-safe.</item>
     </plurals>
-    <string name="files_migrate_more">Upgrade more</string>
+    <string name="files_migrate_more">Upgrade more files</string>
     <string name="files_migrate_open_failed">Couldn\'t open the file.</string>
     <string name="files_migrate_read_failed">Couldn\'t read the file.</string>
     <string name="files_migrate_not_age">Not an age file.</string>
     <string name="files_migrate_no_match">No matching identity, and no passphrase given.</string>
     <string name="files_migrate_other_passphrase">Needs a different passphrase. Skipped.</string>
-    <string name="files_migrate_reencrypt_failed">Re-encrypt failed: %1$s</string>
+    <string name="files_migrate_reencrypt_failed">Couldn\'t encrypt it again.</string>
     <string name="files_migrate_item_done">Re-encrypted to your quantum-safe identity.</string>
-    <string name="files_migrate_save_failed">Couldn\'t save to the folder: %1$s</string>
+    <string name="files_migrate_save_failed">Couldn\'t save it to the folder.</string>
 
     <!-- Recipient picker -->
     <string name="files_picker_confirm_passphrase">Confirm passphrase</string>
@@ -190,9 +192,6 @@
         <item quantity="one">%1$d random word, about %2$d bits. Write it down before you use it: nothing can recover a file if this is lost.</item>
         <item quantity="other">%1$d random words, about %2$d bits. Write it down before you use it: nothing can recover a file if this is lost.</item>
     </plurals>
-    <string name="files_picker_shorter">Shorter</string>
-    <string name="files_picker_longer">Longer</string>
-    <string name="files_picker_again">Again</string>
     <string name="files_picker_use_it">Use it</string>
     <string name="files_picker_scrypt_detail">Anyone with the passphrase can decrypt; nobody else can. There is no recovery if you forget it. Work factor 2^%1$d, which needs about %2$d MB of memory while the key is derived, whatever the file size (change it in Settings).</string>
     <string name="files_picker_scrypt_low_memory">This device does not have that much free right now. Lower the work factor in Settings, or encrypt to a recipient key instead.</string>
@@ -206,7 +205,7 @@
     <string name="files_picker_save_failed">Couldn\'t save this recipient.</string>
     <string name="files_picker_save_to_recipients">Save to recipients</string>
     <string name="files_picker_paste_label">Paste age1… / age1pq… or ssh-* AAAA… (one-time)</string>
-    <string name="files_picker_parse_failed">Couldn\'t parse that.</string>
+    <string name="files_picker_parse_failed">Couldn\'t read that as a recipient.</string>
     <string name="files_picker_add_one_time">Add one-time recipient</string>
     <string name="files_picker_load_failed">Couldn\'t load a selected recipient.</string>
     <string name="files_picker_use_passphrase">Use passphrase</string>
@@ -223,19 +222,6 @@
     <string name="files_picker_cant_encrypt_to">Can\'t encrypt to: %1$s. Untick it and try again.</string>
 
     <!-- Key type labels in the recipient picker -->
-    <string name="files_type_age_x25519">age X25519</string>
-    <string name="files_type_mlkem">Quantum-safe (ML-KEM-768 + X25519)</string>
-    <string name="files_type_ssh_ed25519">SSH Ed25519</string>
-    <string name="files_type_ssh_rsa">SSH RSA</string>
-    <string name="files_type_hardware_p256">Hardware key (P-256)</string>
-    <string name="files_type_sk_ed25519">Security key (Ed25519)</string>
-    <string name="files_type_sk_p256">Security key (P-256)</string>
-    <string name="files_type_hardware_tag">Hardware decryption key (P-256)</string>
-    <string name="files_type_hardware_tag_pq">Hardware decryption key, quantum-safe</string>
-    <string name="files_type_yubikey_piv">YubiKey (PIV P-256)</string>
-    <string name="files_type_yubikey_p256">YubiKey (P-256)</string>
-    <string name="files_type_tag">Hardware key (age1tag)</string>
-    <string name="files_type_tag_pq">Hardware key, quantum-safe (age1tagpq)</string>
 
     <!-- Text tab -->
     <string name="text_title">Text</string>
@@ -262,4 +248,8 @@
     <string name="text_paste_first">Paste some text first.</string>
     <string name="text_oom_decrypt">Not enough memory to decrypt this text.</string>
     <string name="text_not_armored">This doesn\'t look like an armored age block.</string>
+    <string name="text_encrypt_failed">Couldn\'t encrypt the text.</string>
+    <string name="text_decrypt_failed">Couldn\'t decrypt the text.</string>
+    <string name="files_picker_word_count">Number of words</string>
+    <string name="files_picker_new_suggestion">Suggest another</string>
 </resources>

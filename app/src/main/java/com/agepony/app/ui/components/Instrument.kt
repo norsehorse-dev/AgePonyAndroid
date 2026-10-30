@@ -66,6 +66,7 @@ import androidx.annotation.PluralsRes
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.consumeWindowInsets
+import com.agepony.app.ui.theme.mono
 
 // Shared building blocks (HashPony pattern). The rules they encode: platform
 // sans for UI text, monospace only for keys; plain sentence-case headings;
@@ -379,7 +380,13 @@ fun <T> ChoiceField(
 
 /** Centered empty state for a list: a title and one line on what to do. */
 @Composable
-fun EmptyState(title: String, body: String, modifier: Modifier = Modifier) {
+fun EmptyState(
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
@@ -390,6 +397,10 @@ fun EmptyState(title: String, body: String, modifier: Modifier = Modifier) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            // The one step there is to take from here, when there is one (5.1.0, U5).
+            if (actionLabel != null && onAction != null) {
+                SecondaryAction(text = actionLabel, onClick = onAction, modifier = Modifier.padding(top = 16.dp))
+            }
         }
     }
 }
@@ -403,6 +414,94 @@ fun ErrorText(message: String, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.error,
         modifier = modifier,
     )
+}
+
+/**
+ * A long value on one line (file name, key, address), cut in the middle so both ends stay
+ * readable. Monospace only when the value is key material or a file name.
+ */
+@Composable
+fun OneLineValue(
+    text: String,
+    modifier: Modifier = Modifier,
+    mono: Boolean = true,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    Text(
+        text,
+        style = if (mono) MaterialTheme.typography.mono else MaterialTheme.typography.bodyMedium,
+        color = color,
+        maxLines = 1,
+        overflow = TextOverflow.MiddleEllipsis,
+        modifier = modifier,
+    )
+}
+
+/** A label and its value on one row of a details list. A long value truncates in the middle. */
+@Composable
+fun ValueRow(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    mono: Boolean = false,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(end = 16.dp))
+        Text(
+            value,
+            style = if (mono) MaterialTheme.typography.mono else MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.MiddleEllipsis,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/**
+ * A plain action that fills a row, in the accent color ("Decrypt another file"). The whole
+ * row is the target. Used on done screens, under the result's own action.
+ */
+@Composable
+fun RowAction(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    icon: ImageVector? = null,
+) {
+    val color = if (enabled) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    }
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = color)
+            Spacer(Modifier.width(16.dp))
+        }
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = color)
+    }
+}
+
+/** "Done" in the app bar of a finished flow, as on iOS. The back arrow still works. */
+@Composable
+fun DoneAction(onClick: () -> Unit) {
+    TextButton(onClick = onClick) { Text(stringResource(R.string.app_done)) }
 }
 
 /** A row that opens another screen or flow; the whole row is the target. */

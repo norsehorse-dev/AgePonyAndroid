@@ -36,6 +36,7 @@ import java.util.UUID
  * stream a large payload past [SSHSig.hashStream] never hold the message.
  */
 object HardwareKeyService {
+    /** Mapped by type, with [cause] read for its Keystore code; the message is internal (5.1.0, UI plan U5). */
     class HardwareKeyException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"

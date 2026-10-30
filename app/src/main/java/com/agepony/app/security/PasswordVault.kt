@@ -42,7 +42,8 @@ import java.security.SecureRandom
  * chose so the unlock screen shows the right input, and nothing else differs.
  */
 object PasswordVault {
-    class PasswordVaultException(message: String) : Exception(message)
+    /** [deviceKeyMissing] or a damaged blob; the message is internal (5.1.0, UI plan U5). */
+    class PasswordVaultException(message: String, val deviceKeyMissing: Boolean = false) : Exception(message)
 
     /**
      * The device-held secret mixed into the v2 KEK (audit M-2). Production uses
@@ -173,9 +174,7 @@ object PasswordVault {
                 // A v2 real blob whose device key is gone (or was just recreated) can never open
                 // again. Say so instead of reporting a wrong password forever.
                 real.version == 2 && (real.bindingFailed || keyCreated) ->
-                    throw PasswordVaultException(
-                        "This device's key for the app password is missing, so the password can't open the vault."
-                    )
+                    throw PasswordVaultException("device key for the app password is missing", deviceKeyMissing = true)
                 else -> Outcome.Wrong
             }
         } finally {

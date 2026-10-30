@@ -10,4 +10,11 @@ import com.agepony.core.Stanza
  */
 interface HardwareIdentity : AgeIdentity {
     fun matches(stanza: Stanza): Boolean
+
+    /**
+     * True for a key that has to be held to the phone (a YubiKey). Those are tried after the
+     * keys in the phone's own hardware, so a working Keystore key never asks for a tap, and one
+     * that fails still leaves the tap on offer (5.1.0, M-4).
+     */
+    val isExternalDevice: Boolean get() = false
 }

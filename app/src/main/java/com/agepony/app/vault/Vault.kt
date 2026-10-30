@@ -8,6 +8,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.agepony.app.R
+import com.agepony.app.security.BiometricGate
+import com.agepony.app.security.OwnerCheckPolicy
 import com.agepony.app.security.PasswordCheck
 import com.agepony.app.security.PasswordDeviceKey
 import com.agepony.app.security.PasswordVault
@@ -28,10 +31,17 @@ import java.io.File
 //
 // Files (app-private, filesDir/vault/):
 //   vault.key — iv(12) ‖ KEK-wrapped VK         (written once at bootstrap)
+//   vault.key.bio: iv(12) ‖ VK under the Biometrics-only KEK (5.1.0, that mode only)
 //   vault.dat — iv(12) ‖ AES-256-GCM(VK, snapshot)   (rewritten on every change)
 //
 // The VK is held only while unlocked and is dropped by lock().
 //
+/**
+ * Setting the first app password outside vault creation without a recent biometric or
+ * device-credential check (5.1.0, iOS H-1). [message] is the user-facing text.
+ */
+class OwnerCheckNeededException(message: String) : IllegalStateException(message)
+
 /** The process-wide [Vault]. Every activity's view model uses this one instance. */
 object SharedVault {
     @Volatile private var instance: Vault? = null
@@ -107,7 +117,18 @@ class Vault(context: Context) {
 
     var hasCompletedOnboarding: Boolean
         get() = prefs.getBoolean(KEY_ONBOARDED, false)
-        set(value) { prefs.edit().putBoolean(KEY_ONBOARDED, value).apply() }
+        set(value) {
+            prefs.edit().putBoolean(KEY_ONBOARDED, value).apply()
+            if (value) createdThisRun = false
+        }
+
+    /**
+     * True from [bootstrap] until onboarding finishes or the vault locks: the vault is new and
+     * empty, so a first app password may be set without an owner check (5.1.0, iOS H-1). Only
+     * creating a vault sets it, which needs the old one gone, so holding an unlocked app
+     * doesn't give it.
+     */
+    @Volatile private var createdThisRun: Boolean = false
 
     // Last selected bottom-nav tab. The vault re-locks whenever the app is
     // backgrounded (see AutoLock), which tears down the app shell, so the tab
@@ -309,6 +330,7 @@ class Vault(context: Context) {
     private val keyFile: File get() = File(vaultDir, "vault.key")
     private val plainKeyFile: File get() = File(vaultDir, "vault.key.plain")
     private val passwordKeyFile: File get() = File(vaultDir, "vault.key.pw")
+    private val biometricOnlyKeyFile: File get() = File(vaultDir, "vault.key.bio")
     private val duressKeyFile: File get() = File(vaultDir, "vault.key.duress")
     private val dataFile: File get() = File(vaultDir, "vault.dat")
 
@@ -325,6 +347,20 @@ class Vault(context: Context) {
     // The in-memory vault key. Non-null only while unlocked.
     private var vk: ByteArray? = null
 
+    init {
+        // The in-app prompts follow this vault's lock state (5.1.0, iOS E6, M-3, L-11).
+        BiometricGate.ownerPolicy = { ownerPolicy() }
+    }
+
+    /** Which in-app owner check this vault's lock state calls for. */
+    fun ownerPolicy(): BiometricGate.OwnerPolicy = when {
+        !isProvisioned() -> BiometricGate.OwnerPolicy.DEFAULT
+        duressBlobExists() -> BiometricGate.OwnerPolicy.APP_PASSWORD_ONLY
+        lockMode == LockMode.BIOMETRIC_ONLY -> BiometricGate.OwnerPolicy.BIOMETRIC_ONLY
+        passwordIsOnlyUnlock() -> BiometricGate.OwnerPolicy.APP_PASSWORD_ONLY
+        else -> BiometricGate.OwnerPolicy.DEFAULT
+    }
+
     // MARK: - Provisioning state
 
     /**
@@ -333,7 +369,7 @@ class Vault(context: Context) {
      * only `vault.key.pw`, and must still read as provisioned.
      */
     fun isProvisioned(): Boolean =
-        keyFile.exists() || plainKeyFile.exists() || passwordKeyFile.exists()
+        keyFile.exists() || plainKeyFile.exists() || passwordKeyFile.exists() || biometricOnlyKeyFile.exists()
 
     fun keyBlobExists(): Boolean = keyFile.exists()
 
@@ -366,6 +402,22 @@ class Vault(context: Context) {
         plainKeyFile.delete()
     }
 
+    // Biometrics-only blob (5.1.0, iOS E6): the VK under the BIOMETRIC_STRONG-only KEK. Present
+    // only in that mode; the auth and plain blobs are gone then, so the device credential has no
+    // wrap of the VK to open.
+
+    fun biometricOnlyKeyBlobExists(): Boolean = biometricOnlyKeyFile.exists()
+
+    fun writeBiometricOnlyKeyBlob(blob: ByteArray) {
+        writeAtomically(biometricOnlyKeyFile, blob)
+    }
+
+    fun readBiometricOnlyKeyBlob(): ByteArray = biometricOnlyKeyFile.readBytes()
+
+    fun deleteBiometricOnlyKeyBlob() {
+        biometricOnlyKeyFile.delete()
+    }
+
     // App-owned password/PIN unlock (4.0.0). The blobs are made and opened by
     // PasswordVault; the Vault only stores them. vault.key.pw wraps the VK under
     // the password-derived KEK; vault.key.duress is the decoy verifier.
@@ -373,6 +425,17 @@ class Vault(context: Context) {
     fun passwordKeyBlobExists(): Boolean = passwordKeyFile.exists()
 
     fun writePasswordKeyBlob(blob: ByteArray) {
+        // The first password is a new way into the vault, and the owner checks after it trust
+        // it. Outside vault creation it needs a biometric or device-credential check in the last
+        // few minutes, so a caller that forgets the check fails here (5.1.0, iOS H-1).
+        val allowed = OwnerCheckPolicy.firstPasswordAllowed(
+            hasAppPassword = passwordKeyFile.exists(),
+            vaultExists = isProvisioned(),
+            createdThisRun = createdThisRun,
+            deviceSecure = BiometricGate.isDeviceSecure(appContext),
+            ownerConfirmedRecently = BiometricGate.ownerConfirmed(OwnerCheckPolicy.FIRST_PASSWORD_WINDOW_MILLIS),
+        )
+        if (!allowed) throw OwnerCheckNeededException(appContext.getString(R.string.core_owner_check_needed))
         // Often the only wrap of the VK (password-only vaults), and now rewritten on upgrade
         // from v1 to v2, so never leave it half-written.
         writeAtomically(passwordKeyFile, blob)
@@ -411,6 +474,7 @@ class Vault(context: Context) {
         return when (lockMode) {
             LockMode.OFF -> !plainKeyBlobExists()
             LockMode.BIOMETRIC -> !keyBlobExists()
+            LockMode.BIOMETRIC_ONLY -> !biometricOnlyKeyBlobExists()
             LockMode.DEVICE_CREDENTIAL ->
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) !keyBlobExists() else !plainKeyBlobExists()
         }
@@ -451,6 +515,7 @@ class Vault(context: Context) {
         trashedRecipients.clear()
         persist()
         isUnlocked = true
+        createdThisRun = true
         onUnlocked?.invoke()
     }
 
@@ -485,6 +550,8 @@ class Vault(context: Context) {
         trashedIdentities.clear()
         trashedRecipients.clear()
         isUnlocked = false
+        createdThisRun = false
+        BiometricGate.forgetOwnerCheck()
         runCatching { TempFiles.sweep(appContext) }
     }
 
@@ -684,6 +751,8 @@ class Vault(context: Context) {
         lock()
         keyFile.delete()
         plainKeyFile.delete()
+        biometricOnlyKeyFile.delete()
+        runCatching { KeystoreMasterKey.deleteBiometricOnly() }
         passwordKeyFile.delete()
         duressKeyFile.delete()
         dataFile.delete()

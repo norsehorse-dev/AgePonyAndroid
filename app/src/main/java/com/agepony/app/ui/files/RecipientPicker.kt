@@ -1,7 +1,9 @@
 package com.agepony.app.ui.files
 
+import com.agepony.app.vault.ShownMessageException
+import com.agepony.app.vault.DefaultKeyNames
+import com.agepony.app.ui.UserMessage
 import android.content.Context
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,10 +34,8 @@ import androidx.compose.ui.unit.dp
 import com.agepony.app.R
 import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.RecipientImport
-import com.agepony.app.vault.StoredIdentityType
 import com.agepony.app.vault.StoredRecipient
 import com.agepony.app.vault.Wordlist
-import com.agepony.app.vault.StoredRecipientType
 import com.agepony.app.vault.Vault
 import com.agepony.app.vault.isSigningOnly
 import com.agepony.app.vault.toAgeRecipient
@@ -53,6 +53,10 @@ import com.agepony.core.ssh.OpenSSHPublicKey
 import java.util.UUID
 import androidx.compose.foundation.layout.imePadding
 import com.agepony.app.ui.components.CheckRow
+import com.agepony.app.ui.components.ChoiceField
+import com.agepony.app.ui.components.OneLineValue
+import com.agepony.app.ui.components.QuietAction
+import com.agepony.app.ui.components.SecondaryAction
 import com.agepony.app.ui.components.ErrorText
 import com.agepony.app.ui.components.ListDivider
 import com.agepony.app.ui.components.SectionHeader
@@ -127,7 +131,7 @@ internal class RecipientSelection(
             adHoc.forEach { add(it.recipient) }
         }
         if (failed.isNotEmpty()) {
-            throw IllegalStateException(
+            throw ShownMessageException(
                 context.getString(R.string.files_picker_cant_encrypt_to, failed.joinToString(", ")),
             )
         }
@@ -283,11 +287,12 @@ internal fun RecipientPickerContent(
                         Text(stringResource(R.string.files_picker_suggest))
                     }
                 } else {
+                    // The phrase is key material, so monospace; the accent color is for actions only.
                     Text(
                         suggestion!!,
                         style = MaterialTheme.typography.titleMedium,
                         fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         pluralStringResource(
@@ -299,30 +304,31 @@ internal fun RecipientPickerContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(
-                            onClick = {
-                                suggestionWords -= 1
-                                suggestion = Diceware.generate(wordlist, suggestionWords)
-                            },
-                            enabled = suggestionWords > Diceware.MIN_WORD_COUNT,
-                        ) { Text(stringResource(R.string.files_picker_shorter)) }
-                        TextButton(
-                            onClick = {
-                                suggestionWords += 1
-                                suggestion = Diceware.generate(wordlist, suggestionWords)
-                            },
-                            enabled = suggestionWords < Diceware.MAX_WORD_COUNT,
-                        ) { Text(stringResource(R.string.files_picker_longer)) }
-                        TextButton(
-                            onClick = { suggestion = Diceware.generate(wordlist, suggestionWords) }
-                        ) { Text(stringResource(R.string.files_picker_again)) }
-                        Button(onClick = {
+                    // A word-count menu and two plain actions instead of four buttons in one row,
+                    // which long translated labels would squeeze (5.1.0, U4).
+                    ChoiceField(
+                        label = stringResource(R.string.files_picker_word_count),
+                        selected = suggestionWords,
+                        options = (Diceware.MIN_WORD_COUNT..Diceware.MAX_WORD_COUNT).toList(),
+                        optionLabel = { it.toString() },
+                        onSelect = { words ->
+                            suggestionWords = words
+                            suggestion = Diceware.generate(wordlist, words)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    TextButton(
+                        onClick = { suggestion = Diceware.generate(wordlist, suggestionWords) }
+                    ) { Text(stringResource(R.string.files_picker_new_suggestion)) }
+                    SecondaryAction(
+                        stringResource(R.string.files_picker_use_it),
+                        onClick = {
                             selection.passphrase = suggestion!!
                             selection.passphraseConfirm = suggestion!!
                             suggestion = null
-                        }) { Text(stringResource(R.string.files_picker_use_it)) }
-                    }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
             val workFactor = vault.scryptWorkFactor
@@ -351,10 +357,11 @@ internal fun RecipientPickerContent(
                 )
             } else {
                 encryptableIdentities.forEach { identity ->
+                    // Name, type and short key, so two keys with one name differ (5.1.0 item 3).
                     CheckRow(
                         checked = selection.identityIds.contains(identity.id),
                         title = identity.name,
-                        subtitle = stringResource(identityTypeLabel(identity.type)),
+                        subtitle = KeyPickerText.subtitle(context, identity),
                         onCheckedChange = { toggle(selection.identityIds, identity.id) },
                     )
                 }
@@ -376,7 +383,7 @@ internal fun RecipientPickerContent(
                                 RecipientImport.rsaBits(recipient.type, recipient.publicKeyB64)
                             )
                         } else {
-                            stringResource(recipientTypeLabel(recipient.type))
+                            KeyPickerText.subtitle(context, recipient)
                         },
                         enabled = !tooSmall,
                         onCheckedChange = { toggle(selection.recipientIds, recipient.id) },
@@ -391,14 +398,18 @@ internal fun RecipientPickerContent(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        ah.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
+                    // An age key is shown as the key (monospace); an SSH key's label is words.
+                    if (ah.raw.startsWith("age1")) {
+                        OneLineValue(ah.label, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                    } else {
+                        Text(
+                            ah.label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     if (savingKey != ah.key) {
                         TextButton(onClick = { savingKey = ah.key; saveName = ""; saveError = null }) {
                             Text(stringResource(R.string.files_picker_save))
@@ -420,10 +431,11 @@ internal fun RecipientPickerContent(
                     if (saveError != null) ErrorText(saveError!!)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = { savingKey = null }) { Text(stringResource(R.string.action_cancel)) }
-                        Button(
+                        // Outlined: the picker's own Use button below is the filled one.
+                        OutlinedButton(
                             onClick = {
                                 try {
-                                    val candidate = RecipientImport.parsePastedText(ah.raw)
+                                    val candidate = RecipientImport.parsePastedText(ah.raw, DefaultKeyNames.from(context))
                                     vault.addRecipient(
                                         StoredRecipient(
                                             id = UUID.randomUUID().toString(),
@@ -442,7 +454,7 @@ internal fun RecipientPickerContent(
                                     selection.adHoc.removeAll { it.key == ah.key }
                                     savingKey = null
                                 } catch (e: Exception) {
-                                    saveError = e.message ?: context.getString(R.string.files_picker_save_failed)
+                                    saveError = UserMessage.text(context, e, R.string.files_picker_save_failed)
                                 }
                             },
                             enabled = saveName.isNotBlank(),
@@ -465,7 +477,7 @@ internal fun RecipientPickerContent(
                         pasteText = ""
                         pasteError = null
                     } catch (e: Exception) {
-                        pasteError = e.message ?: context.getString(R.string.files_picker_parse_failed)
+                        pasteError = UserMessage.text(context, e, R.string.files_picker_parse_failed)
                     }
                 },
                 enabled = pasteText.isNotBlank(),
@@ -474,7 +486,8 @@ internal fun RecipientPickerContent(
 
         if (confirmError != null) ErrorText(confirmError!!)
         ListDivider()
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        // Stacked, full width, so long translated labels never squeeze (5.1.0, U4).
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             Button(
                 onClick = {
                     if (selection.useScrypt) {
@@ -489,7 +502,7 @@ internal fun RecipientPickerContent(
                         val built = try {
                             selection.buildRecipients(context, vault)
                         } catch (e: Exception) {
-                            confirmError = e.message ?: context.getString(R.string.files_picker_load_failed)
+                            confirmError = UserMessage.text(context, e, R.string.files_picker_load_failed)
                             null
                         }
                         if (built != null) {
@@ -499,7 +512,7 @@ internal fun RecipientPickerContent(
                     }
                 },
                 enabled = canConfirm,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
                     when {
@@ -509,7 +522,7 @@ internal fun RecipientPickerContent(
                     }
                 )
             }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_cancel)) }
+            QuietAction(stringResource(R.string.action_cancel), onClick = onCancel)
         }
     }
 }
@@ -520,7 +533,7 @@ private fun toggle(set: MutableList<String>, id: String) {
 
 private fun parseAdHoc(context: Context, raw: String): AdHocRecipient {
     val t = raw.trim()
-    if (t.isEmpty()) throw IllegalArgumentException(context.getString(R.string.files_picker_nothing_to_add))
+    if (t.isEmpty()) throw ShownMessageException(context.getString(R.string.files_picker_nothing_to_add))
     // Longer age1 prefixes first: they all share "age1".
     if (TagRecipient.isTagRecipient(t)) {
         val r = TagRecipient(t)
@@ -551,7 +564,7 @@ private fun parseAdHoc(context: Context, raw: String): AdHocRecipient {
             is OpenSSHPublicKey.RSA -> {
                 val r = SSHRSARecipient(parsed)
                 if (r.isBelowMinimumSize) {
-                    throw IllegalArgumentException(
+                    throw ShownMessageException(
                         context.getString(
                             R.string.files_picker_rsa_too_small,
                             parsed.modulus.bitLength(),
@@ -563,33 +576,8 @@ private fun parseAdHoc(context: Context, raw: String): AdHocRecipient {
             }
         }
     }
-    throw IllegalArgumentException(context.getString(R.string.files_picker_unrecognised))
+    throw ShownMessageException(context.getString(R.string.files_picker_unrecognised))
 }
 
 private fun shorten(s: String): String =
     if (s.length <= 28) s else "${s.take(14)}…${s.takeLast(10)}"
-
-@StringRes
-private fun identityTypeLabel(t: StoredIdentityType): Int = when (t) {
-    StoredIdentityType.X25519 -> R.string.files_type_age_x25519
-    StoredIdentityType.MLKEM768X25519 -> R.string.files_type_mlkem
-    StoredIdentityType.SSH_ED25519 -> R.string.files_type_ssh_ed25519
-    StoredIdentityType.SSH_RSA -> R.string.files_type_ssh_rsa
-    StoredIdentityType.HARDWARE_KEY -> R.string.files_type_hardware_p256
-    StoredIdentityType.SK_ED25519 -> R.string.files_type_sk_ed25519
-    StoredIdentityType.SK_ECDSA_P256 -> R.string.files_type_sk_p256
-    StoredIdentityType.HARDWARE_TAG -> R.string.files_type_hardware_tag
-    StoredIdentityType.HARDWARE_TAG_PQ -> R.string.files_type_hardware_tag_pq
-    StoredIdentityType.YUBIKEY_PIV -> R.string.files_type_yubikey_piv
-}
-
-@StringRes
-private fun recipientTypeLabel(t: StoredRecipientType): Int = when (t) {
-    StoredRecipientType.X25519 -> R.string.files_type_age_x25519
-    StoredRecipientType.MLKEM768X25519 -> R.string.files_type_mlkem
-    StoredRecipientType.SSH_ED25519 -> R.string.files_type_ssh_ed25519
-    StoredRecipientType.SSH_RSA -> R.string.files_type_ssh_rsa
-    StoredRecipientType.YUBIKEY_P256 -> R.string.files_type_yubikey_p256
-    StoredRecipientType.TAG -> R.string.files_type_tag
-    StoredRecipientType.TAG_PQ -> R.string.files_type_tag_pq
-}

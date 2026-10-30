@@ -1,5 +1,6 @@
 package com.agepony.app.ui.files
 
+import com.agepony.app.ui.UserMessage
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
@@ -16,9 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
@@ -35,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.vault.FileEncryptor
 import com.agepony.app.vault.NoMatchingVaultIdentityException
@@ -58,13 +56,15 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import com.agepony.app.R
 import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.DoneAction
+import com.agepony.app.ui.components.OneLineValue
+import com.agepony.app.ui.components.RowAction
 import com.agepony.app.ui.components.ErrorText
 import com.agepony.app.ui.components.ListDivider
 import com.agepony.app.ui.components.RadioRow
 import com.agepony.app.ui.components.SectionHeader
 import com.agepony.app.ui.components.VerdictPanel
 import com.agepony.app.ui.theme.AgeStatus
-import com.agepony.app.ui.theme.mono
 
 //
 // Migrate flow: batch "upgrade to quantum-safe". Pick a post-quantum identity as the target,
@@ -114,6 +114,7 @@ fun MigrateFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         title = stringResource(R.string.files_migrate),
         modifier = modifier,
         onBack = if (stage == MigrateStage.WORKING) null else onClose,
+        actions = { if (stage == MigrateStage.DONE) DoneAction(onClose) },
     ) { padding ->
     Column(Modifier.fillMaxSize().padding(padding)) {
         when (stage) {
@@ -127,7 +128,7 @@ fun MigrateFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                HorizontalDivider()
+                ListDivider()
 
                 SectionHeader(stringResource(R.string.files_migrate_section_identity))
                 if (pqcIdentities.isEmpty()) {
@@ -142,7 +143,7 @@ fun MigrateFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                     }
                 }
 
-                HorizontalDivider()
+                ListDivider()
 
                 SectionHeader(stringResource(R.string.files_title))
                 Text(
@@ -161,7 +162,7 @@ fun MigrateFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 )
                 TextButton(onClick = { vault.autoLockSuppressed = true; pickFolder.launch(null) }) { Text(stringResource(R.string.files_migrate_choose_folder)) }
 
-                HorizontalDivider()
+                ListDivider()
 
                 SectionHeader(stringResource(R.string.files_migrate_section_passphrase))
                 OutlinedTextField(
@@ -256,11 +257,9 @@ fun MigrateFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                                 tint = if (item.ok) AgeStatus.colors.success else AgeStatus.colors.failure,
                                 modifier = Modifier.size(16.dp),
                             )
-                            Text(
+                            OneLineValue(
                                 item.name,
-                                style = MaterialTheme.typography.mono,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(start = 8.dp),
                             )
                         }
@@ -272,8 +271,8 @@ fun MigrateFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                     }
                     ListDivider()
                 }
-                Button(onClick = { reset() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.files_migrate_more)) }
-                OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(stringResource(R.string.files_action_done)) }
+                // Done sits in the app bar; the next batch is its own row (5.1.0, U4).
+                RowAction(stringResource(R.string.files_migrate_more), onClick = { reset() })
             }
         }
     }
@@ -314,24 +313,24 @@ private fun migrateOne(
         } catch (e2: WrongPassphraseException) {
             return MigrateItem(name, false, context.getString(R.string.files_migrate_other_passphrase))
         } catch (e2: Exception) {
-            return MigrateItem(name, false, e2.message ?: context.getString(R.string.files_decrypt_failed))
+            return MigrateItem(name, false, UserMessage.text(context, e2, R.string.files_decrypt_failed))
         }
     } catch (e: Exception) {
-        return MigrateItem(name, false, e.message ?: context.getString(R.string.files_decrypt_failed))
+        return MigrateItem(name, false, UserMessage.text(context, e, R.string.files_decrypt_failed))
     }
 
     val wasArmored = FileEncryptor.isArmored(raw)
     val out = try {
         FileEncryptor.encrypt(plain, listOf(target), null, wasArmored)
     } catch (e: Exception) {
-        return MigrateItem(name, false, context.getString(R.string.files_migrate_reencrypt_failed, e.message.orEmpty()))
+        return MigrateItem(name, false, UserMessage.text(context, e, R.string.files_migrate_reencrypt_failed))
     }
 
     return try {
         writeToTree(context, destTree, name, out)
         MigrateItem(name, true, context.getString(R.string.files_migrate_item_done))
     } catch (e: Exception) {
-        MigrateItem(name, false, context.getString(R.string.files_migrate_save_failed, e.message.orEmpty()))
+        MigrateItem(name, false, UserMessage.text(context, e, R.string.files_migrate_save_failed))
     }
 }
 

@@ -1,11 +1,11 @@
 package com.agepony.app.ui.notes
 
+import com.agepony.app.ui.UserMessage
 import android.text.format.DateUtils
 import android.util.Base64
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -120,6 +120,8 @@ private fun NoteList(
             EmptyState(
                 title = stringResource(R.string.notes_empty_title),
                 body = stringResource(R.string.notes_empty_body),
+                actionLabel = stringResource(R.string.notes_new),
+                onAction = onCreate,
             )
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
@@ -204,7 +206,8 @@ private fun CreateNote(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (error != null) ErrorText(error!!)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        // Stacked, full width, so long translated labels never squeeze (5.1.0, U4).
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             Button(
                 onClick = {
                     if (!canSave) return@Button
@@ -233,14 +236,14 @@ private fun CreateNote(
                             error = context.getString(R.string.notes_oom_encrypt)
                         } catch (e: Exception) {
                             busy = false
-                            error = e.message ?: context.getString(R.string.notes_create_failed)
+                            error = UserMessage.text(context, e, R.string.notes_create_failed)
                         }
                     }
                 },
                 enabled = canSave,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(if (busy) R.string.notes_encrypting else R.string.notes_create)) }
-            OutlinedButton(onClick = onCancel, enabled = !busy, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_cancel)) }
+            QuietAction(text = stringResource(R.string.action_cancel), onClick = onCancel, enabled = !busy)
         }
     }
     }
@@ -347,7 +350,7 @@ private fun NoteDetail(
                             } catch (e: OutOfMemoryError) {
                                 working = false; error = context.getString(R.string.notes_oom_decrypt)
                             } catch (e: Exception) {
-                                working = false; error = e.message ?: context.getString(R.string.notes_unlock_failed)
+                                working = false; error = UserMessage.text(context, e, R.string.notes_unlock_failed)
                             }
                         }
                     },
@@ -374,7 +377,8 @@ private fun NoteDetail(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (error != null) ErrorText(error!!)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                // Stacked, full width, so long translated labels never squeeze (5.1.0, U4).
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = {
                             if (!dirty || working) return@Button
@@ -402,12 +406,12 @@ private fun NoteDetail(
                                 } catch (e: OutOfMemoryError) {
                                     working = false; error = context.getString(R.string.notes_oom_save)
                                 } catch (e: Exception) {
-                                    working = false; error = e.message ?: context.getString(R.string.notes_save_failed)
+                                    working = false; error = UserMessage.text(context, e, R.string.notes_save_failed)
                                 }
                             }
                         },
                         enabled = dirty && !working,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     ) { Text(stringResource(if (working) R.string.notes_encrypting else R.string.notes_save)) }
                     OutlinedButton(
                         onClick = {
@@ -416,7 +420,7 @@ private fun NoteDetail(
                             phase = NotePhase.LOCKED
                         },
                         enabled = !working,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     ) { Text(stringResource(R.string.notes_lock)) }
                 }
                 if (dirty) {

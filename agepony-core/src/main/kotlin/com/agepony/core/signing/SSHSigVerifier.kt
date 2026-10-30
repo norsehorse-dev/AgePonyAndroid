@@ -32,6 +32,7 @@ object SSHSigVerifier {
      * @param reason null when valid; otherwise why it failed.
      * @param skFlags the FIDO authenticator-data flags byte for an `sk-*` signature, null for
      *   every other key type. See [userPresent] and [userVerified].
+     * @param failure why it failed, typed, for the app's message (5.1.0, UI plan U5); null when valid.
      */
     class Result(
         val valid: Boolean,
@@ -40,6 +41,7 @@ object SSHSigVerifier {
         val namespace: String,
         val reason: String?,
         val skFlags: Int? = null,
+        val failure: Failure? = null,
     ) {
         /** For an `sk-*` signature: whether the key saw a touch (UP, flags bit 0). Null otherwise. */
         val userPresent: Boolean? get() = skFlags?.let { it and SK_FLAG_USER_PRESENT != 0 }
@@ -50,6 +52,9 @@ object SSHSigVerifier {
          */
         val userVerified: Boolean? get() = skFlags?.let { it and SK_FLAG_USER_VERIFIED != 0 }
     }
+
+    /** Why a signature that parsed was still refused. */
+    enum class Failure { NAMESPACE_MISMATCH, RSA_KEY_UNACCEPTABLE, SIGNATURE_MISMATCH, NO_TOUCH }
 
     /** FIDO authenticator-data flag: user present (the key was touched). */
     const val SK_FLAG_USER_PRESENT: Int = 0x01
@@ -124,6 +129,7 @@ object SSHSigVerifier {
                 signerPublicWire = env.publicKeyBlob,
                 namespace = env.namespace,
                 reason = "namespace mismatch: got '${env.namespace}', expected '$expectedNamespace'",
+                failure = Failure.NAMESPACE_MISMATCH,
             )
         }
 
@@ -136,6 +142,7 @@ object SSHSigVerifier {
                     signerPublicWire = env.publicKeyBlob,
                     namespace = env.namespace,
                     reason = problem,
+                    failure = Failure.RSA_KEY_UNACCEPTABLE,
                 )
             }
         }
@@ -169,6 +176,11 @@ object SSHSigVerifier {
                 else -> null
             },
             skFlags = flags,
+            failure = when {
+                !ok -> Failure.SIGNATURE_MISMATCH
+                untouched -> Failure.NO_TOUCH
+                else -> null
+            },
         )
     }
 

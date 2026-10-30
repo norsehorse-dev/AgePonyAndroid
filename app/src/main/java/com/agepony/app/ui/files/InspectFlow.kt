@@ -1,5 +1,6 @@
 package com.agepony.app.ui.files
 
+import com.agepony.app.ui.UserMessage
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -15,7 +16,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,8 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.R
 import com.agepony.app.vault.FileEncryptor
@@ -52,13 +50,15 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Warning
 import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.DoneAction
+import com.agepony.app.ui.components.OneLineValue
+import com.agepony.app.ui.components.RowAction
 import com.agepony.app.ui.components.ErrorText
 import com.agepony.app.ui.components.ListDivider
 import com.agepony.app.ui.components.PostQuantumBadge
 import com.agepony.app.ui.components.SectionHeader
 import com.agepony.app.ui.components.VerdictPanel
 import com.agepony.app.ui.theme.AgeStatus
-import com.agepony.app.ui.theme.mono
 
 //
 // Header inspector: what is this .age file encrypted to?
@@ -76,8 +76,11 @@ private enum class InspectStage { PICK, WORKING, RESULT }
 /** One recipient stanza, described in words rather than base64. */
 private class StanzaInfo(
     val title: String,
+    /** Prose about the stanza, or the label for [tag] when there is one. */
     val detail: String,
     val postQuantum: Boolean,
+    /** Key material shown after [detail] in monospace; the prose stays in the UI font (5.1.0, U4). */
+    val tag: String? = null,
 )
 
 private class InspectResult(
@@ -111,7 +114,7 @@ fun InspectFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                 result = withContext(Dispatchers.IO) { inspect(context, uri, identities) }
                 stage = InspectStage.RESULT
             } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.files_not_age_file)
+                error = UserMessage.text(context, e, R.string.files_not_age_file)
                 stage = InspectStage.PICK
             }
         }
@@ -124,6 +127,7 @@ fun InspectFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
         title = stringResource(R.string.files_inspect),
         modifier = modifier,
         onBack = if (stage == InspectStage.WORKING) null else onClose,
+        actions = { if (stage == InspectStage.RESULT) DoneAction(onClose) },
     ) { padding ->
     Column(Modifier.fillMaxSize().padding(padding)) {
         when (stage) {
@@ -166,12 +170,7 @@ fun InspectFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text(
-                            r.name,
-                            style = MaterialTheme.typography.mono,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        OneLineValue(r.name, color = MaterialTheme.colorScheme.onSurface)
                         Text(
                             when {
                                 // 0 means the provider reported no size, so leave the size out.
@@ -180,9 +179,9 @@ fun InspectFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                                 r.size <= 0 ->
                                     stringResource(R.string.files_inspect_summary_binary_no_size, r.headerBytes)
                                 r.armored ->
-                                    stringResource(R.string.files_inspect_summary_armored, SafIo.humanSize(r.size), r.headerBytes)
+                                    stringResource(R.string.files_inspect_summary_armored, SafIo.humanSize(LocalContext.current, r.size), r.headerBytes)
                                 else ->
-                                    stringResource(R.string.files_inspect_summary_binary, SafIo.humanSize(r.size), r.headerBytes)
+                                    stringResource(R.string.files_inspect_summary_binary, SafIo.humanSize(LocalContext.current, r.size), r.headerBytes)
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -217,19 +216,30 @@ fun InspectFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         stringResource(R.string.files_inspect_stanza_row, index + 1, s.title),
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = MaterialTheme.typography.bodyLarge,
                                         modifier = Modifier.weight(1f, fill = false),
                                     )
                                     if (s.postQuantum) {
                                         PostQuantumBadge(Modifier.padding(start = 8.dp))
                                     }
                                 }
-                                Text(
-                                    s.detail,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontFamily = FontFamily.Monospace,
-                                )
+                                if (s.tag != null) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            s.detail,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(end = 8.dp),
+                                        )
+                                        OneLineValue(s.tag)
+                                    }
+                                } else {
+                                    Text(
+                                        s.detail,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                             ListDivider()
                         }
@@ -240,14 +250,12 @@ fun InspectFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Unit
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
 
-                        Button(
+                        // Done is in the app bar; the next file is its own row (5.1.0, U4).
+                        ListDivider()
+                        RowAction(
+                            stringResource(R.string.files_inspect_another),
                             onClick = { result = null; error = null; stage = InspectStage.PICK },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.files_inspect_another)) }
-                        OutlinedButton(
-                            onClick = onClose,
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        ) { Text(stringResource(R.string.files_action_done)) }
+                        )
                     }
                 }
             }
@@ -310,33 +318,39 @@ private fun describe(context: Context, stanza: Stanza): StanzaInfo = when (stanz
     }
     "X25519" -> StanzaInfo(
         title = context.getString(R.string.files_inspect_x25519),
-        detail = context.getString(R.string.files_inspect_ephemeral_share, shortArg(context, stanza.args.getOrNull(0))),
+        detail = context.getString(R.string.files_inspect_ephemeral_share),
         postQuantum = false,
+        tag = shortArg(context, stanza.args.getOrNull(0)),
     )
     "mlkem768x25519" -> StanzaInfo(
         title = context.getString(R.string.files_inspect_mlkem),
-        detail = context.getString(R.string.files_inspect_encapsulation, shortArg(context, stanza.args.getOrNull(0))),
+        detail = context.getString(R.string.files_inspect_encapsulation),
         postQuantum = true,
+        tag = shortArg(context, stanza.args.getOrNull(0)),
     )
     "ssh-ed25519" -> StanzaInfo(
         title = context.getString(R.string.files_inspect_ssh_ed25519),
-        detail = context.getString(R.string.files_inspect_key_tag, shortArg(context, stanza.args.getOrNull(0))),
+        detail = context.getString(R.string.files_inspect_key_tag),
         postQuantum = false,
+        tag = shortArg(context, stanza.args.getOrNull(0)),
     )
     "ssh-rsa" -> StanzaInfo(
         title = context.getString(R.string.files_inspect_ssh_rsa),
-        detail = context.getString(R.string.files_inspect_key_tag, shortArg(context, stanza.args.getOrNull(0))),
+        detail = context.getString(R.string.files_inspect_key_tag),
         postQuantum = false,
+        tag = shortArg(context, stanza.args.getOrNull(0)),
     )
     "p256tag" -> StanzaInfo(
         title = context.getString(R.string.files_inspect_p256tag),
-        detail = context.getString(R.string.files_inspect_key_tag, shortArg(context, stanza.args.getOrNull(0))),
+        detail = context.getString(R.string.files_inspect_key_tag),
         postQuantum = false,
+        tag = shortArg(context, stanza.args.getOrNull(0)),
     )
     "mlkem768p256tag" -> StanzaInfo(
         title = context.getString(R.string.files_inspect_mlkem_p256tag),
-        detail = context.getString(R.string.files_inspect_key_tag, shortArg(context, stanza.args.getOrNull(0))),
+        detail = context.getString(R.string.files_inspect_key_tag),
         postQuantum = true,
+        tag = shortArg(context, stanza.args.getOrNull(0)),
     )
     SignatureStanza.TYPE -> StanzaInfo(
         title = context.getString(R.string.files_inspect_signature),
@@ -345,8 +359,9 @@ private fun describe(context: Context, stanza: Stanza): StanzaInfo = when (stanz
     )
     "piv-p256" -> StanzaInfo(
         title = context.getString(R.string.files_inspect_piv),
-        detail = context.getString(R.string.files_inspect_key_tag, shortArg(context, stanza.args.getOrNull(0))),
+        detail = context.getString(R.string.files_inspect_key_tag),
         postQuantum = false,
+        tag = shortArg(context, stanza.args.getOrNull(0)),
     )
     else -> StanzaInfo(
         title = context.getString(R.string.files_inspect_unknown, stanza.type),

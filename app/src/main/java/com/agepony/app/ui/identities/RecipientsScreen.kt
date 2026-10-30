@@ -1,5 +1,7 @@
 package com.agepony.app.ui.identities
 
+import com.agepony.app.vault.DefaultKeyNames
+import com.agepony.app.ui.UserMessage
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,8 +20,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Tab
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.foundation.layout.heightIn
+import com.agepony.app.ui.components.ChoiceField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,7 +34,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.ui.components.KeyAvatar
@@ -64,6 +65,8 @@ import com.agepony.app.ui.components.EmptyState
 import com.agepony.app.ui.components.ErrorText
 import com.agepony.app.ui.components.ListDivider
 import com.agepony.app.ui.components.QuietAction
+import com.agepony.app.ui.components.OneLineValue
+import com.agepony.app.ui.components.ValueRow
 import com.agepony.app.ui.components.SectionHeader
 import com.agepony.app.ui.components.pluralResource
 
@@ -82,12 +85,15 @@ import com.agepony.app.ui.components.pluralResource
 internal fun RecipientList(
     vault: Vault,
     onOpen: (String) -> Unit,
+    onAdd: () -> Unit,
 ) {
-    // Add and Recently deleted live in the Identities app bar.
+    // Add and Recently deleted live in the Identities app bar; the empty state offers Add too.
     if (vault.recipients.isEmpty()) {
         EmptyState(
             title = stringResource(R.string.identities_recipients_empty_title),
             body = stringResource(R.string.identities_recipients_empty_body),
+            actionLabel = stringResource(R.string.action_add_recipient),
+            onAction = onAdd,
         )
     } else {
         LazyColumn(Modifier.fillMaxSize()) {
@@ -114,7 +120,7 @@ private fun RecipientRow(recipient: StoredRecipient, onClick: () -> Unit) {
             RecipientImport.isRsaBelowMinimum(recipient.type, recipient.publicKeyB64)
         }
         Column(Modifier.weight(1f)) {
-            Text(recipient.name, style = MaterialTheme.typography.bodyLarge)
+            Text(recipient.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (recipient.type.isPostQuantum) {
                     PostQuantumBadge(modifier = Modifier.padding(end = 8.dp))
@@ -125,14 +131,10 @@ private fun RecipientRow(recipient: StoredRecipient, onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                    text = recipient.publicDisplayString(),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 8.dp),
+                // The key on one line, cut in the middle so both ends stay readable (5.1.0, U4).
+                OneLineValue(
+                    recipient.publicDisplayString(),
+                    modifier = Modifier.padding(start = 8.dp).weight(1f, fill = false),
                 )
             }
             // Audit L-4: encrypting to an ssh-rsa key under 2048 bits now fails, so say so here
@@ -157,6 +159,9 @@ internal fun RecipientDetail(
 ) {
     val recipient = vault.recipients.firstOrNull { it.id == recipientId }
     var confirmDelete by remember { mutableStateOf(false) }
+    // Rename starts from the app bar, as on iOS (5.1.0, U4); the field opens in the content.
+    val renaming = remember(recipientId) { mutableStateOf(false) }
+    val draftName = remember(recipientId) { mutableStateOf(recipient?.name.orEmpty()) }
 
     if (confirmDelete && recipient != null) {
         AlertDialog(
@@ -176,7 +181,19 @@ internal fun RecipientDetail(
         )
     }
 
-    AgeScreen(title = stringResource(R.string.recipient_title), modifier = modifier, onBack = onBack) { padding ->
+    AgeScreen(
+        title = stringResource(R.string.recipient_title),
+        modifier = modifier,
+        onBack = onBack,
+        actions = {
+            if (recipient != null && !renaming.value) {
+                TextButton(onClick = {
+                    draftName.value = recipient.name
+                    renaming.value = true
+                }) { Text(stringResource(R.string.identities_rename)) }
+            }
+        },
+    ) { padding ->
     Column(Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState())) {
         if (recipient == null) {
             Text(
@@ -191,8 +208,6 @@ internal fun RecipientDetail(
             Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val renaming = remember(recipientId) { mutableStateOf(false) }
-            val draftName = remember(recipientId) { mutableStateOf(recipient.name) }
             if (renaming.value) {
                 OutlinedTextField(
                     value = draftName.value,
@@ -211,47 +226,27 @@ internal fun RecipientDetail(
                         enabled = draftName.value.isNotBlank(),
                     ) { Text(stringResource(R.string.identities_save)) }
                 }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        recipient.name,
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = {
-                        draftName.value = recipient.name
-                        renaming.value = true
-                    }) { Text(stringResource(R.string.identities_rename)) }
-                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    recipient.sourceMetadata?.let { meta ->
-                        stringResource(
-                            R.string.identities_recipient_meta_extra,
-                            stringResource(typeLabel(recipient.type)),
-                            stringResource(sourceDetailLabel(recipient.source)),
-                            meta,
-                        )
-                    } ?: stringResource(
-                        R.string.identities_recipient_meta,
-                        stringResource(typeLabel(recipient.type)),
-                        stringResource(sourceDetailLabel(recipient.source)),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
+            // Name, type, source and origin as rows of a details list (5.1.0, U4).
+            Column {
+                if (!renaming.value) {
+                    ValueRow(stringResource(R.string.identities_row_name), recipient.name)
+                    ListDivider()
+                }
+                ValueRow(stringResource(R.string.identities_row_type), stringResource(typeLabel(recipient.type)))
                 if (recipient.type.isPostQuantum) {
-                    PostQuantumBadge(modifier = Modifier.padding(start = 8.dp))
+                    PostQuantumBadge(modifier = Modifier.padding(bottom = 8.dp))
                 }
-            }
-            if (!recipient.sshComment.isNullOrBlank()) {
-                Text(
-                    recipient.sshComment!!,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                ListDivider()
+                ValueRow(stringResource(R.string.identities_row_source), stringResource(sourceLabel(recipient.source)))
+                recipient.sourceMetadata?.let { meta ->
+                    ListDivider()
+                    ValueRow(stringResource(R.string.identities_row_origin), meta)
+                }
+                if (!recipient.sshComment.isNullOrBlank()) {
+                    ListDivider()
+                    ValueRow(stringResource(R.string.identities_row_comment), recipient.sshComment!!)
+                }
             }
             if (RecipientImport.isRsaBelowMinimum(recipient.type, recipient.publicKeyB64)) {
                 Text(
@@ -283,7 +278,7 @@ internal fun RecipientDetail(
 
 // MARK: - Add recipient
 
-private enum class AddRecipientSource(@StringRes val label: Int) {
+private enum class AddRecipientSource(@param:StringRes val label: Int) {
     PASTE(R.string.identities_add_source_paste),
     GITHUB(R.string.identities_add_source_github),
     SCAN(R.string.identities_add_source_scan),
@@ -312,6 +307,7 @@ internal fun AddRecipientFlow(
     val candidates = remember { mutableStateListOf<EditableCandidate>() }
     val scope = rememberCoroutineScope()
     var showScanner by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     // A blank name still saves (it falls back to the key summary), but it is nearly always an
     // oversight rather than a choice, so confirm instead of silently storing a key as a name.
@@ -321,12 +317,12 @@ internal fun AddRecipientFlow(
         QrScanner(
             onResult = { value ->
                 try {
-                    val parsed = RecipientImport.parsePastedText(value)
+                    val parsed = RecipientImport.parsePastedText(value, DefaultKeyNames.from(context))
                         .copy(source = StoredRecipientSource.QR_SCAN)
                     candidates.add(EditableCandidate(parsed))
                     inputError = null
                 } catch (e: Exception) {
-                    inputError = e.message
+                    inputError = UserMessage.text(context, e, R.string.files_picker_parse_failed)
                 }
                 showScanner = false
             },
@@ -384,15 +380,15 @@ internal fun AddRecipientFlow(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        PrimaryTabRow(selectedTabIndex = source.ordinal) {
-            AddRecipientSource.entries.forEach { s ->
-                Tab(
-                    selected = source == s,
-                    onClick = { source = s; inputError = null },
-                    text = { Text(stringResource(s.label)) },
-                )
-            }
-        }
+        // A menu labelled Source, as on iOS (5.1.0, U4).
+        ChoiceField(
+            label = stringResource(R.string.identities_row_source),
+            selected = source,
+            options = AddRecipientSource.entries.toList(),
+            optionLabel = { stringResource(it.label) },
+            onSelect = { source = it; inputError = null },
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         when (source) {
             AddRecipientSource.PASTE -> {
@@ -403,15 +399,15 @@ internal fun AddRecipientFlow(
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Button(
+                OutlinedButton(
                     onClick = {
                         try {
-                            val c = RecipientImport.parsePastedText(pasteText)
+                            val c = RecipientImport.parsePastedText(pasteText, DefaultKeyNames.from(context))
                             candidates.add(EditableCandidate(c))
                             pasteText = ""
                             inputError = null
                         } catch (e: Exception) {
-                            inputError = e.message
+                            inputError = UserMessage.text(context, e, R.string.files_picker_parse_failed)
                         }
                     },
                     enabled = pasteText.isNotBlank(),
@@ -426,9 +422,10 @@ internal fun AddRecipientFlow(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Button(
+                // Outlined: Save below is the screen's one filled button.
+                OutlinedButton(
                     onClick = {
-                        if (loading) return@Button
+                        if (loading) return@OutlinedButton
                         loading = true
                         inputError = null
                         scope.launch {
@@ -436,10 +433,12 @@ internal fun AddRecipientFlow(
                                 val found = RecipientImport.fetchFromGitHub(
                                     githubUser,
                                     vault.proxyConfig,
+                                    DefaultKeyNames.from(context),
                                 )
                                 found.forEach { candidates.add(EditableCandidate(it)) }
                             } catch (e: Exception) {
-                                inputError = e.message
+                                // An account with no usable keys says so ("found none", U5).
+                                inputError = UserMessage.text(context, e, R.string.identities_github_fetch_failed)
                             } finally {
                                 loading = false
                             }
@@ -466,7 +465,7 @@ internal fun AddRecipientFlow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = { inputError = null; showScanner = true }) { Text(stringResource(R.string.identities_open_camera)) }
+                OutlinedButton(onClick = { inputError = null; showScanner = true }) { Text(stringResource(R.string.identities_open_camera)) }
             }
         }
 
@@ -484,7 +483,8 @@ internal fun AddRecipientFlow(
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        // Stacked, full width, so long translated labels never squeeze (5.1.0, U4).
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             val savable = candidates.count { it.include }
             Button(
                 onClick = {
@@ -495,14 +495,14 @@ internal fun AddRecipientFlow(
                     }
                 },
                 enabled = savable > 0,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
                     if (savable > 0) pluralResource(R.plurals.identities_save_count, savable, savable)
                     else stringResource(R.string.identities_save)
                 )
             }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_cancel)) }
+            QuietAction(stringResource(R.string.action_cancel), onClick = onCancel)
         }
     }
     }
@@ -516,11 +516,14 @@ private fun CandidateRow(ec: EditableCandidate, onDiscard: () -> Unit) {
         // The whole row toggles "include"; the Switch only draws it. Discard stays its own button.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.toggleable(
-                value = ec.include,
-                role = Role.Switch,
-                onValueChange = { ec.include = it },
-            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = ec.include,
+                    role = Role.Switch,
+                    onValueChange = { ec.include = it },
+                )
+                .heightIn(min = 48.dp),
         ) {
             Switch(checked = ec.include, onCheckedChange = null)
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
@@ -529,18 +532,12 @@ private fun CandidateRow(ec: EditableCandidate, onDiscard: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                    candidateKeySummary(ec.candidate),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                OneLineValue(candidateKeySummary(ec.candidate), color = MaterialTheme.colorScheme.onSurface)
                 if (!ec.candidate.sshComment.isNullOrBlank()) {
+                    // The comment is a label someone typed, not key material, so the UI font.
                     Text(
                         ec.candidate.sshComment!!,
                         style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -620,15 +617,6 @@ private fun sourceLabel(s: StoredRecipientSource): Int = when (s) {
     StoredRecipientSource.DERIVED_FROM_IDENTITY -> R.string.identities_source_identity
 }
 
-/** The same source word in the middle of the detail line ("age X25519, pasted"). */
-@StringRes
-private fun sourceDetailLabel(s: StoredRecipientSource): Int = when (s) {
-    StoredRecipientSource.PASTE_AGE -> R.string.identities_source_pasted_inline
-    StoredRecipientSource.PASTE_SSH -> R.string.identities_source_pasted_inline
-    StoredRecipientSource.QR_SCAN -> R.string.identities_source_scanned_inline
-    StoredRecipientSource.GITHUB -> R.string.identities_source_github
-    StoredRecipientSource.DERIVED_FROM_IDENTITY -> R.string.identities_source_identity_inline
-}
 
 /** "Too small to encrypt to" text for an ssh-rsa key under the minimum (audit L-4). */
 internal fun rsaTooSmallText(context: Context, bits: Int?, withAdvice: Boolean = false): String = when {

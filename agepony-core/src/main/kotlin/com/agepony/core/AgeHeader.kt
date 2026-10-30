@@ -37,7 +37,16 @@ object AgeHeader {
     /** The MAC is 32 bytes, so its unpadded base64 is always exactly 43 characters. */
     private const val MAC_B64_LEN = 43
 
-    class HeaderException(message: String) : Exception(message)
+    /**
+     * The header can't be used. [reason] is what the app shows; the message stays internal
+     * (5.1.0, UI plan U5).
+     */
+    class HeaderException(
+        message: String,
+        val reason: HeaderException.Reason = HeaderException.Reason.DAMAGED,
+    ) : Exception(message) {
+        enum class Reason { DAMAGED, NOT_AGE, TOO_LARGE, MAC_FAILED, SCRYPT_NOT_ALONE, TRUNCATED }
+    }
 
     data class ParsedHeader(
         val stanzas: List<Stanza>,
@@ -103,7 +112,7 @@ object AgeHeader {
             break
         }
         if (idx < 0) {
-            if (data.size >= MAX_HEADER_SIZE) throw HeaderException("header exceeds $MAX_HEADER_SIZE bytes")
+            if (data.size >= MAX_HEADER_SIZE) throw HeaderException("header exceeds $MAX_HEADER_SIZE bytes", HeaderException.Reason.TOO_LARGE)
             throw HeaderException("missing '--- ' line in header")
         }
 
@@ -116,7 +125,7 @@ object AgeHeader {
         // The MAC line is exactly 43 base64 characters, then '\n'.
         val macStart = idx + 5
         val nlPos = macStart + MAC_B64_LEN
-        if (nlPos > MAX_HEADER_SIZE - 1) throw HeaderException("header exceeds $MAX_HEADER_SIZE bytes")
+        if (nlPos > MAX_HEADER_SIZE - 1) throw HeaderException("header exceeds $MAX_HEADER_SIZE bytes", HeaderException.Reason.TOO_LARGE)
         if (nlPos >= data.size) throw HeaderException("truncated MAC line")
         if (data[nlPos] != '\n'.code.toByte()) throw HeaderException("malformed MAC line")
         for (k in macStart until nlPos) {
@@ -141,7 +150,7 @@ object AgeHeader {
         val headerText = String(macInputBytes, Charsets.US_ASCII)
         val lines = headerText.split('\n')
         if (lines.isEmpty() || lines[0] != VERSION_LINE) {
-            throw HeaderException("missing or wrong version line: got '${lines.getOrNull(0)}'")
+            throw HeaderException("missing or wrong version line: got '${lines.getOrNull(0)}'", HeaderException.Reason.NOT_AGE)
         }
 
         val stanzas = mutableListOf<Stanza>()
@@ -171,7 +180,7 @@ object AgeHeader {
     fun verifyMAC(macInputBytes: ByteArray, mac: ByteArray, fileKey: ByteArray) {
         val macKey = HKDF.derive(fileKey, ByteArray(0), HEADER_INFO.toByteArray(), 32)
         val computed = hmacSHA256(macKey, macInputBytes)
-        if (!constantTimeEquals(computed, mac)) throw HeaderException("MAC verification failed")
+        if (!constantTimeEquals(computed, mac)) throw HeaderException("MAC verification failed", HeaderException.Reason.MAC_FAILED)
     }
 
     // --- Internals ---

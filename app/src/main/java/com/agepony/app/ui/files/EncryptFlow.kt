@@ -1,5 +1,6 @@
 package com.agepony.app.ui.files
 
+import com.agepony.app.ui.UserMessage
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -14,10 +15,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -63,6 +62,11 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.DoneAction
+import com.agepony.app.ui.components.OneLineValue
+import com.agepony.app.ui.components.PrimaryAction
+import com.agepony.app.ui.components.RowAction
+import com.agepony.app.ui.components.SectionFooter
 import com.agepony.app.ui.components.ErrorText
 import com.agepony.app.ui.components.ListDivider
 import com.agepony.app.ui.components.RadioRow
@@ -70,7 +74,6 @@ import com.agepony.app.ui.components.SectionHeader
 import com.agepony.app.ui.components.SwitchRow
 import com.agepony.app.ui.components.VerdictPanel
 import com.agepony.app.ui.theme.AgeStatus
-import com.agepony.app.ui.theme.mono
 
 //
 // Encrypt flow. Android counterpart of iOS's EncryptFlow:
@@ -166,7 +169,7 @@ fun EncryptFlow(
                 sources = refs
                 stage = if (refs.size > 1) EncryptStage.MODE else EncryptStage.CONFIGURE
             } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.files_encrypt_read_failed)
+                error = UserMessage.text(context, e, R.string.files_encrypt_read_failed)
             }
         }
     }
@@ -222,13 +225,13 @@ fun EncryptFlow(
                 savedUri = uri
                 stage = EncryptStage.DONE
             } catch (e: ScryptMemoryException) {
-                error = e.message
+                error = UserMessage.text(context, e, R.string.files_encrypt_failed)
                 stage = EncryptStage.CONFIGURE
             } catch (e: OutOfMemoryError) {
                 error = context.getString(outOfMemoryMessage(!pass.isNullOrEmpty()))
                 stage = EncryptStage.CONFIGURE
             } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.files_encrypt_failed)
+                error = UserMessage.textUnlessCancelled(context, e, R.string.files_encrypt_failed)
                 stage = EncryptStage.CONFIGURE
             }
         }
@@ -279,13 +282,13 @@ fun EncryptFlow(
                 }
                 stage = EncryptStage.DONE
             } catch (e: ScryptMemoryException) {
-                error = e.message
+                error = UserMessage.text(context, e, R.string.files_encrypt_failed)
                 stage = EncryptStage.CONFIGURE
             } catch (e: OutOfMemoryError) {
                 error = context.getString(outOfMemoryMessage(!pass.isNullOrEmpty()))
                 stage = EncryptStage.CONFIGURE
             } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.files_encrypt_failed)
+                error = UserMessage.textUnlessCancelled(context, e, R.string.files_encrypt_failed)
                 stage = EncryptStage.CONFIGURE
             }
         }
@@ -341,7 +344,12 @@ fun EncryptFlow(
         EncryptStage.WORKING -> null
     }
 
-    AgeScreen(title = stringResource(R.string.files_encrypt), modifier = modifier, onBack = onBack) { padding ->
+    AgeScreen(
+        title = stringResource(R.string.files_encrypt),
+        modifier = modifier,
+        onBack = onBack,
+        actions = { if (stage == EncryptStage.DONE) DoneAction(onClose) },
+    ) { padding ->
     Column(Modifier.fillMaxSize().padding(padding)) {
         when (stage) {
             EncryptStage.PICK -> Column(
@@ -409,20 +417,23 @@ fun EncryptFlow(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 SectionHeader(stringResource(R.string.files_encrypt_section_source))
-                Text(
-                    when {
-                        sources.size > 1 && separate ->
+                if (sources.size > 1) {
+                    Text(
+                        if (separate) {
                             pluralStringResource(R.plurals.files_encrypt_source_separate, sources.size, sources.size)
-                        sources.size > 1 ->
+                        } else {
                             pluralStringResource(R.plurals.files_encrypt_source_bundle, sources.size, sources.size)
-                        else -> sources.firstOrNull()?.name ?: "file"
-                    },
-                    style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
+                        },
+                        style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    // One file: its name on one line, cut in the middle so the extension stays.
+                    OneLineValue(sources.firstOrNull()?.name ?: "file", color = MaterialTheme.colorScheme.onSurface)
+                }
                 // 0 means the provider reported no size; say nothing rather than "0 B".
                 if (totalSize > 0) {
                     Text(
-                        SafIo.humanSize(totalSize),
+                        SafIo.humanSize(LocalContext.current, totalSize),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -436,7 +447,7 @@ fun EncryptFlow(
                     }
                 }
 
-                HorizontalDivider()
+                ListDivider()
 
                 // Recipients, inline. Opening this used to replace the whole screen and then throw
                 // the user back to the top of the form on the way out (issue #2, item 4).
@@ -485,7 +496,7 @@ fun EncryptFlow(
                     )
                 }
 
-                HorizontalDivider()
+                ListDivider()
 
                 // Optional signing: in-app SSH keys sign in-process; a hardware key prompts
                 // for biometrics during the encrypt. Security keys stay on the Sign tab.
@@ -494,14 +505,19 @@ fun EncryptFlow(
                     SectionHeader(stringResource(R.string.files_encrypt_section_sign))
                     RadioRow(selected = signerId == null, title = stringResource(R.string.files_encrypt_dont_sign), onClick = { signerId = null })
                     signingIdentities.forEach { id ->
-                        RadioRow(selected = signerId == id.id, title = id.name, onClick = { signerId = id.id })
+                        RadioRow(
+                            selected = signerId == id.id,
+                            title = id.name,
+                            subtitle = KeyPickerText.subtitle(context, id),
+                            onClick = { signerId = id.id },
+                        )
                     }
                     Text(
                         stringResource(R.string.files_encrypt_sign_detail),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    HorizontalDivider()
+                    ListDivider()
                 }
 
                 // Remembered across files and launches (issue #2, item 1); the same switch
@@ -585,7 +601,7 @@ fun EncryptFlow(
                 )
                 if (bytesTotal > 0) {
                     Text(
-                        stringResource(R.string.files_progress_bytes, SafIo.humanSize(bytesDone), SafIo.humanSize(bytesTotal)),
+                        stringResource(R.string.files_progress_bytes, SafIo.humanSize(LocalContext.current, bytesDone), SafIo.humanSize(LocalContext.current, bytesTotal)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -603,21 +619,15 @@ fun EncryptFlow(
                         color = AgeStatus.colors.success,
                         icon = Icons.Filled.CheckCircle,
                     )
-                    savedName?.let { name ->
-                        Text(
-                            name,
-                            style = MaterialTheme.typography.mono,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    // The output is ciphertext, so it can go straight out to another app.
+                    savedName?.let { name -> OneLineValue(name) }
+                    // The output is ciphertext, so it can go straight out to another app. Sharing
+                    // it is the result's action, so it is the filled button (5.1.0, U4).
                     savedUri?.let { out ->
-                        OutlinedButton(
+                        PrimaryAction(
+                            stringResource(R.string.files_encrypt_share),
                             onClick = { ShareOut.file(context, out, savedName ?: "encrypted.age") },
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.files_encrypt_share)) }
+                        )
                     }
                 } else {
                     val okCount = results.count { it.ok }
@@ -642,11 +652,9 @@ fun EncryptFlow(
                                     tint = if (item.ok) AgeStatus.colors.success else AgeStatus.colors.failure,
                                     modifier = Modifier.size(16.dp),
                                 )
-                                Text(
+                                OneLineValue(
                                     item.name,
-                                    style = MaterialTheme.typography.mono,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.padding(start = 8.dp),
                                 )
                             }
@@ -659,15 +667,12 @@ fun EncryptFlow(
                         ListDivider()
                     }
                 }
-                Button(onClick = { encryptMore() }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.files_encrypt_more))
+                // Done sits in the app bar; the next files are their own row (5.1.0, U4).
+                Column(Modifier.fillMaxWidth()) {
+                    if (results.isEmpty()) ListDivider()
+                    RowAction(stringResource(R.string.files_encrypt_more), onClick = { encryptMore() })
+                    SectionFooter(stringResource(R.string.files_encrypt_more_detail))
                 }
-                Text(
-                    stringResource(R.string.files_encrypt_more_detail),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(stringResource(R.string.files_action_done)) }
             }
         }
     }
@@ -827,7 +832,7 @@ private suspend fun encryptToFolder(
         } catch (e: OutOfMemoryError) {
             throw e // a memory failure is not per-file; let the caller report it once
         } catch (e: Exception) {
-            onResult(EncryptResult(ref.name, false, e.message ?: context.getString(R.string.files_encrypt_failed)))
+            onResult(EncryptResult(ref.name, false, UserMessage.text(context, e, R.string.files_encrypt_failed)))
         }
     }
 }

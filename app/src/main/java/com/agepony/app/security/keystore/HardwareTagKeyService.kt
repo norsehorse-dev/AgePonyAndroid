@@ -45,7 +45,12 @@ import javax.crypto.KeyAgreement
  * auth-bound keys, and the UI says so before the user opts in.
  */
 object HardwareTagKeyService {
-    class HardwareTagException(message: String, cause: Throwable? = null) : Exception(message, cause)
+    /** [keyGone] when the Keystore no longer holds the key; the message is internal (5.1.0, UI plan U5). */
+    class HardwareTagException(
+        message: String,
+        cause: Throwable? = null,
+        val keyGone: Boolean = false,
+    ) : Exception(message, cause)
 
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
     const val ALIAS_PREFIX = "com.agepony.app.decrypt.p256."
@@ -237,7 +242,7 @@ object HardwareTagKeyService {
 
     private fun privateKey(alias: String): PrivateKey =
         (keystore().getEntry(alias, null) as? KeyStore.PrivateKeyEntry)?.privateKey
-            ?: throw HardwareTagException("This hardware key is gone from the device keystore.")
+            ?: throw HardwareTagException("key is gone from the device keystore", keyGone = true)
 
     private fun keyInfo(alias: String): KeyInfo {
         val priv = privateKey(alias)

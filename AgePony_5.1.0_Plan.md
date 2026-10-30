@@ -15,9 +15,9 @@ Last updated: 2026-10-16 (Rev 1, drafted). Nothing below is decided except where
 
 | Item | State |
 | --- | --- |
-| 1. YubiKey PIN before the tap | Planned. |
-| 2. YubiKey PIV over USB-C | Planned, blocked on hardware (see 2.4). |
-| 3. Picker rows show key material | Planned. |
+| 1. YubiKey PIN before the tap | Done in RC2 (unit tests; device pass waits on a working YubiKey). |
+| 2. YubiKey PIV over USB-C | Moved to 5.2.0, blocked on hardware (see 2.4). |
+| 3. Picker rows show key material | Done in RC2, including the Sign and encrypt-signer pickers. |
 | 4. GitHub issue housekeeping | To do, no build needed. |
 | 5. Carryovers | Listed, not triaged. |
 | U1 to U9 | UI restyle (no generated look), see `AgePony_5.1.0_UI_Plan.md` in the iOS repo; inventory in `AgePony_5.1.0_UI_Inventory_Android.md`. |
@@ -27,10 +27,10 @@ Last updated: 2026-10-16 (Rev 1, drafted). Nothing below is decided except where
 
 One RC at a time. RC2 is not started until RC1 is built and tested.
 
-- **RC1 (built, device pass pending):** UI foundations (U2, U3, U6), Sign folded into Files,
+- **RC1 (built, device pass green):** UI foundations (U2, U3, U6), Sign folded into Files,
   every string in resources (U1, six `strings_*.xml` files), Files tab with Encrypt/Decrypt
   buttons and the tool list, E7 CCTV vectors and the all-zero X25519 check in `agepony-core`.
-- **RC2:** screens and errors (U4, U5); item 1 (PIN before the tap, `pinPolicy` in
+- **RC2 (built, device pass green Oct 29):** screens and errors (U4, U5); item 1 (PIN before the tap, `pinPolicy` in
   `agepony.json` matching iOS); item 3 (picker rows); a strong-biometric-only lock to match iOS
   Face ID only (Q4, now in scope); and the iOS 5.1.1 follow-ups below.
 - **Item 2 (USB-C) moves to 5.2.0** (Q1): there is no working USB-C YubiKey to build it against.

@@ -14,6 +14,13 @@ import java.nio.file.Files
  *
  * Any cacheDir entry whose name starts with [PREFIX] is treated as AgePony staging and
  * removed, directories included. New temp files should use that prefix so they are covered.
+ *
+ * 5.1.0 check against iOS 5.1.1 M-2: decrypted output never goes through a temp file on
+ * Android. File decrypt streams straight into the document the user picked (and deletes it if
+ * the decrypt fails, audit L-18), and Text, passphrase mode and the share sheet keep plaintext in
+ * memory only. The only plaintext on disk is an encrypt's staging copy of its input, in the
+ * app-private cache, removed in a finally by the flow that made it, and swept here at process
+ * start (AgePonyApplication) and on every lock.
  */
 object TempFiles {
 
@@ -21,7 +28,11 @@ object TempFiles {
     const val PREFIX = "agepony-"
 
     fun sweep(context: Context) {
-        val dir = context.cacheDir ?: return
+        sweepDir(context.cacheDir ?: return)
+    }
+
+    /** [sweep] for one directory: removes every entry named with [PREFIX], nothing else. */
+    fun sweepDir(dir: File) {
         val entries = dir.listFiles() ?: return
         for (entry in entries) {
             if (!entry.name.startsWith(PREFIX)) continue

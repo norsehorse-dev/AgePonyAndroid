@@ -18,7 +18,23 @@ import java.security.spec.ECParameterSpec
  * (NFC IsoDep on Android). Response chaining (SW 61xx) is handled in [transceive].
  */
 object Piv {
-    class PivException(message: String, val sw: Int = 0) : Exception(message)
+    /**
+     * A PIV exchange failed. [reason] and [sw] are what the app shows; the message stays
+     * internal (5.1.0, UI plan U5). [foundSerial] and [expectedSerial] are set for WRONG_YUBIKEY.
+     */
+    class PivException(
+        message: String,
+        val sw: Int = 0,
+        val reason: PivException.Reason = PivException.Reason.MALFORMED,
+        val foundSerial: Long? = null,
+        val expectedSerial: Long? = null,
+    ) : Exception(message) {
+        enum class Reason {
+            NOT_PIV, PIN_CHECK_FAILED, NO_KEY_IN_SLOT, NOT_P256, REFUSED, MALFORMED,
+            KEY_MISMATCH, WRONG_YUBIKEY, APP_NOT_OPEN, NO_NFC, NFC_OFF, READER_FAILED, NOT_A_SMART_CARD,
+            MOVED_AWAY, HOLD_AGAIN,
+        }
+    }
     class WrongPinException(val retriesLeft: Int) : Exception(
         if (retriesLeft == 0) "The YubiKey PIN is blocked." else "Wrong PIN, $retriesLeft tries left."
     )
@@ -33,6 +49,8 @@ object Piv {
     const val SW_SECURITY_STATUS = 0x6982
     const val SW_AUTH_BLOCKED = 0x6983
     private const val ALG_ECC_P256 = 0x11
+    const val INS_VERIFY = 0x20
+    const val INS_GET_METADATA = 0xF7
 
     /**
      * Caps on 61xx GET RESPONSE chaining (audit L-11). The largest PIV object read here is a
@@ -46,7 +64,7 @@ object Piv {
 
     fun select(card: Card) {
         val (_, sw) = transceive(card, apdu(0x00, 0xA4, 0x04, 0x00, AID, le = true))
-        if (sw != SW_OK) throw PivException("This isn't a PIV card (select failed, SW %04X).".format(sw), sw)
+        if (sw != SW_OK) throw PivException("This isn't a PIV card (select failed, SW %04X).".format(sw), sw, PivException.Reason.NOT_PIV)
     }
 
     /** YubiKey serial number (YubiKey 5 firmware; older keys answer with an error, returned as null). */
@@ -59,15 +77,24 @@ object Piv {
     /** Verify [pin] (6 to 8 characters). Throws [WrongPinException] with the tries left. */
     fun verifyPin(card: Card, pin: String) {
         val bytes = pin.toByteArray(Charsets.UTF_8)
-        require(bytes.size in 1..8) { "A PIV PIN is 6 to 8 characters." }
-        val padded = ByteArray(8) { 0xFF.toByte() }.also { bytes.copyInto(it) }
-        val (_, sw) = transceive(card, apdu(0x00, 0x20, 0x00, 0x80, padded, le = false))
-        padded.fill(0)
+        val padded = ByteArray(8) { 0xFF.toByte() }
+        var command: ByteArray? = null
+        val sw = try {
+            require(bytes.size in 1..8) { "A PIV PIN is 6 to 8 characters." }
+            bytes.copyInto(padded)
+            command = apdu(0x00, INS_VERIFY, 0x00, 0x80, padded, le = false)
+            transceive(card, command).second
+        } finally {
+            // Wipe every copy we made of the PIN, on every path (5.1.0 review).
+            bytes.fill(0)
+            padded.fill(0)
+            command?.fill(0)
+        }
         when {
             sw == SW_OK -> Unit
             sw and 0xFFF0 == 0x63C0 -> throw WrongPinException(sw and 0x0F)
             sw == SW_AUTH_BLOCKED -> throw WrongPinException(0)
-            else -> throw PivException("PIN check failed (SW %04X).".format(sw), sw)
+            else -> throw PivException("PIN check failed (SW %04X).".format(sw), sw, PivException.Reason.PIN_CHECK_FAILED)
         }
     }
 
@@ -76,12 +103,12 @@ object Piv {
         val objectId = certObjectId(slot)
         val data = byteArrayOf(0x5C, 0x03) + objectId
         val (resp, sw) = transceive(card, apdu(0x00, 0xCB, 0x3F, 0xFF, data, le = true))
-        if (sw != SW_OK) throw PivException("No age key in slot %02X of this YubiKey (SW %04X).".format(slot, sw), sw)
+        if (sw != SW_OK) throw PivException("No age key in slot %02X of this YubiKey (SW %04X).".format(slot, sw), sw, PivException.Reason.NO_KEY_IN_SLOT)
         val outer = Tlv.find(resp, 0x53) ?: throw PivException("Unexpected certificate object layout.")
-        val der = Tlv.find(outer, 0x70) ?: throw PivException("Slot %02X holds no certificate.".format(slot))
+        val der = Tlv.find(outer, 0x70) ?: throw PivException("Slot %02X holds no certificate.".format(slot), reason = PivException.Reason.NO_KEY_IN_SLOT)
         val cert = CertificateFactory.getInstance("X.509").generateCertificate(ByteArrayInputStream(der)) as X509Certificate
-        val pub = cert.publicKey as? ECPublicKey ?: throw PivException("Slot %02X key isn't elliptic-curve.".format(slot))
-        if (!isP256(pub.params)) throw PivException("Slot %02X key isn't P-256.".format(slot))
+        val pub = cert.publicKey as? ECPublicKey ?: throw PivException("Slot %02X key isn't elliptic-curve.".format(slot), reason = PivException.Reason.NOT_P256)
+        if (!isP256(pub.params)) throw PivException("Slot %02X key isn't P-256.".format(slot), reason = PivException.Reason.NOT_P256)
         val x = fixed32(pub.w.affineX.toByteArray())
         val y = pub.w.affineY
         val compressed = byteArrayOf(if (y.testBit(0)) 0x03 else 0x02) + x
@@ -123,12 +150,30 @@ object Piv {
         when (sw) {
             SW_OK -> Unit
             SW_SECURITY_STATUS -> throw PinRequiredException()
-            else -> throw PivException("The YubiKey refused the decryption (SW %04X).".format(sw), sw)
+            else -> throw PivException("The YubiKey refused the decryption (SW %04X).".format(sw), sw, PivException.Reason.REFUSED)
         }
         val template = Tlv.find(resp, 0x7C) ?: throw PivException("Unexpected ECDH response.")
         val secret = Tlv.find(template, 0x82) ?: throw PivException("ECDH response had no shared secret.")
         if (secret.size != 32) throw PivException("Unexpected shared secret size ${secret.size}.")
         return secret
+    }
+
+    /**
+     * YubiKey GET METADATA (INS F7, firmware 5.3+) for [slot]: the PIN policy of the key in it
+     * (5.1.0 item 1). Older firmware answers 6D00, which gives [YubiKeyPinPolicy.UNKNOWN], as does
+     * any other refusal or an answer without a policy. Only the transport can throw.
+     */
+    fun pinPolicy(card: Card, slot: Int): YubiKeyPinPolicy {
+        val (resp, sw) = transceive(card, apdu(0x00, INS_GET_METADATA, 0x00, slot, ByteArray(0), le = true))
+        return pinPolicy(resp, sw)
+    }
+
+    /** The PIN policy in a GET METADATA answer: tag 02, byte 0. Anything but 9000 with a well-formed policy tag is unknown. */
+    fun pinPolicy(metadata: ByteArray, sw: Int): YubiKeyPinPolicy {
+        if (sw != SW_OK) return YubiKeyPinPolicy.UNKNOWN
+        val policy = runCatching { Tlv.find(metadata, 0x02) }.getOrNull() ?: return YubiKeyPinPolicy.UNKNOWN
+        if (policy.isEmpty()) return YubiKeyPinPolicy.UNKNOWN
+        return YubiKeyPinPolicy.fromMetadataByte(policy[0].toInt())
     }
 
     /** Object id of a retired key-management slot's certificate: 82 -> 5FC10D ... 95 -> 5FC120. */

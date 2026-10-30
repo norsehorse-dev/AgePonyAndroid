@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -53,6 +52,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.ui.semantics.Role
 import com.agepony.app.ui.components.AgeScreen
 import com.agepony.app.ui.components.ChoiceField
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.files.KeyPickerText
 import com.agepony.app.ui.components.QuietAction
 import com.agepony.app.ui.components.RadioRow
 import com.agepony.app.ui.components.SectionHeader
@@ -73,6 +74,12 @@ import com.agepony.app.R
 // erase-after-failed-attempts. A duress secret makes the vault PIN-only, so the lock mode
 // rows are disabled while one is set (H-1).
 //
+// 5.1.0: Biometrics only (iOS E6), listed when a strong biometric is enrolled and no duress
+// secret is set. Choosing it explains what it means first; without a password it offers to set
+// one and switches once it is saved. Leaving it asks for the app password (L-15), and the
+// password can't be removed while it is the mode. Setting the first password asks the owner to
+// confirm with a biometric or the screen lock first (iOS H-1).
+//
 private enum class SettingsSub { HELP, SECURITY, LICENSES, TRASH, SEND_KEYS, RECEIVE_KEYS, PAPER_RESTORE }
 private enum class ProxyMode { OFF, ORBOT, CUSTOM }
 
@@ -91,6 +98,9 @@ fun SettingsScreen(
     var showSetPassword by remember { mutableStateOf(false) }
     var showSetDuress by remember { mutableStateOf(false) }
     var confirmRemovePassword by remember { mutableStateOf(false) }
+    var showBiometricOnlyDialog by remember { mutableStateOf(false) }
+    // Set when the password sheet was opened from the Biometrics only dialog: switch once saved.
+    var biometricOnlyAfterPassword by remember { mutableStateOf(false) }
     var passwordOnlyNotice by remember { mutableStateOf<String?>(null) }
 
     // Re-auth before loosening the lock (audit L-15). The second form always asks the app
@@ -113,6 +123,8 @@ fun SettingsScreen(
     val confirmStopErasingTitle = stringResource(R.string.settings_confirm_stop_erasing)
     val allowScreenshotsTitle = stringResource(R.string.settings_screenshots)
     val confirmLockLessTitle = stringResource(R.string.settings_confirm_lock_less)
+    val confirmSetSecretTitle = stringResource(R.string.settings_confirm_set_secret)
+    val confirmChangeLockTitle = stringResource(R.string.settings_confirm_change_lock)
 
     fun openUrl(url: String) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
@@ -189,6 +201,17 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        // Leaving Biometrics only lets the screen lock back in, and leaving password-only No lock
+        // adds the screen lock or a biometric as a way in: the app password first either way
+        // (L-15; iOS H-1).
+        fun switchLock(target: LockMode) {
+            if (target == vm.lockMode) return
+            if ((vm.lockMode == LockMode.BIOMETRIC_ONLY || vault.passwordIsOnlyUnlock()) && vm.passwordEnrolled) {
+                confirmWithPassword(confirmChangeLockTitle) { vm.applyLockMode(activity, target) }
+            } else {
+                vm.applyLockMode(activity, target)
+            }
+        }
         LockModeRow(
             selected = vm.lockMode == LockMode.BIOMETRIC,
             title = stringResource(R.string.settings_lock_biometric),
@@ -198,8 +221,43 @@ fun SettingsScreen(
                 stringResource(R.string.settings_lock_biometric_unavailable)
             },
             enabled = !vm.isBusy && hasBiometric && !pinOnly,
-            onClick = { vm.applyLockMode(activity, LockMode.BIOMETRIC) },
+            onClick = { switchLock(LockMode.BIOMETRIC) },
         )
+        // Biometrics only (5.1.0, iOS E6). Named after what the phone has.
+        val fingerprintOnly = remember { BiometricGate.fingerprintOnlyHardware(context) }
+        val biometricOnlyTitle = stringResource(
+            if (fingerprintOnly) R.string.settings_lock_fingerprint_only else R.string.settings_lock_biometric_only
+        )
+        if (LockMode.biometricOnlyListed(vm.lockMode, pinOnly, hasBiometric)) {
+            LockModeRow(
+                selected = vm.lockMode == LockMode.BIOMETRIC_ONLY,
+                title = biometricOnlyTitle,
+                subtitle = when {
+                    !hasBiometric -> stringResource(R.string.settings_lock_biometric_unavailable)
+                    !vm.passwordEnrolled -> stringResource(R.string.settings_lock_biometric_only_detail_none)
+                    isPin -> stringResource(R.string.settings_lock_biometric_only_detail_pin)
+                    else -> stringResource(R.string.settings_lock_biometric_only_detail_password)
+                },
+                enabled = !vm.isBusy && !pinOnly && (hasBiometric || vm.lockMode == LockMode.BIOMETRIC_ONLY),
+                onClick = { if (vm.lockMode != LockMode.BIOMETRIC_ONLY) showBiometricOnlyDialog = true },
+            )
+            // The mode's key stopped working (a biometric added or removed): offer a new one.
+            val biometricOnlyBroken = remember(vm.isBusy, vm.lockMode) {
+                vm.lockMode == LockMode.BIOMETRIC_ONLY && vault.isUnlocked &&
+                    !BiometricGate.biometricOnlyUsable(context)
+            }
+            if (biometricOnlyBroken) {
+                Text(
+                    stringResource(R.string.settings_biometric_only_off_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(
+                    onClick = { vm.restoreBiometricOnly(activity) },
+                    enabled = !vm.isBusy && hasBiometric,
+                ) { Text(stringResource(R.string.settings_biometric_only_turn_on_again)) }
+            }
+        }
         LockModeRow(
             selected = vm.lockMode == LockMode.DEVICE_CREDENTIAL,
             title = stringResource(R.string.settings_lock_device),
@@ -209,7 +267,7 @@ fun SettingsScreen(
                 else -> stringResource(R.string.settings_lock_device_detail)
             },
             enabled = !vm.isBusy && deviceSecure && !pinOnly,
-            onClick = { vm.applyLockMode(activity, LockMode.DEVICE_CREDENTIAL) },
+            onClick = { switchLock(LockMode.DEVICE_CREDENTIAL) },
         )
         LockModeRow(
             selected = vm.lockMode == LockMode.OFF,
@@ -234,7 +292,9 @@ fun SettingsScreen(
         // home of the duress password.
         if (!vm.passwordEnrolled) {
             OutlinedButton(
-                onClick = { showSetPassword = true },
+                // The first password is a new way in, and later owner checks trust it: the owner
+                // confirms first, not just whoever holds the unlocked app (5.1.0, iOS H-1).
+                onClick = { confirmIdentity(confirmSetSecretTitle) { showSetPassword = true } },
                 enabled = vm.vault.isUnlocked && !vm.isBusy,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             ) { Text(stringResource(R.string.settings_set_secret_button)) }
@@ -269,8 +329,8 @@ fun SettingsScreen(
                 }
                 TextButton(
                     onClick = {
-                        // Never strand the vault (audit L-16).
-                        if (vault.passwordIsOnlyUnlock()) {
+                        // Never strand the vault (audit L-16), and keep Biometrics only's way back in (E6).
+                        if (vm.passwordRemovalRefused()) {
                             passwordOnlyNotice = vm.passwordOnlyMessage()
                         } else {
                             confirmRemovePassword = true
@@ -368,7 +428,7 @@ fun SettingsScreen(
             )
         }
 
-        HorizontalDivider()
+        ListDivider()
 
         // Encryption
         SectionHeader(stringResource(R.string.files_section_encryption))
@@ -410,39 +470,43 @@ fun SettingsScreen(
         }
 
         var workFactor by remember { mutableStateOf(vault.scryptWorkFactor) }
-        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.settings_work_factor), style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    if (workFactor == FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR) {
-                        stringResource(
-                            R.string.settings_work_factor_detail_default,
-                            workFactor,
-                            FileEncryptor.scryptMemoryBytes(workFactor) shr 20,
-                        )
-                    } else {
-                        stringResource(
-                            R.string.settings_work_factor_detail_custom,
-                            workFactor,
-                            FileEncryptor.scryptMemoryBytes(workFactor) shr 20,
-                            FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR,
-                        )
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // A menu of the allowed factors, as on iOS, instead of Less and More buttons squeezed
+        // beside the label (5.1.0, U4).
+        ChoiceField(
+            label = stringResource(R.string.settings_work_factor),
+            selected = workFactor,
+            options = (FileEncryptor.MIN_SCRYPT_WORK_FACTOR..FileEncryptor.MAX_SCRYPT_WORK_FACTOR).toList(),
+            optionLabel = { factor ->
+                stringResource(
+                    if (factor == FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR) R.string.settings_work_factor_option_default
+                    else R.string.settings_work_factor_option,
+                    factor,
+                    FileEncryptor.scryptMemoryBytes(factor) shr 20,
                 )
-            }
-            TextButton(
-                onClick = { workFactor -= 1; vault.scryptWorkFactor = workFactor },
-                enabled = workFactor > FileEncryptor.MIN_SCRYPT_WORK_FACTOR,
-            ) { Text(stringResource(R.string.settings_work_factor_less)) }
-            TextButton(
-                onClick = { workFactor += 1; vault.scryptWorkFactor = workFactor },
-                enabled = workFactor < FileEncryptor.MAX_SCRYPT_WORK_FACTOR,
-            ) { Text(stringResource(R.string.settings_work_factor_more)) }
-        }
+            },
+            onSelect = { factor -> workFactor = factor; vault.scryptWorkFactor = factor },
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        )
+        Text(
+            if (workFactor == FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR) {
+                stringResource(
+                    R.string.settings_work_factor_detail_default,
+                    workFactor,
+                    FileEncryptor.scryptMemoryBytes(workFactor) shr 20,
+                )
+            } else {
+                stringResource(
+                    R.string.settings_work_factor_detail_custom,
+                    workFactor,
+                    FileEncryptor.scryptMemoryBytes(workFactor) shr 20,
+                    FileEncryptor.DEFAULT_SCRYPT_WORK_FACTOR,
+                )
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
-        HorizontalDivider()
+        ListDivider()
 
         // Auto-lock
         SectionHeader(stringResource(R.string.settings_section_autolock))
@@ -466,7 +530,7 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        HorizontalDivider()
+        ListDivider()
 
         // Network
         SectionHeader(stringResource(R.string.settings_section_network))
@@ -603,7 +667,7 @@ fun SettingsScreen(
             )
         }
 
-        HorizontalDivider()
+        ListDivider()
 
         // Active identity
         SectionHeader(stringResource(R.string.settings_section_active_identity))
@@ -619,7 +683,8 @@ fun SettingsScreen(
                 label = stringResource(R.string.settings_identity_label),
                 selected = active,
                 options = vault.identities.toList(),
-                optionLabel = { it.name },
+                // Name, type and key, as every key picker shows them (5.1.0 item 3).
+                optionLabel = { KeyPickerText.menuLine(LocalContext.current, it) },
                 onSelect = { identity ->
                     activeId = identity.id
                     vault.activeIdentityId = identity.id
@@ -633,26 +698,21 @@ fun SettingsScreen(
             )
         }
 
-        HorizontalDivider()
+        ListDivider()
 
         // Keys on other devices (5.0.0)
         SectionHeader(stringResource(R.string.settings_section_keys))
-        OutlinedButton(onClick = { subScreen = SettingsSub.SEND_KEYS }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.settings_send_keys))
-        }
-        OutlinedButton(onClick = { subScreen = SettingsSub.RECEIVE_KEYS }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.settings_receive_keys))
-        }
-        OutlinedButton(onClick = { subScreen = SettingsSub.PAPER_RESTORE }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.settings_paper_restore))
-        }
+        // Each opens its own screen, so they are rows with a chevron, not buttons (5.1.0, U4).
+        ActionRow(label = stringResource(R.string.settings_send_keys), onClick = { subScreen = SettingsSub.SEND_KEYS })
+        ActionRow(label = stringResource(R.string.settings_receive_keys), onClick = { subScreen = SettingsSub.RECEIVE_KEYS })
+        ActionRow(label = stringResource(R.string.settings_paper_restore), onClick = { subScreen = SettingsSub.PAPER_RESTORE })
         Text(
             stringResource(R.string.settings_keys_detail),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        HorizontalDivider()
+        ListDivider()
 
         OutlinedButton(onClick = { vm.lock() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.settings_lock_now)) }
 
@@ -660,7 +720,7 @@ fun SettingsScreen(
             Text(vm.error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
 
-        HorizontalDivider()
+        ListDivider()
 
         // About
         SectionHeader(stringResource(R.string.settings_section_about))
@@ -671,13 +731,13 @@ fun SettingsScreen(
         ActionRow(label = stringResource(R.string.settings_licenses), onClick = { subScreen = SettingsSub.LICENSES })
         AboutRow(stringResource(R.string.settings_made_by), "NorseHorse")
 
-        HorizontalDivider()
+        ListDivider()
 
         // AgePony for Desktop — the same product on the desktop, not a sibling
         // app, so it sits above the More-from list. Mirrors PGPony's desktop promo.
         MoreRow(stringResource(R.string.settings_desktop), stringResource(R.string.settings_desktop_detail)) { openUrl("https://agepony.com/desktop") }
 
-        HorizontalDivider()
+        ListDivider()
 
         // More from NorseHorse — the sibling apps, each linking to its product
         // site. AgePony itself is omitted since this is it. Mirrors PGPony's
@@ -694,7 +754,7 @@ fun SettingsScreen(
         MoreRow("RelayPony", stringResource(R.string.settings_more_relaypony_detail)) { openUrl("https://relaypony.app") }
         MoreRow("ScrubPony", stringResource(R.string.settings_more_scrubpony_detail)) { openUrl("https://scrubpony.app") }
 
-        HorizontalDivider()
+        ListDivider()
 
         // Help & feedback
         SectionHeader(stringResource(R.string.settings_section_help))
@@ -728,7 +788,7 @@ fun SettingsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        HorizontalDivider()
+        ListDivider()
 
         // Reset
         SectionHeader(stringResource(R.string.settings_reset))
@@ -766,10 +826,63 @@ fun SettingsScreen(
             allowKindChoice = true,
             initialKind = vm.unlockSecretKind,
             onConfirm = { secret, kind, _ ->
-                vm.enrollPassword(secret, kind)
+                val switchAfter = biometricOnlyAfterPassword
+                biometricOnlyAfterPassword = false
+                vm.enrollPassword(secret, kind) {
+                    if (switchAfter) vm.applyLockMode(context as FragmentActivity, LockMode.BIOMETRIC_ONLY)
+                }
                 showSetPassword = false
             },
-            onDismiss = { showSetPassword = false },
+            onDismiss = { showSetPassword = false; biometricOnlyAfterPassword = false },
+        )
+    }
+
+    if (showBiometricOnlyDialog) {
+        val fingerprintOnly = remember { BiometricGate.fingerprintOnlyHardware(context) }
+        AlertDialog(
+            onDismissRequest = { showBiometricOnlyDialog = false },
+            title = {
+                Text(
+                    stringResource(
+                        if (fingerprintOnly) R.string.settings_lock_fingerprint_only else R.string.settings_lock_biometric_only
+                    )
+                )
+            },
+            text = {
+                Column {
+                    Text(stringResource(R.string.settings_biometric_only_dialog_body))
+                    if (!vm.passwordEnrolled) {
+                        Text(
+                            stringResource(R.string.settings_biometric_only_dialog_needs_secret),
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                if (vm.passwordEnrolled) {
+                    // From password-only No lock this adds a way in, so the app password first
+                    // (iOS H-1). From another mode it narrows the lock, and the biometric prompt
+                    // that makes the key is the check.
+                    TextButton(onClick = {
+                        showBiometricOnlyDialog = false
+                        val apply = { vm.applyLockMode(context as FragmentActivity, LockMode.BIOMETRIC_ONLY) }
+                        if (vault.passwordIsOnlyUnlock()) confirmWithPassword(confirmChangeLockTitle) { apply() } else apply()
+                    }) { Text(stringResource(R.string.settings_biometric_only_turn_on)) }
+                } else {
+                    TextButton(onClick = {
+                        showBiometricOnlyDialog = false
+                        // The first password needs the owner (iOS H-1), then the mode switches once it is saved.
+                        confirmIdentity(confirmSetSecretTitle) {
+                            biometricOnlyAfterPassword = true
+                            showSetPassword = true
+                        }
+                    }) { Text(stringResource(R.string.settings_biometric_only_set_secret)) }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBiometricOnlyDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
         )
     }
 
@@ -877,14 +990,17 @@ private fun SetSecretDialog(
                     Text(body, style = MaterialTheme.typography.bodyMedium)
                 }
                 if (allowKindChoice) {
-                    Row(modifier = Modifier.padding(top = 8.dp)) {
-                        TextButton(onClick = { kind = "password" }) {
-                            Text(stringResource(R.string.settings_kind_password), color = if (!isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        TextButton(onClick = { kind = "pin" }) {
-                            Text(stringResource(R.string.settings_kind_pin), color = if (isPin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+                    // A menu, not two text buttons posing as segments (5.1.0, U4).
+                    ChoiceField(
+                        label = stringResource(R.string.settings_secret_type),
+                        selected = kind,
+                        options = listOf("password", "pin"),
+                        optionLabel = {
+                            stringResource(if (it == "pin") R.string.settings_kind_pin else R.string.settings_kind_password)
+                        },
+                        onSelect = { kind = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    )
                 }
                 val kb = KeyboardOptions(keyboardType = if (isPin) KeyboardType.NumberPassword else KeyboardType.Password)
                 if (currentLabel != null) {

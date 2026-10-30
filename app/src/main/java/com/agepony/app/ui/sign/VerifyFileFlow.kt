@@ -1,5 +1,6 @@
 package com.agepony.app.ui.sign
 
+import com.agepony.app.ui.UserMessage
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,7 +15,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.agepony.app.signing.FileVerifier
 import com.agepony.app.ui.files.SafIo
@@ -48,6 +47,12 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import com.agepony.app.ui.components.AgeScreen
+import com.agepony.app.ui.components.DoneAction
+import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.OneLineValue
+import com.agepony.app.ui.components.PrimaryAction
+import com.agepony.app.ui.components.RowAction
+import com.agepony.app.ui.components.ValueRow
 import com.agepony.app.ui.components.ErrorText
 import com.agepony.app.ui.components.StatusText
 import com.agepony.app.ui.components.VerdictPanel
@@ -99,7 +104,7 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                 }
                 stage = VerifyStage.RESULT
             } catch (e: Exception) {
-                error = e.message ?: context.getString(R.string.sign_verify_not_ssh_signature)
+                error = UserMessage.text(context, e, R.string.sign_verify_not_ssh_signature)
                 stage = VerifyStage.PICK
             }
         }
@@ -123,6 +128,7 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
         title = stringResource(R.string.files_verify),
         modifier = modifier,
         onBack = if (stage == VerifyStage.WORKING) null else onClose,
+        actions = { if (stage == VerifyStage.RESULT) DoneAction(onClose) },
     ) { padding ->
     when (stage) {
         VerifyStage.PICK -> Column(
@@ -178,12 +184,7 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                         .padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(
-                        file?.name ?: "",
-                        style = MaterialTheme.typography.mono,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    OneLineValue(file?.name ?: "", color = MaterialTheme.colorScheme.onSurface)
 
                     when (r.trust) {
                         FileVerifier.Trust.TRUSTED -> VerdictPanel(
@@ -201,7 +202,8 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                                 detail = stringResource(
                                     R.string.sign_verify_untrusted_detail,
                                     r.untrustedSignerName ?: "",
-                                    r.untrustedReason ?: stringResource(R.string.sign_verify_untrusted_default_reason),
+                                    r.untrustedReason?.resolve(LocalContext.current)
+                                        ?: stringResource(R.string.sign_verify_untrusted_default_reason),
                                 ),
                                 color = AgeStatus.colors.warning,
                                 icon = Icons.Filled.Warning,
@@ -216,25 +218,31 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                         }
                         FileVerifier.Trust.INVALID -> VerdictPanel(
                             title = stringResource(R.string.sign_verify_invalid_title),
-                            detail = r.reason ?: stringResource(R.string.sign_verify_failed),
+                            detail = r.reason?.resolve(LocalContext.current) ?: stringResource(R.string.sign_verify_failed),
                             color = AgeStatus.colors.failure,
                             icon = Icons.Filled.Warning,
                         )
                     }
 
-                    Text(
-                        r.keyType,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    r.signerPublicWire?.let { wire ->
-                        Text(
-                            StoredSigner.sshFingerprint(wire),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    // Details as rows under the verdict (5.1.0, U4). The fingerprint wraps in full,
+                    // since it is what people compare.
+                    Column(Modifier.fillMaxWidth()) {
+                        ValueRow(stringResource(R.string.sign_verify_key_type_label), r.keyType, mono = true)
+                        r.signerPublicWire?.let { wire ->
+                            ListDivider()
+                            Text(
+                                stringResource(R.string.sign_verify_fingerprint_label),
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                            Text(
+                                StoredSigner.sshFingerprint(wire),
+                                style = MaterialTheme.typography.mono,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                            )
+                        }
+                        ListDivider()
                     }
 
                     if (addedName != null) {
@@ -246,13 +254,17 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                     } else if (r.trust == FileVerifier.Trust.VALID_UNKNOWN && r.signerPublicWire != null &&
                         r.untrustedSignerName == null
                     ) {
-                        OutlinedButton(
+                        // The one thing to do with an unknown signer, so it is the filled button.
+                        PrimaryAction(
+                            stringResource(R.string.sign_verify_add_signer),
                             onClick = { showAddSigner = true },
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.sign_verify_add_signer)) }
+                        )
                     }
 
-                    Button(
+                    // Done sits in the app bar; the next file is its own row (5.1.0, U4).
+                    RowAction(
+                        stringResource(R.string.sign_verify_another),
                         onClick = {
                             result = null
                             file = null
@@ -260,9 +272,7 @@ fun VerifyFileFlow(vault: Vault, modifier: Modifier = Modifier, onClose: () -> U
                             addedName = null
                             stage = VerifyStage.PICK
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(stringResource(R.string.sign_verify_another)) }
-                    OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.app_done)) }
+                    )
                 }
 
                 if (showAddSigner && r.signerPublicWire != null) {

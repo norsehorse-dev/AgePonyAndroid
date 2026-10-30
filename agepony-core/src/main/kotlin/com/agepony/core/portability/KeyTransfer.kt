@@ -36,7 +36,14 @@ object KeyTransfer {
     private const val SSH_DIR = "ssh/"
     private const val MAX_ENTRIES = 512
 
-    class TransferException(message: String, cause: Throwable? = null) : Exception(message, cause)
+    /** [reason] is what the app shows; the message stays internal (5.1.0, UI plan U5). */
+    class TransferException(
+        message: String,
+        cause: Throwable? = null,
+        val reason: TransferException.Reason = TransferException.Reason.NOT_A_TRANSFER,
+    ) : Exception(message, cause) {
+        enum class Reason { NOT_A_TRANSFER, TOO_MANY_ENTRIES, UNSUPPORTED_FORMAT, WRONG_SESSION, NOT_A_RECIPIENT }
+    }
 
     class Bundle(
         /** Contents of identities.txt (may be empty if only SSH keys were sent). */
@@ -86,11 +93,11 @@ object KeyTransfer {
         } catch (e: Exception) {
             throw TransferException("This isn't an AgePony key transfer (not a valid archive).", e)
         }
-        if (entries.size > MAX_ENTRIES) throw TransferException("Transfer has too many entries.")
+        if (entries.size > MAX_ENTRIES) throw TransferException("Transfer has too many entries.", reason = TransferException.Reason.TOO_MANY_ENTRIES)
         val byName = entries.associateBy { it.name }
         val format = byName[FORMAT_FILE]?.data?.toString(Charsets.UTF_8)?.trim()
             ?: throw TransferException("This isn't an AgePony key transfer (no FORMAT entry).")
-        if (format != FORMAT_LINE) throw TransferException("Unsupported transfer format: $format")
+        if (format != FORMAT_LINE) throw TransferException("Unsupported transfer format: $format", reason = TransferException.Reason.UNSUPPORTED_FORMAT)
         val ssh = entries.filter { it.name.startsWith(SSH_DIR) && it.name.length > SSH_DIR.length }
             .associate { it.name.removePrefix(SSH_DIR) to it.data.toString(Charsets.UTF_8) }
         return Bundle(
@@ -109,7 +116,7 @@ object KeyTransfer {
         val tar = try {
             Age.decrypt(binary, listOf(with))
         } catch (e: Age.NoMatchingIdentityException) {
-            throw TransferException("This transfer was made for a different receive session.", e)
+            throw TransferException("This transfer was made for a different receive session.", e, TransferException.Reason.WRONG_SESSION)
         }
         return unpack(tar)
     }
@@ -122,7 +129,7 @@ object KeyTransfer {
         return when {
             t.startsWith("age1pq1") -> HybridRecipient(t)
             t.startsWith("age1") -> X25519Recipient(t)
-            else -> throw TransferException("That isn't an age recipient.")
+            else -> throw TransferException("That isn't an age recipient.", reason = TransferException.Reason.NOT_A_RECIPIENT)
         }
     }
 

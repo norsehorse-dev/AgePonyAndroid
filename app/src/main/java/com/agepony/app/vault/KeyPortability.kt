@@ -18,6 +18,9 @@ import com.agepony.core.ssh.OpenSSHPublicKey
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.time.Instant
 import java.util.UUID
@@ -80,8 +83,28 @@ object KeyPortability {
         val identitiesTxt = KeyTransfer.identityFile(movable.mapNotNull(::identityLine))
         val ssh = movable.filter { it.type == StoredIdentityType.SSH_RSA }
             .associate { it.name to String(b64d(it.privateKeyB64), Charsets.UTF_8) }
-        val meta = TransferMetadata(identities = movable, recipients = recipients, signers = signers)
-        return KeyTransfer.Bundle(identitiesTxt, ssh, json.encodeToString(TransferMetadata.serializer(), meta))
+        val meta = TransferMetadata(identities = movable.map(::wirePinPolicy), recipients = recipients, signers = signers)
+        return KeyTransfer.Bundle(identitiesTxt, ssh, metadataJson(meta))
+    }
+
+    /**
+     * `pinPolicy` travels as iOS writes it (5.1.0 item 1): "required" or "notRequired" on a
+     * `yubikeyPiv` record, left out when unknown and on every other type. Older readers on
+     * either platform ignore it.
+     */
+    private fun wirePinPolicy(identity: StoredIdentity): StoredIdentity =
+        identity.copy(pinPolicy = null).let {
+            if (identity.type == StoredIdentityType.YUBIKEY_PIV) it.withYubiKeyPinPolicy(identity.yubiKeyPinPolicy) else it
+        }
+
+    /** [meta] as JSON, with a null `pinPolicy` left out of each identity, as iOS leaves it out. */
+    internal fun metadataJson(meta: TransferMetadata): String {
+        val root = json.encodeToJsonElement(TransferMetadata.serializer(), meta).jsonObject
+        val identities = (root["identities"] as? JsonArray).orEmpty().map { element ->
+            val record = element as? JsonObject ?: return@map element
+            if (record["pinPolicy"] is JsonNull) JsonObject(record - "pinPolicy") else record
+        }
+        return json.encodeToString(JsonElement.serializer(), JsonObject(root + ("identities" to JsonArray(identities))))
     }
 
     /** What an incoming transfer holds, before anything is written. */
@@ -97,21 +120,23 @@ object KeyPortability {
      * Identities whose private key doesn't produce their stated public key are dropped, and so
      * are recipients and signers whose key doesn't parse.
      */
-    fun readBundle(bundle: KeyTransfer.Bundle): Incoming {
+    fun readBundle(bundle: KeyTransfer.Bundle, names: DefaultKeyNames): Incoming {
         val root = runCatching { json.parseToJsonElement(bundle.metadataJson).jsonObject }.getOrNull()
         if (root != null) {
             fun <T> each(key: String, s: kotlinx.serialization.KSerializer<T>): List<T> =
                 (root[key] as? JsonArray).orEmpty().mapNotNull { runCatching { json.decodeFromJsonElement(s, it) }.getOrNull() }
-            val ids = each("identities", StoredIdentity.serializer()).filter { isTransferable(it) && isConsistent(it) }
+            val ids = each("identities", StoredIdentity.serializer())
+                .filter { isTransferable(it) && isConsistent(it) }
+                .map(::wirePinPolicy)
             val recips = each("recipients", StoredRecipient.serializer()).filter { r -> runCatching { r.toAgeRecipient() }.isSuccess }
             val signers = each("signers", StoredSigner.serializer()).filter(::signerKeyReadable)
             return Incoming(ids, recips, signers)
         }
         // No AgePony metadata (a hand-built transfer): use the plain identity file and SSH keys.
         val ssh = bundle.sshKeys.mapNotNull { (name, pem) ->
-            runCatching { IdentityImport.fromOpenSSHPem(pem, null, name) }.getOrNull()
+            runCatching { IdentityImport.fromOpenSSHPem(pem, null, name, names) }.getOrNull()
         }
-        return Incoming(identitiesFromText(bundle.identitiesTxt) + ssh, emptyList(), emptyList())
+        return Incoming(identitiesFromText(bundle.identitiesTxt, names) + ssh, emptyList(), emptyList())
     }
 
     /**
@@ -188,11 +213,11 @@ object KeyPortability {
     }.getOrDefault(false)
 
     /** Parse the age secret keys in an identity file into vault records, keeping `# name:` labels. */
-    fun identitiesFromText(identityFile: String): List<StoredIdentity> {
+    fun identitiesFromText(identityFile: String, defaultNames: DefaultKeyNames): List<StoredIdentity> {
         val names = PaperBackup.namesByKey(identityFile)
         return PaperBackup.secretKeys(identityFile).mapIndexedNotNull { i, secret ->
             runCatching {
-                IdentityImport.fromAgeSecretKey(secret, names[secret] ?: "restored key ${i + 1}")
+                IdentityImport.fromAgeSecretKey(secret, names[secret] ?: defaultNames.restoredKey(i + 1), defaultNames)
             }.getOrNull()
         }
     }
@@ -253,17 +278,23 @@ object KeyPortability {
         if (isKnown(vault, recipient)) null else vault.recipients.firstOrNull { sameName(it.name, recipient.name) }
 
     /** A signer's name is what a verified file shows, so it may not reuse a signer's or an identity's name. */
-    fun nameClash(vault: Vault, signer: StoredSigner): String? {
+    fun nameClash(vault: Vault, signer: StoredSigner): SignerNameClash? {
         if (isKnown(vault, signer)) return null
-        vault.signers.firstOrNull { sameName(it.name, signer.name) }?.let { return "a trusted signer" }
-        vault.identities.firstOrNull { sameName(it.name, signer.name) }?.let { return "one of your identities" }
+        vault.signers.firstOrNull { sameName(it.name, signer.name) }?.let { return SignerNameClash.TRUSTED_SIGNER }
+        vault.identities.firstOrNull { sameName(it.name, signer.name) }?.let { return SignerNameClash.IDENTITY }
         return null
     }
 
+    /** What an incoming signer's name clashes with; the preview words each as a whole sentence. */
+    enum class SignerNameClash { TRUSTED_SIGNER, IDENTITY }
+
     private fun sameName(a: String, b: String): Boolean = a.trim().equals(b.trim(), ignoreCase = true)
 
-    /** The key as the preview shows it: `SHA256:` fingerprint for SSH keys, the shortened key string otherwise. */
-    fun keySummary(context: Context, identity: StoredIdentity): String = runCatching {
+    /**
+     * The key as the preview and the pickers show it: `SHA256:` fingerprint for SSH keys, the
+     * shortened key string otherwise. Null when the stored key doesn't read.
+     */
+    fun keySummaryOrNull(identity: StoredIdentity): String? = runCatching {
         when (identity.type) {
             StoredIdentityType.SSH_ED25519 ->
                 StoredSigner.sshFingerprint(SSHSig.ed25519PublicWire(b64d(identity.publicKeyB64)))
@@ -272,16 +303,23 @@ object KeyPortability {
                 StoredSigner.sshFingerprint(b64d(identity.publicKeyB64))
             else -> shorten(identity.publicDisplayString())
         }
-    }.getOrDefault(context.getString(R.string.identities_transfer_unreadable_key))
+    }.getOrNull()
 
-    fun keySummary(context: Context, recipient: StoredRecipient): String = runCatching {
+    fun keySummaryOrNull(recipient: StoredRecipient): String? = runCatching {
         when (recipient.type) {
             StoredRecipientType.SSH_ED25519 ->
                 StoredSigner.sshFingerprint(SSHSig.ed25519PublicWire(b64d(recipient.publicKeyB64)))
             StoredRecipientType.SSH_RSA -> sshLineFingerprint(String(b64d(recipient.publicKeyB64), Charsets.UTF_8))
             else -> shorten(recipient.publicDisplayString())
         }
-    }.getOrDefault(context.getString(R.string.identities_transfer_unreadable_key))
+    }.getOrNull()
+
+    /** [keySummaryOrNull], or "unreadable key" in words. */
+    fun keySummary(context: Context, identity: StoredIdentity): String =
+        keySummaryOrNull(identity) ?: context.getString(R.string.identities_transfer_unreadable_key)
+
+    fun keySummary(context: Context, recipient: StoredRecipient): String =
+        keySummaryOrNull(recipient) ?: context.getString(R.string.identities_transfer_unreadable_key)
 
     // The same labels the Identities and Recipients screens show.
     fun typeLabel(context: Context, t: StoredIdentityType): String = context.getString(

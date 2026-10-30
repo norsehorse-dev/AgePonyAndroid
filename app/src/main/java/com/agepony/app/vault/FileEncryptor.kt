@@ -30,7 +30,16 @@ import java.io.PushbackInputStream
 // requires to be the only recipient — enforced here and again in Age.encrypt.
 //
 
-class FileEncryptorException(message: String) : Exception(message)
+/**
+ * An encrypt or decrypt step failed. [reason] says which; [cause] is the core error the message
+ * mapper reads (5.1.0, UI plan U5). The message is internal and never shown.
+ */
+class FileEncryptorException(
+    val reason: FileEncryptorException.Reason,
+    cause: Throwable? = null,
+) : Exception(reason.name, cause) {
+    enum class Reason { NO_RECIPIENTS, PASSPHRASE_WITH_RECIPIENTS, ENCRYPT_FAILED, DECRYPT_FAILED, ARMOR_UNREADABLE }
+}
 
 /** The file is valid age, but no identity in the vault can unwrap it (try a passphrase). */
 class NoMatchingVaultIdentityException : Exception("No matching identity in your vault for this file.")
@@ -170,7 +179,7 @@ object FileEncryptor {
         val ciphertext = try {
             Age.encrypt(plaintext, to)
         } catch (e: Exception) {
-            throw FileEncryptorException("Encrypt failed: ${e.message}")
+            throw FileEncryptorException(FileEncryptorException.Reason.ENCRYPT_FAILED, e)
         }
 
         return if (armor) Armor.encode(ciphertext).toByteArray(Charsets.UTF_8) else ciphertext
@@ -202,7 +211,7 @@ object FileEncryptor {
                 Age.encryptStream(plaintext, to, out)
             }
         } catch (e: Exception) {
-            throw FileEncryptorException("Encrypt failed: ${e.message}")
+            throw FileEncryptorException(FileEncryptorException.Reason.ENCRYPT_FAILED, e)
         }
     }
 
@@ -225,13 +234,13 @@ object FileEncryptor {
         signatureArmored: String,
         armor: Boolean,
     ): ByteArray {
-        if (recipients.isEmpty()) throw FileEncryptorException("No recipients selected.")
+        if (recipients.isEmpty()) throw FileEncryptorException(FileEncryptorException.Reason.NO_RECIPIENTS)
         val ciphertext = try {
             Age.encrypt(plaintext, recipients) { fileKey ->
                 listOf(SignatureStanza.build(fileKey, signatureArmored))
             }
         } catch (e: Exception) {
-            throw FileEncryptorException("Encrypt failed: ${e.message}")
+            throw FileEncryptorException(FileEncryptorException.Reason.ENCRYPT_FAILED, e)
         }
         return if (armor) Armor.encode(ciphertext).toByteArray(Charsets.UTF_8) else ciphertext
     }
@@ -244,11 +253,11 @@ object FileEncryptor {
      * why the file key must exist before signing.
      */
     fun prepareSigned(recipients: List<AgeRecipient>): SignedEncryption {
-        if (recipients.isEmpty()) throw FileEncryptorException("No recipients selected.")
+        if (recipients.isEmpty()) throw FileEncryptorException(FileEncryptorException.Reason.NO_RECIPIENTS)
         return try {
             SignedEncryption.prepare(recipients)
         } catch (e: Exception) {
-            throw FileEncryptorException("Encrypt failed: ${e.message}")
+            throw FileEncryptorException(FileEncryptorException.Reason.ENCRYPT_FAILED, e)
         }
     }
 
@@ -262,7 +271,7 @@ object FileEncryptor {
         val ciphertext = try {
             prepared.encrypt(plaintext, signatureArmored)
         } catch (e: Exception) {
-            throw FileEncryptorException("Encrypt failed: ${e.message}")
+            throw FileEncryptorException(FileEncryptorException.Reason.ENCRYPT_FAILED, e)
         }
         return if (armor) Armor.encode(ciphertext).toByteArray(Charsets.UTF_8) else ciphertext
     }
@@ -289,7 +298,7 @@ object FileEncryptor {
                 prepared.encryptStream(plaintext, plaintextSha512, signatureArmored, out)
             }
         } catch (e: Exception) {
-            throw FileEncryptorException("Encrypt failed: ${e.message}")
+            throw FileEncryptorException(FileEncryptorException.Reason.ENCRYPT_FAILED, e)
         }
     }
 
@@ -307,7 +316,7 @@ object FileEncryptor {
             try {
                 Armor.decode(String(raw, Charsets.UTF_8))
             } catch (e: Exception) {
-                throw FileEncryptorException("Couldn't read the armored file: ${e.message}")
+                throw FileEncryptorException(FileEncryptorException.Reason.ARMOR_UNREADABLE, e)
             }
         } else {
             raw
@@ -343,7 +352,7 @@ object FileEncryptor {
         } catch (e: Age.NoMatchingIdentityException) {
             throw NoMatchingVaultIdentityException()
         } catch (e: Exception) {
-            throw FileEncryptorException("Decrypt failed: ${e.message}")
+            throw FileEncryptorException(FileEncryptorException.Reason.DECRYPT_FAILED, e)
         }
     }
 
@@ -355,7 +364,7 @@ object FileEncryptor {
         } catch (e: Age.NoMatchingIdentityException) {
             throw WrongPassphraseException()
         } catch (e: Exception) {
-            throw FileEncryptorException("Decrypt failed: ${e.message}")
+            throw FileEncryptorException(FileEncryptorException.Reason.DECRYPT_FAILED, e)
         }
     }
 
@@ -375,7 +384,7 @@ object FileEncryptor {
         } catch (e: Age.NoMatchingIdentityException) {
             throw NoMatchingVaultIdentityException()
         } catch (e: Exception) {
-            throw FileEncryptorException("Decrypt failed: ${e.message}")
+            throw FileEncryptorException(FileEncryptorException.Reason.DECRYPT_FAILED, e)
         }
     }
 
@@ -392,7 +401,7 @@ object FileEncryptor {
         } catch (e: Age.NoMatchingIdentityException) {
             throw WrongPassphraseException()
         } catch (e: Exception) {
-            throw FileEncryptorException("Decrypt failed: ${e.message}")
+            throw FileEncryptorException(FileEncryptorException.Reason.DECRYPT_FAILED, e)
         }
     }
 
@@ -430,7 +439,7 @@ object FileEncryptor {
         } catch (e: Age.NoMatchingIdentityException) {
             throw NoMatchingVaultIdentityException()
         } catch (e: Exception) {
-            throw FileEncryptorException("Decrypt failed: ${e.message}")
+            throw FileEncryptorException(FileEncryptorException.Reason.DECRYPT_FAILED, e)
         }
     }
 
@@ -444,12 +453,10 @@ object FileEncryptor {
     ): List<AgeRecipient> {
         val usingPassphrase = !passphrase.isNullOrEmpty()
         if (!usingPassphrase && recipients.isEmpty()) {
-            throw FileEncryptorException("No recipients selected.")
+            throw FileEncryptorException(FileEncryptorException.Reason.NO_RECIPIENTS)
         }
         if (usingPassphrase && recipients.isNotEmpty()) {
-            throw FileEncryptorException(
-                "Passphrase mode can't be combined with recipients (age spec)."
-            )
+            throw FileEncryptorException(FileEncryptorException.Reason.PASSPHRASE_WITH_RECIPIENTS)
         }
         if (!usingPassphrase) return recipients
 

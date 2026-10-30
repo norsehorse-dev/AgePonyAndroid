@@ -1,5 +1,7 @@
 package com.agepony.app.ui.sign
 
+import com.agepony.app.ui.components.EmptyState
+import com.agepony.app.ui.UserMessage
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,7 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.unit.dp
 import com.agepony.app.ui.files.SafIo
 import com.agepony.app.vault.AllowedSignerReview
@@ -53,6 +55,8 @@ import androidx.compose.ui.semantics.Role
 import com.agepony.app.R
 import com.agepony.app.ui.components.AgeScreen
 import com.agepony.app.ui.components.ListDivider
+import com.agepony.app.ui.components.OneLineValue
+import com.agepony.app.ui.components.QuietAction
 
 //
 // Trusted signers: the keys whose signatures verify with a name attached.
@@ -94,7 +98,7 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                     review = ImportReview(rows, entryLines(text) - entries.size)
                 }
             } catch (e: Exception) {
-                status = context.getString(R.string.sign_signers_import_failed, e.message.orEmpty())
+                status = UserMessage.text(context, e, R.string.sign_signers_import_failed)
             }
         }
     }
@@ -113,7 +117,7 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                     R.plurals.signers_exported, vault.signers.size, vault.signers.size,
                 )
             } catch (e: Exception) {
-                status = context.getString(R.string.sign_signers_export_failed, e.message.orEmpty())
+                status = UserMessage.text(context, e, R.string.sign_signers_export_failed)
             }
         }
     }
@@ -162,10 +166,9 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
         }
 
         if (vault.signers.isEmpty()) {
-            Text(
-                stringResource(R.string.sign_signers_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            EmptyState(
+                title = stringResource(R.string.sign_signers_empty_title),
+                body = stringResource(R.string.sign_signers_empty),
             )
         } else {
             vault.signers.forEach { signer ->
@@ -173,13 +176,7 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(signer.name, style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                "${signer.keyType} · ${signer.fingerprint()}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                            )
+                            OneLineValue("${signer.keyType} · ${signer.fingerprint()}")
                             // Imported restrictions (audit L-6), kept and exported as written.
                             val restrictions = signer.restrictions(LocalContext.current)
                             if (restrictions.isNotEmpty()) {
@@ -193,7 +190,7 @@ fun SignersScreen(vault: Vault, modifier: Modifier = Modifier, onClose: () -> Un
                                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                             }
                         }
-                        TextButton(onClick = { confirmDelete = signer }) { Text(stringResource(R.string.action_delete)) }
+                        QuietAction(stringResource(R.string.action_delete), onClick = { confirmDelete = signer }, destructive = true)
                     }
                     ListDivider()
                 }
@@ -340,6 +337,7 @@ private fun ImportReviewPane(
                         role = Role.Checkbox,
                         onValueChange = { if (i in picked) picked.remove(i) else picked.add(i) },
                     )
+                    .heightIn(min = 48.dp)
                     .padding(vertical = 8.dp),
             ) {
                 Checkbox(
@@ -349,12 +347,17 @@ private fun ImportReviewPane(
                 )
                 Column(Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(row.entry.principals.joinToString(", "), style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        "${row.entry.keyType} · ${row.signer?.let { runCatching { it.fingerprint() }.getOrNull() } ?: stringResource(R.string.sign_signers_unreadable_key)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    val fingerprint = row.signer?.let { runCatching { it.fingerprint() }.getOrNull() }
+                    if (fingerprint != null) {
+                        OneLineValue("${row.entry.keyType} · $fingerprint")
+                    } else {
+                        // "Unreadable key" is prose, so it stays in the UI font.
+                        Text(
+                            "${row.entry.keyType} · ${stringResource(R.string.sign_signers_unreadable_key)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     row.restrictions(LocalContext.current).forEach {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
