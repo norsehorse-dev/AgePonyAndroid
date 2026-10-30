@@ -1,0 +1,33 @@
+AgePony es una app de cifrado rápida y privada para tu teléfono, basada en age, el formato de cifrado moderno. Cifra tus archivos y mensajes para que solo la persona adecuada pueda abrirlos, fírmalos para que quien los reciba sepa que de verdad vienen de ti, y mantén tus claves y tus datos en tu dispositivo. Sin cuentas, sin rastreo y sin analíticas.
+
+CIFRADO POSCUÁNTICO
+Protege tus datos frente a los ataques de «recolectar ahora, descifrar después». AgePony genera claves híbridas poscuánticas (ML-KEM-768 combinado con X25519) que siguen siendo seguras incluso frente a un futuro ordenador cuántico, y son totalmente compatibles con la herramienta de línea de comandos de age. Todo lo que cifras para un destinatario poscuántico lleva una etiqueta bien visible, así siempre sabes qué protección estás usando.
+
+Además:
+- Cifra y firma en un solo paso, para que quien recibe el archivo pueda abrirlo y confirmar que de verdad es tuyo.
+- Una herramienta integrada para actualizar archivos antiguos a cifrado poscuántico. Vuelve a cifrar por lotes tus archivos para una nueva clave poscuántica; los originales se conservan hasta que se verifica la copia nueva.
+
+POR QUÉ AGEPONY
+- Cifrado age estándar. AgePony lee y escribe el mismo formato que la herramienta de línea de comandos de age, así que tus archivos funcionan con otras herramientas age en ordenadores y servidores.
+- Clave pública o frase de contraseña. Cifra para la clave pública de otra persona o protege un archivo con una frase de contraseña que compartes por otra vía.
+- Firma SSH bien hecha. Firma y verifica archivos desde la pestaña Archivos con claves SSH Ed25519 o RSA, una clave de hardware o una llave de seguridad por NFC, y lleva una lista de firmantes de confianza. Las firmas usan el estándar SSHSIG, así que ssh-keygen puede verificarlas.
+- Todo en tu dispositivo. El cifrado, el descifrado, la firma y la generación de claves se hacen en tu teléfono, y tus claves privadas nunca salen de él.
+- Un único paso en línea, y es opcional. Cuando importas un destinatario desde GitHub, AgePony descarga las claves SSH públicas de esa persona desde github.com. Es la única conexión a la red que hace la app, solo ocurre cuando tocas Obtener y no se envía nada sobre ti.
+- Sin rastreo, sin anuncios y sin necesidad de cuenta. AgePony no recopila analíticas ni datos personales.
+- Código abierto. Todo el código fuente está disponible para que lo revises.
+
+FUNCIONES
+- Genera pares de claves age y guárdalos en una bóveda de la app que se desbloquea con la biometría de tu dispositivo.
+- Claves híbridas poscuánticas (ML-KEM-768 + X25519) junto a las claves X25519 clásicas.
+- Cifra y descifra archivos y mensajes de texto.
+- Cifrado con frase de contraseña para compartir rápido sin claves.
+- Firma y verifica archivos (SSHSIG) con claves SSH Ed25519 o RSA, claves de hardware o una llave de seguridad por NFC, con una lista de firmantes de confianza.
+- Desbloqueo con biometría, contraseña o PIN, así la app funciona aunque no tengas bloqueo de pantalla.
+- Contraseña de coacción opcional que borra la bóveda al introducirla.
+- Escanea las claves de los destinatarios con la cámara mediante código QR.
+- Importa un destinatario a partir de un nombre de usuario de GitHub, con sus claves SSH públicas de github.com.
+- Actualiza por lotes tus archivos existentes a cifrado poscuántico.
+
+Tanto si eres periodista, activista o desarrollador como si simplemente quieres tener el control real de tus archivos privados, AgePony te da un cifrado sólido y estándar sin complicaciones.
+
+AgePony es una app independiente basada en el formato de cifrado abierto age y no está afiliada al proyecto age.

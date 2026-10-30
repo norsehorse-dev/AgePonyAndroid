@@ -12,6 +12,7 @@ import com.agepony.app.security.TempFiles
 class AgePonyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        com.agepony.app.i18n.AppLanguage.init(this)
         TempFiles.sweep(this)
         AutoLock.install(this)
     }

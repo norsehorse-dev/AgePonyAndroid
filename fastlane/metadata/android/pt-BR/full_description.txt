@@ -1,0 +1,33 @@
+AgePony é um app de criptografia rápido e privado para o seu celular, baseado no age, um formato moderno de criptografia. Proteja seus arquivos e mensagens para que só a pessoa certa consiga abri-los, assine para que os destinatários saibam que o arquivo veio mesmo de você e mantenha suas chaves e seus dados no seu dispositivo. Sem contas, sem rastreamento, sem coleta de estatísticas.
+
+CRIPTOGRAFIA PÓS-QUÂNTICA
+Proteja seus dados contra ataques do tipo “colete agora, descriptografe depois”. O AgePony gera chaves híbridas pós-quânticas (ML-KEM-768 combinado com X25519), que continuam seguras mesmo diante de um futuro computador quântico e são totalmente compatíveis com a ferramenta de linha de comando age. Tudo o que é criptografado para um destinatário pós-quântico recebe um selo bem visível, então você sempre sabe qual proteção está usando.
+
+Também inclui:
+- Criptografar e assinar em uma única etapa, para que os destinatários consigam abrir seu arquivo e confirmar que ele é mesmo seu.
+- Uma ferramenta de migração para atualizar arquivos antigos para criptografia pós-quântica. Criptografe de novo seus arquivos em lote para uma nova chave pós-quântica. Os originais são mantidos até a nova cópia ser verificada.
+
+POR QUE O AGEPONY
+- Criptografia age padrão. O AgePony lê e grava o mesmo formato da linha de comando age, então seus arquivos funcionam com outras ferramentas age no computador e no servidor.
+- Chave pública ou frase secreta. Criptografe para a chave pública de alguém ou proteja um arquivo com uma frase secreta que você envia por outro canal.
+- Assinatura SSH bem feita. Assine e verifique arquivos na aba Arquivos usando chaves SSH Ed25519 ou RSA, uma chave de hardware ou uma chave de segurança por NFC, e mantenha uma lista de signatários confiáveis. As assinaturas seguem o padrão SSHSIG, então o ssh-keygen consegue verificá-las.
+- Tudo no dispositivo por padrão. Criptografia, descriptografia, assinatura e geração de chaves acontecem localmente no seu celular, e suas chaves privadas nunca saem do aparelho.
+- Uma única etapa on-line, opcional. Quando você importa um destinatário do GitHub, o AgePony busca as chaves SSH públicas dessa pessoa em github.com. Essa é a única requisição de rede que o app faz, ela só acontece quando você toca em Buscar e nada sobre você é enviado.
+- Sem rastreamento, sem anúncios, sem conta. O AgePony não coleta estatísticas de uso nem dados pessoais.
+- Código aberto. Todo o código-fonte está disponível para análise.
+
+RECURSOS
+- Gere e guarde pares de chaves age em um cofre no app, desbloqueado com a biometria do seu dispositivo.
+- Chaves híbridas pós-quânticas (ML-KEM-768 + X25519) ao lado das chaves X25519 clássicas.
+- Criptografe e descriptografe arquivos e mensagens de texto.
+- Criptografia com frase secreta para compartilhar rápido, sem precisar de chaves.
+- Assine e verifique arquivos (SSHSIG) com chaves SSH Ed25519 ou RSA, chaves de hardware ou uma chave de segurança por NFC, com uma lista de signatários confiáveis.
+- Desbloqueie com biometria, senha ou PIN, para que o app funcione mesmo sem bloqueio de tela configurado.
+- Senha de coação opcional, que apaga o cofre quando é digitada.
+- Escaneie com a câmera o código QR das chaves de destinatários.
+- Importe um destinatário pelo nome de usuário do GitHub, buscando as chaves SSH públicas dele em github.com.
+- Migre arquivos existentes em lote para criptografia pós-quântica.
+
+Seja você jornalista, ativista, desenvolvedor ou apenas alguém que quer ter controle de verdade sobre seus arquivos privados, o AgePony oferece criptografia forte e padronizada, sem complicação.
+
+O AgePony é um app independente, baseado no formato aberto de criptografia age, e não tem vínculo com o projeto age.

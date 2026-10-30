@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Настройки</string>
+    <string name="settings_ok">ОК</string>
+    <string name="settings_action_change">Изменить</string>
+    <string name="settings_action_remove">Удалить</string>
+
+    <string name="settings_section_security">Безопасность</string>
+    <string name="settings_lock_intro">Как блокируется хранилище AgePony. Пароль или PIN-код, заданный ниже, — это второй способ входа наряду с биометрией или PIN-кодом устройства, а не дополнительный шаг. В режиме «Без блокировки» пароль — единственный способ входа.</string>
+    <string name="settings_pin_only_note_pin">Отключите тревожный PIN-код, чтобы входить по отпечатку пальца или разблокировкой устройства.</string>
+    <string name="settings_pin_only_note_password">Отключите тревожный пароль, чтобы входить по отпечатку пальца или разблокировкой устройства.</string>
+    <string name="settings_lock_biometric">Биометрия</string>
+    <string name="settings_lock_biometric_detail">Хранилище открывается по отпечатку пальца или лицу, а запасной способ — PIN-код, графический ключ или пароль устройства.</string>
+    <string name="settings_lock_biometric_unavailable">Нужно зарегистрировать на устройстве отпечаток пальца или лицо.</string>
+    <string name="settings_lock_device">PIN-код, графический ключ или пароль устройства</string>
+    <string name="settings_lock_device_no_screen_lock">Чтобы использовать этот вариант, настройте блокировку экрана в настройках Android.</string>
+    <string name="settings_lock_device_legacy">Требуется при каждой разблокировке. В этой версии Android это ограничивает доступ, но не добавляет аппаратного шифрования; пароль хранилища ниже его добавляет.</string>
+    <string name="settings_lock_device_detail">PIN-код, графический ключ или пароль устройства требуется при каждой разблокировке и проверяется по аппаратному ключу.</string>
+    <string name="settings_lock_off">Без блокировки</string>
+    <string name="settings_lock_off_detail_pin">Без проверки отпечатка пальца или устройства. Тогда единственный способ входа — ваш PIN-код ниже.</string>
+    <string name="settings_lock_off_detail_password">Без проверки отпечатка пальца или устройства. Тогда единственный способ входа — ваш пароль ниже.</string>
+    <string name="settings_lock_off_detail_open">Хранилище открывается без подтверждения: любой, кто откроет приложение, получит доступ. Задайте пароль ниже, чтобы он стал единственным способом входа.</string>
+    <string name="settings_confirm_lock_off">Отключить вход по отпечатку пальца и разблокировкой устройства</string>
+
+    <string name="settings_set_secret_button">Задать пароль или PIN-код…</string>
+    <string name="settings_set_secret_hint">Пароль, которым можно разблокировать хранилище даже без зарегистрированной биометрии. Он также нужен, чтобы задать тревожный пароль.</string>
+    <string name="settings_secret_set_pin">PIN-код для разблокировки задан.</string>
+    <string name="settings_secret_set_password">Пароль для разблокировки задан.</string>
+    <string name="settings_pin_too_short">Ваш PIN-код короче %1$d цифр, которые теперь требует AgePony. Он по-прежнему работает, но более длинный подобрать гораздо труднее. Измените его ниже.</string>
+    <string name="settings_password_too_short">Ваш пароль короче %1$d символов, которые теперь требует AgePony. Он по-прежнему работает, но более длинный подобрать гораздо труднее. Измените его ниже.</string>
+    <string name="settings_confirm_change_pin">Изменить PIN-код</string>
+    <string name="settings_confirm_change_password">Изменить пароль</string>
+    <string name="settings_set_duress_button_pin">Задать тревожный PIN-код…</string>
+    <string name="settings_set_duress_button_password">Задать тревожный пароль…</string>
+    <string name="settings_duress_hint_pin">Второй, отдельный PIN-код, который вместо открытия хранилища незаметно стирает его. Если ввести его под принуждением, останется пустое приложение, в котором нечего показать. Подтверждения не будет, отменить это нельзя. Пока он задан, вход по отпечатку пальца и разблокировкой устройства отключён, поэтому экран блокировки всегда запрашивает PIN-код.</string>
+    <string name="settings_duress_hint_password">Второй, отдельный пароль, который вместо открытия хранилища незаметно стирает его. Если ввести его под принуждением, останется пустое приложение, в котором нечего показать. Подтверждения не будет, отменить это нельзя. Пока он задан, вход по отпечатку пальца и разблокировкой устройства отключён, поэтому экран блокировки всегда запрашивает пароль.</string>
+    <string name="settings_duress_set_pin">Тревожный PIN-код задан. Его ввод стирает хранилище. Пока он задан, вход по отпечатку пальца и разблокировкой устройства отключён.</string>
+    <string name="settings_duress_set_password">Тревожный пароль задан. Его ввод стирает хранилище. Пока он задан, вход по отпечатку пальца и разблокировкой устройства отключён.</string>
+    <string name="settings_confirm_remove_duress_pin">Удалить тревожный PIN-код</string>
+    <string name="settings_confirm_remove_duress_password">Удалить тревожный пароль</string>
+    <plurals name="settings_erase_title">
+        <item quantity="one">Стирать хранилище после %1$d неверной попытки</item>
+        <item quantity="few">Стирать хранилище после %1$d неверных попыток</item>
+        <item quantity="many">Стирать хранилище после %1$d неверных попыток</item>
+        <item quantity="other">Стирать хранилище после %1$d неверной попытки</item>
+    </plurals>
+    <plurals name="settings_erase_detail_pin">
+        <item quantity="one">После %1$d неверного PIN-кода AgePony стирает хранилище на экране блокировки так же, как это делает тревожный PIN-код. Начиная с %2$d-й неверной попытки, каждой следующей также приходится ждать дольше.</item>
+        <item quantity="few">После %1$d неверных PIN-кодов подряд AgePony стирает хранилище на экране блокировки так же, как это делает тревожный PIN-код. Начиная с %2$d-й неверной попытки, каждой следующей также приходится ждать дольше.</item>
+        <item quantity="many">После %1$d неверных PIN-кодов подряд AgePony стирает хранилище на экране блокировки так же, как это делает тревожный PIN-код. Начиная с %2$d-й неверной попытки, каждой следующей также приходится ждать дольше.</item>
+        <item quantity="other">После %1$d неверного PIN-кода подряд AgePony стирает хранилище на экране блокировки так же, как это делает тревожный PIN-код. Начиная с %2$d-й неверной попытки, каждой следующей также приходится ждать дольше.</item>
+    </plurals>
+    <plurals name="settings_erase_detail_password">
+        <item quantity="one">После %1$d неверного пароля AgePony стирает хранилище на экране блокировки так же, как это делает тревожный пароль. Начиная с %2$d-й неверной попытки, каждой следующей также приходится ждать дольше.</item>
+        <item quantity="few">После %1$d неверных паролей подряд AgePony стирает хранилище на экране блокировки так же, как это делает тревожный пароль. Начиная с %2$d-й неверной попытки, каждой следующей также приходится ждать дольше.</item>
+        <item quantity="many">После %1$d неверных паролей подряд AgePony стирает хранилище на экране блокировки так же, как это делает тревожный пароль. Начиная с %2$d-й неверной попытки, каждой следующей также приходится ждать дольше.</item>
+        <item quantity="other">После %1$d неверного пароля подряд AgePony стирает хранилище на экране блокировки так же, как это делает тревожный пароль. Начиная с %2$d-й неверной попытки, каждой следующей также приходится ждать дольше.</item>
+    </plurals>
+    <string name="settings_confirm_stop_erasing">Больше не стирать после неверных попыток</string>
+    <string name="settings_screenshots">Разрешить скриншоты</string>
+    <string name="settings_screenshots_detail">Выключено: экраны AgePony не попадают в скриншоты, записи экрана и превью недавних приложений. Включайте, только пока нужно снять экран.</string>
+
+    <string name="settings_set_secret_title">Задать пароль или PIN-код</string>
+    <string name="settings_set_duress_title_pin">Задать тревожный PIN-код</string>
+    <string name="settings_set_duress_title_password">Задать тревожный пароль</string>
+    <string name="settings_set_duress_confirm">Задать</string>
+    <string name="settings_set_duress_body_pin">Введите второй PIN-код, отличный от настоящего. Если ввести его при разблокировке, хранилище будет незаметно стёрто. Выберите то, что вспомните под давлением, но не введёте по привычке. Пока он задан, вход по отпечатку пальца и разблокировкой устройства отключён, поэтому сначала подтвердите текущий PIN-код.</string>
+    <string name="settings_set_duress_body_password">Введите второй пароль, отличный от настоящего. Если ввести его при разблокировке, хранилище будет незаметно стёрто. Выберите то, что вспомните под давлением, но не введёте по привычке. Пока он задан, вход по отпечатку пальца и разблокировкой устройства отключён, поэтому сначала подтвердите текущий пароль.</string>
+    <string name="settings_current_pin">Текущий PIN-код</string>
+    <string name="settings_current_password">Текущий пароль</string>
+    <string name="settings_remove_title_pin">Удалить PIN-код?</string>
+    <string name="settings_remove_title_password">Удалить пароль?</string>
+    <string name="settings_remove_body_duress_pin">Хранилище больше не будет его запрашивать, и ваш тревожный PIN-код тоже будет удалён.</string>
+    <string name="settings_remove_body_duress_password">Хранилище больше не будет его запрашивать, и ваш тревожный пароль тоже будет удалён.</string>
+    <string name="settings_remove_body">Хранилище больше не будет его запрашивать. Тогда оно будет открываться только способом блокировки, выбранным выше.</string>
+    <string name="settings_confirm_remove_pin">Удалить PIN-код</string>
+    <string name="settings_confirm_remove_password">Удалить пароль</string>
+    <string name="settings_cant_remove_title">Пока удалить нельзя</string>
+    <string name="settings_save">Сохранить</string>
+    <string name="settings_kind_password">Пароль</string>
+    <string name="settings_kind_pin">PIN-код</string>
+    <string name="settings_pin_min">Не меньше %1$d цифр.</string>
+    <string name="settings_password_min">Не меньше %1$d символов.</string>
+    <string name="settings_confirm_field">Подтверждение</string>
+    <string name="settings_mismatch">Не совпадают.</string>
+
+    <string name="settings_encrypt_to_self">Шифровать для себя по умолчанию</string>
+    <string name="settings_encrypt_to_self_detail">Заранее отмечать вашу активную идентичность при выборе получателей, чтобы вы всегда могли расшифровать собственные файлы.</string>
+    <string name="settings_armor_default">Текстовый формат (armor) по умолчанию</string>
+    <string name="settings_armor_default_detail">Экран шифрования открывается с включённым текстовым форматом (ASCII armor). Такой вывод можно вставить в сообщение; необработанный двоичный примерно на треть меньше. Переключатель на экране шифрования тоже меняет эту настройку.</string>
+    <string name="settings_passphrase_default">Только парольная фраза по умолчанию</string>
+    <string name="settings_passphrase_default_detail">Открывать выбор получателей в режиме парольной фразы (scrypt), а не выбора ключей. Удобно, если вы в основном шифруете парольной фразой.</string>
+    <string name="settings_forget_passphrase">Забыть запомненную парольную фразу</string>
+    <string name="settings_forget">Забыть</string>
+    <string name="settings_forget_passphrase_detail">Парольная фраза хранится в памяти, чтобы для серии файлов её спрашивали только один раз. Она никогда не записывается на диск и сбрасывается при каждой блокировке хранилища.</string>
+    <string name="settings_work_factor">Коэффициент сложности парольной фразы</string>
+    <string name="settings_work_factor_detail_default">2^%1$d: пока scrypt получает ключ, он занимает около %2$d МБ независимо от размера файла. Это значение age по умолчанию. Оно сохраняется в файле, поэтому любой инструмент age сможет его открыть.</string>
+    <string name="settings_work_factor_detail_custom">2^%1$d: пока scrypt получает ключ, он занимает около %2$d МБ независимо от размера файла. По умолчанию в age используется 2^%3$d. Значение сохраняется в файле, поэтому любой инструмент age сможет его открыть.</string>
+
+    <string name="settings_section_autolock">Автоблокировка</string>
+    <string name="settings_autolock_label">Блокировать после выхода из приложения</string>
+    <string name="settings_confirm_lock_less">Блокировать реже</string>
+    <string name="settings_autolock_detail">Сколько AgePony ждёт после переключения на другое приложение, прежде чем заблокировать хранилище. Чем короче, тем безопаснее; чем дольше, тем проще вернуться на то же место после быстрого переключения. Выключение экрана тоже считается переключением.</string>
+    <string name="settings_autolock_immediately">Сразу</string>
+    <plurals name="settings_autolock_seconds">
+        <item quantity="one">%1$d секунда</item>
+        <item quantity="few">%1$d секунды</item>
+        <item quantity="many">%1$d секунд</item>
+        <item quantity="other">%1$d секунды</item>
+    </plurals>
+    <plurals name="settings_autolock_minutes">
+        <item quantity="one">%1$d минута</item>
+        <item quantity="few">%1$d минуты</item>
+        <item quantity="many">%1$d минут</item>
+        <item quantity="other">%1$d минуты</item>
+    </plurals>
+
+    <string name="settings_section_network">Сеть</string>
+    <string name="settings_network_intro">Направлять единственное сетевое обращение — загрузку ключей с GitHub — через прокси. Всё остальное в AgePony и так работает офлайн.</string>
+    <string name="settings_proxy_off">Выключено</string>
+    <string name="settings_proxy_off_detail">Прямое подключение (по умолчанию).</string>
+    <string name="settings_proxy_orbot">Orbot (Tor)</string>
+    <string name="settings_proxy_orbot_detail">SOCKS5 на %1$s:%2$d.</string>
+    <string name="settings_proxy_custom">Свой</string>
+    <string name="settings_proxy_custom_detail">Ваш собственный прокси SOCKS5 или HTTP.</string>
+    <string name="settings_orbot_missing">Похоже, Orbot не установлен. Установите его из Google Play или F-Droid либо выберите «Свой», чтобы указать другой SOCKS-порт Tor.</string>
+    <string name="settings_proxy_socks">SOCKS5 (Tor)</string>
+    <string name="settings_proxy_host">Хост прокси</string>
+    <string name="settings_proxy_port">Порт</string>
+    <string name="settings_proxy_username">Имя пользователя прокси (необязательно)</string>
+    <string name="settings_proxy_password">Пароль прокси (необязательно)</string>
+    <string name="settings_proxy_credentials_detail">Для Tor/Orbot имя пользователя и пароль выделяют трафику AgePony отдельную цепочку (изоляция потоков). Для обычного прокси это стандартные учётные данные. Оставьте поля пустыми, если они не нужны.</string>
+    <string name="settings_proxy_no_fallback">Если прокси недоступен, загрузка ключей завершится ошибкой, а не перейдёт на прямое подключение.</string>
+
+    <string name="settings_section_active_identity">Активная идентичность</string>
+    <string name="settings_no_identities">Идентичностей пока нет. Добавьте её на вкладке «Идентичности».</string>
+    <string name="settings_active_identity_detail">Активная идентичность — получатель по умолчанию при шифровании «для себя» и первая, которая пробуется при расшифровке.</string>
+
+    <string name="settings_section_keys">Перенос и резервное копирование ключей</string>
+    <string name="settings_send_keys">Отправить ключи на другое устройство</string>
+    <string name="settings_receive_keys">Получить ключи с другого устройства</string>
+    <string name="settings_paper_restore">Восстановить из бумажной копии</string>
+    <string name="settings_keys_detail">Чтобы сделать бумажную копию, откройте идентичность на вкладке «Идентичности». Аппаратные ключи остаются на этом устройстве, их нельзя перенести или сохранить в резервной копии.</string>
+    <string name="settings_lock_now">Заблокировать хранилище</string>
+
+    <string name="settings_section_about">О приложении</string>
+    <string name="settings_version">Версия</string>
+    <string name="settings_website">Сайт</string>
+    <string name="settings_source_code">Исходный код</string>
+    <string name="settings_age_spec">Спецификация age</string>
+    <string name="settings_licenses">Лицензии открытого ПО</string>
+    <string name="settings_made_by">Разработчик</string>
+    <string name="settings_desktop">AgePony для компьютера</string>
+    <string name="settings_desktop_detail">Шифрование age для macOS, Linux и Windows</string>
+
+    <string name="settings_section_more">Другие приложения NorseHorse</string>
+    <string name="settings_more_all">Все приложения Pony</string>
+    <string name="settings_more_all_detail">Всё семейство на pony.norsehor.se</string>
+    <string name="settings_more_pgpony_detail">Шифрование OpenPGP для сообщений и файлов</string>
+    <string name="settings_more_quorumpony_detail">Разделите секрет на карточки, которые восстанавливают его только вместе</string>
+    <string name="settings_more_carrierpony_detail">Приватные сообщения и передача файлов со сквозным шифрованием</string>
+    <string name="settings_more_burnpony_detail">Самоуничтожающиеся заметки, зашифрованные прямо на вашем телефоне</string>
+    <string name="settings_more_vaultpony_detail">Зашифрованные хранилища, совместимые с VeraCrypt, полностью на вашем устройстве</string>
+    <string name="settings_more_passpony_detail">Клиент для хранилищ паролей pass и passage</string>
+    <string name="settings_more_relaypony_detail">Зашифрованная передача файлов с телефона на телефон</string>
+    <string name="settings_more_scrubpony_detail">Удаляет идентифицирующие метаданные из изображений, не меняя ни пикселя</string>
+
+    <string name="settings_section_help">Помощь и отзывы</string>
+    <string name="settings_help">Справка и частые вопросы</string>
+    <string name="settings_security_info">Как AgePony защищает ваши файлы</string>
+    <string name="settings_replay_intro">Показать введение снова</string>
+    <string name="settings_replay_intro_detail">Узнайте, что делает AgePony и как ваши ключи остаются приватными на этом устройстве.</string>
+    <string name="settings_rate">Оценить AgePony</string>
+    <string name="settings_rate_detail">Если AgePony оказался полезен, оценка поможет другим его найти.</string>
+    <string name="settings_send_feedback">Отправить отзыв</string>
+    <string name="settings_send_feedback_detail">Нашли ошибку или есть идея? Откроется письмо для NorseHorse с уже заполненными сведениями о приложении и устройстве.</string>
+    <string name="settings_recently_deleted">Недавно удалённые</string>
+    <string name="settings_recently_deleted_detail">Восстановите удалённую идентичность или получателя в течение 30 дней.</string>
+
+    <string name="settings_reset">Сброс</string>
+    <string name="settings_reset_button">Сбросить AgePony</string>
+    <string name="settings_reset_detail">Стирает все сохранённые идентичности, получателей и заметки. Файлы, которые вы уже сохранили вне AgePony, не затрагиваются. Это действие нельзя отменить.</string>
+    <string name="settings_reset_title">Сбросить AgePony?</string>
+    <string name="settings_reset_body">Будут удалены все идентичности, получатели и зашифрованные заметки в хранилище. Файлы, уже сохранённые вне AgePony, не пострадают. Это действие нельзя отменить.</string>
+
+    <string name="settings_trash_intro">Удалённые идентичности и получатели хранятся здесь %1$d дн., а затем удаляются навсегда. При восстановлении идентичности её закрытый ключ возвращается в целости.</string>
+    <string name="settings_trash_empty_state_title">Нет недавно удалённых</string>
+    <string name="settings_trash_empty">Удалённые идентичности и получатели появляются здесь, и их можно восстановить.</string>
+    <string name="settings_trash_identities">Идентичности</string>
+    <string name="settings_trash_recipients">Получатели</string>
+    <string name="settings_trash_empty_bin">Очистить корзину</string>
+    <string name="settings_trash_empty_title">Очистить корзину?</string>
+    <string name="settings_trash_empty_body">Всё, что здесь есть, будет удалено навсегда. Закрытые ключи удалённых идентичностей пропадут безвозвратно. Это действие нельзя отменить.</string>
+    <string name="settings_trash_empty_confirm">Очистить</string>
+    <string name="settings_trash_purge_title">Удалить «%1$s» навсегда?</string>
+    <string name="settings_trash_purge_identity_body">Идентичность и её закрытый ключ будут удалены навсегда. Файлы, зашифрованные для неё, больше никогда не удастся открыть. Это действие нельзя отменить.</string>
+    <string name="settings_trash_purge_recipient_body">Получатель будет удалён навсегда. Это действие нельзя отменить.</string>
+    <string name="settings_trash_restore">Восстановить</string>
+    <string name="settings_trash_deleted_just_now">Удалено только что</string>
+    <plurals name="settings_trash_deleted_minutes">
+        <item quantity="one">Удалено %1$d минуту назад</item>
+        <item quantity="few">Удалено %1$d минуты назад</item>
+        <item quantity="many">Удалено %1$d минут назад</item>
+        <item quantity="other">Удалено %1$d минуты назад</item>
+    </plurals>
+    <plurals name="settings_trash_deleted_hours">
+        <item quantity="one">Удалено %1$d час назад</item>
+        <item quantity="few">Удалено %1$d часа назад</item>
+        <item quantity="many">Удалено %1$d часов назад</item>
+        <item quantity="other">Удалено %1$d часа назад</item>
+    </plurals>
+    <plurals name="settings_trash_deleted_days">
+        <item quantity="one">Удалено %1$d день назад</item>
+        <item quantity="few">Удалено %1$d дня назад</item>
+        <item quantity="many">Удалено %1$d дней назад</item>
+        <item quantity="other">Удалено %1$d дня назад</item>
+    </plurals>
+
+    <string name="settings_security_intro">Что приложение делает для вас, простыми словами, и чего оно сознательно не делает.</string>
+    <string name="settings_security_device_title">Всё происходит на этом устройстве</string>
+    <string name="settings_security_device_body">У AgePony нет аккаунтов, и приложение не обращается ни к каким нашим серверам. Шифрование, расшифровка и ваши ключи остаются на этом телефоне. Единственное исключение — загрузка открытого ключа получателя с GitHub: она выполняется только по вашему запросу, и её можно направить через прокси.</string>
+    <string name="settings_security_format_title">Формат age и его алгоритмы</string>
+    <string name="settings_security_format_body">Файлы используют формат age: X25519 для получателей с открытыми ключами, ChaCha20-Poly1305 для содержимого и scrypt при шифровании парольной фразой. Постквантовые идентичности добавляют к обмену ключами ML-KEM. Это современные, хорошо изученные решения, и формат тот же, что у утилиты командной строки age.</string>
+    <string name="settings_security_vault_title">Хранилище в состоянии покоя</string>
+    <string name="settings_security_vault_body">Идентичности, получатели и заметки хранятся в зашифрованном файле хранилища. Его ключ находится в Android Keystore, а разблокировку можно защитить блокировкой экрана устройства или отпечатком пальца. В заблокированном состоянии хранилище — просто шифротекст на диске.</string>
+    <string name="settings_security_passphrase_title">Парольные фразы только в памяти</string>
+    <string name="settings_security_passphrase_body">Парольная фраза, которую вы вводите для шифрования файла, хранится в памяти, чтобы не вводить её заново для серии файлов. Она никогда не записывается на диск, не сохраняется в хранилище и сбрасывается, когда приложение уходит в фон или хранилище блокируется.</string>
+    <string name="settings_security_duress_title">Тревожный пароль, если вы его задали</string>
+    <string name="settings_security_duress_body">Можно задать второй пароль, который при вводе во время разблокировки незаметно стирает хранилище. Он нужен на тот случай, когда вас вынуждают открыть приложение, а вы бы предпочли, чтобы оно оказалось пустым.</string>
+    <string name="settings_security_not_doing_title">Чего AgePony не делает</string>
+    <string name="settings_security_no_cloud">Не создаёт резервных копий ваших ключей ни в каком облаке. Если вы потеряете это устройство, не сделав экспорт, ключи пропадут.</string>
+    <string name="settings_security_no_recovery">Не может восстановить закрытый ключ, удалённый навсегда. И мы тоже не можем.</string>
+    <string name="settings_security_no_telemetry">Не отправляет аналитику или телеметрию. Никакие сведения о ваших файлах и использовании приложения не покидают устройство.</string>
+    <string name="settings_security_no_outside">Не может защитить файлы после того, как они покинули AgePony, и не защитит, если телефон уже скомпрометирован на уровне системы.</string>
+    <string name="settings_security_footer">У AgePony открытый исходный код. Если хотите проверить всё это сами, ссылка на исходный код есть в «Настройках», в разделе «О приложении».</string>
+
+    <string name="settings_help_intro">Короткие ответы на самые частые вопросы.</string>
+    <string name="settings_help_what_q">Что такое age и что такое AgePony?</string>
+    <string name="settings_help_what_a">age — современный открытый формат шифрования файлов: компактный, прошедший аудит и свободный от устаревшего наследия старых инструментов. AgePony — удобный клиент age для телефона. Файлы, которые он создаёт, — обычные файлы age, их откроет любой инструмент age.</string>
+    <string name="settings_help_recipient_q">Что такое получатель?</string>
+    <string name="settings_help_recipient_a">Получатель — это тот, для кого вы шифруете. Его определяет открытый ключ (строка age1... или открытый ключ SSH). Добавьте получателя один раз, и вы сможете шифровать файлы, которые откроет только он. Его закрытый ключ вам не нужен, только открытый, которым он делится.</string>
+    <string name="settings_help_choice_q">Парольная фраза или ключ: что выбрать?</string>
+    <string name="settings_help_choice_a">Ключ (идентичность) лучше всего подходит, когда вы шифруете для себя или для людей, с которыми обменялись ключами: ничего не нужно запоминать и вводить. Парольная фраза лучше для разового файла, который вы хотите передать человеку, не пользующемуся AgePony. Ему нужна только фраза, а не ключ.</string>
+    <string name="settings_help_armor_q">Что означает «Текстовый формат (armor)»?</string>
+    <string name="settings_help_armor_a">В этом режиме зашифрованный файл записывается обычными буквами и цифрами вместо необработанных байтов, поэтому его можно вставить в чат или письмо. Он получается немного больше. Для файлов, которые вы отправляете вложениями, оставьте этот режим выключенным.</string>
+    <string name="settings_help_archive_q">Зашифровали несколько файлов сразу. Где они?</string>
+    <string name="settings_help_archive_a">При шифровании нескольких файлов они упаковываются в один архив, чтобы передаваться одним файлом. Когда вы его расшифруете, AgePony предложит «Извлечь файлы в папку», и каждый исходный файл будет записан обратно. Одиночный файл шифруется и расшифровывается сам по себе, без архива.</string>
+    <string name="settings_help_compat_q">Можно ли открыть мой файл без AgePony?</string>
+    <string name="settings_help_compat_a">Да. AgePony создаёт стандартные файлы age, поэтому утилита командной строки age и другие клиенты age открывают их с подходящим ключом или парольной фразой. Вы не привязаны к приложению.</string>
+    <string name="settings_help_lose_q">Что будет, если я удалю или потеряю идентичность?</string>
+    <string name="settings_help_lose_a">Идентичность содержит закрытый ключ. Без него файлы, зашифрованные для этой идентичности, не сможет открыть никто, включая вас. Теперь удалённая идентичность какое-то время находится в разделе «Недавно удалённые», и её можно восстановить, но после окончательного удаления вернуть её нельзя. Если она важна, экспортируйте копию и храните её в надёжном месте.</string>
+    <string name="settings_help_pq_q">Что такое постквантовая идентичность?</string>
+    <string name="settings_help_pq_a">Это гибридная идентичность, сочетающая классический X25519 с ML-KEM — схемой, рассчитанной на устойчивость к будущим квантовым компьютерам. Зашифрованные для неё файлы остаются защищёнными даже от злоумышленника, который перехватывает их сейчас, чтобы взломать позже. Она полностью совместима с инструментами age, которые поддерживают гибридного получателя.</string>
+    <string name="settings_help_sign_q">Можно ли подписать файл, не шифруя его?</string>
+    <string name="settings_help_sign_a">Да. «Подписать файл» на вкладке «Файлы» создаёт отдельную подпись, чтобы другие могли убедиться, что файл от вас, а «Проверить подпись» проверяет подписи людей из вашего списка «Доверенные подписанты». Подпись и шифрование независимы: можно делать что-то одно или и то и другое.</string>
+    <string name="settings_help_footer">Не нашли ответа? В «Настройках» есть кнопка «Отправить отзыв», которая открывает письмо для NorseHorse.</string>
+
+    <string name="settings_licenses_intro">У AgePony открытый исходный код, и приложение построено на этих проектах. Каждый из них распространяется под своей лицензией, а полные тексты лицензий доступны в каждом проекте.</string>
+    <string name="settings_licenses_footer">AgePony реализует открытый формат файлов age. Собственный код шифрования (agepony-core) входит в AgePony и выпущен под той же лицензией, что и приложение. Ссылка на исходный код есть в «Настройках», в разделе «О приложении».</string>
+    <string name="settings_dep_jetpack">Android Jetpack (Core, Lifecycle, Activity, Fragment, Biometric)</string>
+    <string name="settings_dep_compose">Jetpack Compose (UI, Foundation, Material 3, Material Icons)</string>
+    <string name="settings_dep_kotlin">Стандартная библиотека Kotlin</string>
+    <string name="settings_dep_zxing">ZXing core (кодирование и декодирование QR)</string>
+    <string name="settings_dep_desugar">Десахаризация базовой библиотеки Android (desugar_jdk_libs)</string>
+    <string name="settings_dep_play_review">Google Play In-App Review (только в сборке для Play, не в сборке F-Droid)</string>
+    <string name="settings_lock_biometric_only">Только биометрия</string>
+    <string name="settings_lock_fingerprint_only">Только отпечаток пальца</string>
+    <string name="settings_lock_biometric_only_detail_pin">Хранилище открывается только биометрией или вашим PIN-кодом. Блокировка экрана телефона для этого не подходит. Если добавить или удалить отпечаток пальца или лицо, введите PIN-код один раз и снова включите биометрию.</string>
+    <string name="settings_lock_biometric_only_detail_password">Хранилище открывается только биометрией или вашим паролем. Блокировка экрана телефона для этого не подходит. Если добавить или удалить отпечаток пальца или лицо, введите пароль один раз и снова включите биометрию.</string>
+    <string name="settings_lock_biometric_only_detail_none">Хранилище открывается только биометрией или паролем приложения, но никогда блокировкой экрана телефона. Нужен пароль или PIN-код как запасной способ входа.</string>
+    <string name="settings_biometric_only_dialog_body">Хранилище будет открываться только биометрией либо паролем или PIN-кодом приложения. Блокировка экрана телефона не подойдёт. Если добавить или удалить отпечаток пальца или лицо, биометрия перестанет открывать хранилище, пока вы один раз не введёте пароль или PIN-код.</string>
+    <string name="settings_biometric_only_dialog_needs_secret">Сначала задайте пароль или PIN-код. Это запасной способ входа.</string>
+    <string name="settings_biometric_only_turn_on">Включить</string>
+    <string name="settings_biometric_only_set_secret">Задать пароль или PIN-код</string>
+    <string name="settings_confirm_set_secret">Подтвердите, что это вы, чтобы задать пароль или PIN-код</string>
+    <string name="settings_confirm_change_lock">Подтвердите, что это вы, чтобы изменить способ блокировки AgePony</string>
+    <string name="settings_biometric_only_off_note">Биометрическая разблокировка отключена, пока вы снова не подтвердите её биометрией. До тех пор хранилище открывается паролем или PIN-кодом приложения.</string>
+    <string name="settings_biometric_only_turn_on_again">Включить снова</string>
+    <string name="settings_secret_type">Тип</string>
+    <string name="settings_work_factor_option">2^%1$d, около %2$d МБ</string>
+    <string name="settings_work_factor_option_default">2^%1$d, около %2$d МБ (по умолчанию в age)</string>
+    <string name="settings_language">Язык</string>
+    <string name="settings_language_app">Язык приложения</string>
+    <string name="settings_language_system">Язык системы</string>
+    <string name="settings_language_footer">AgePony использует язык телефона, если вы не выберете другой здесь. В Android 13 и новее язык также можно изменить в настройках языка приложений Android.</string>
+</resources>

@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_ok">Aceptar</string>
+    <string name="settings_action_change">Cambiar</string>
+    <string name="settings_action_remove">Quitar</string>
+
+    <string name="settings_section_security">Seguridad</string>
+    <string name="settings_lock_intro">Cómo se bloquea la bóveda de AgePony. Una contraseña o un PIN configurados abajo son una segunda forma de entrar, además de «Biometría» o «PIN, patrón o contraseña del dispositivo», no un paso extra. Con «Sin bloqueo», la contraseña es la única forma de entrar.</string>
+    <string name="settings_pin_only_note_pin">Desactiva el PIN de coacción para usar la huella dactilar o el desbloqueo del dispositivo.</string>
+    <string name="settings_pin_only_note_password">Desactiva la contraseña de coacción para usar la huella dactilar o el desbloqueo del dispositivo.</string>
+    <string name="settings_lock_biometric">Biometría</string>
+    <string name="settings_lock_biometric_detail">Tu huella dactilar o tu cara desbloquean la bóveda, con la credencial del dispositivo como alternativa.</string>
+    <string name="settings_lock_biometric_unavailable">Necesita una huella dactilar o una cara registrada en este dispositivo.</string>
+    <string name="settings_lock_device">PIN, patrón o contraseña del dispositivo</string>
+    <string name="settings_lock_device_no_screen_lock">Configura un bloqueo de pantalla en los ajustes de Android para usar esta opción.</string>
+    <string name="settings_lock_device_legacy">Se pide en cada desbloqueo. En esta versión de Android controla el acceso, pero no añade cifrado respaldado por hardware; una contraseña de bóveda (abajo) sí lo hace.</string>
+    <string name="settings_lock_device_detail">Se pide el PIN, patrón o contraseña del dispositivo en cada desbloqueo, y se comprueba con la clave guardada en el hardware.</string>
+    <string name="settings_lock_off">Sin bloqueo</string>
+    <string name="settings_lock_off_detail_pin">Sin comprobación de huella dactilar ni del dispositivo. Tu PIN de abajo pasa a ser la única forma de entrar.</string>
+    <string name="settings_lock_off_detail_password">Sin comprobación de huella dactilar ni del dispositivo. Tu contraseña de abajo pasa a ser la única forma de entrar.</string>
+    <string name="settings_lock_off_detail_open">La bóveda se abre sin confirmar nada: cualquiera que abra la app entra. Configura una contraseña abajo para que sea la única forma de entrar.</string>
+    <string name="settings_confirm_lock_off">Desactivar la huella dactilar y el desbloqueo del dispositivo</string>
+
+    <string name="settings_set_secret_button">Configurar una contraseña o un PIN…</string>
+    <string name="settings_set_secret_hint">Una contraseña con la que puedes desbloquear aunque no tengas biometría registrada, y la base para una contraseña de coacción.</string>
+    <string name="settings_secret_set_pin">PIN de desbloqueo configurado.</string>
+    <string name="settings_secret_set_password">Contraseña de desbloqueo configurada.</string>
+    <string name="settings_pin_too_short">Tu PIN tiene menos de los %1$d dígitos que AgePony pide ahora. Sigue funcionando, pero uno más largo es mucho más difícil de adivinar. Cámbialo abajo.</string>
+    <string name="settings_password_too_short">Tu contraseña tiene menos de los %1$d caracteres que AgePony pide ahora. Sigue funcionando, pero una más larga es mucho más difícil de adivinar. Cámbiala abajo.</string>
+    <string name="settings_confirm_change_pin">Cambiar tu PIN</string>
+    <string name="settings_confirm_change_password">Cambiar tu contraseña</string>
+    <string name="settings_set_duress_button_pin">Configurar un PIN de coacción…</string>
+    <string name="settings_set_duress_button_password">Configurar una contraseña de coacción…</string>
+    <string name="settings_duress_hint_pin">Un segundo PIN, distinto, que borra la bóveda en silencio en lugar de abrirla. Si lo introduces bajo coacción, deja una app vacía sin nada que revelar. No pide confirmación y no se puede deshacer. Mientras esté configurado, la huella dactilar y el desbloqueo del dispositivo se desactivan, así que la pantalla de bloqueo siempre te pide el PIN.</string>
+    <string name="settings_duress_hint_password">Una segunda contraseña, distinta, que borra la bóveda en silencio en lugar de abrirla. Si la introduces bajo coacción, deja una app vacía sin nada que revelar. No pide confirmación y no se puede deshacer. Mientras esté configurada, la huella dactilar y el desbloqueo del dispositivo se desactivan, así que la pantalla de bloqueo siempre te pide la contraseña.</string>
+    <string name="settings_duress_set_pin">PIN de coacción configurado. Al introducirlo se borra la bóveda. La huella dactilar y el desbloqueo del dispositivo siguen desactivados mientras esté configurado.</string>
+    <string name="settings_duress_set_password">Contraseña de coacción configurada. Al introducirla se borra la bóveda. La huella dactilar y el desbloqueo del dispositivo siguen desactivados mientras esté configurada.</string>
+    <string name="settings_confirm_remove_duress_pin">Quitar el PIN de coacción</string>
+    <string name="settings_confirm_remove_duress_password">Quitar la contraseña de coacción</string>
+    <plurals name="settings_erase_title">
+        <item quantity="one">Borrar la bóveda tras %1$d intento fallido</item>
+        <item quantity="many">Borrar la bóveda tras %1$d intentos fallidos</item>
+        <item quantity="other">Borrar la bóveda tras %1$d intentos fallidos</item>
+    </plurals>
+    <plurals name="settings_erase_detail_pin">
+        <item quantity="one">Tras %1$d PIN incorrecto, AgePony borra la bóveda en la pantalla de bloqueo igual que el PIN de coacción. A partir de %2$d intentos fallidos, cada nuevo intento también tiene que esperar más.</item>
+        <item quantity="many">Tras %1$d PIN incorrectos seguidos, AgePony borra la bóveda en la pantalla de bloqueo igual que el PIN de coacción. A partir de %2$d intentos fallidos, cada nuevo intento también tiene que esperar más.</item>
+        <item quantity="other">Tras %1$d PIN incorrectos seguidos, AgePony borra la bóveda en la pantalla de bloqueo igual que el PIN de coacción. A partir de %2$d intentos fallidos, cada nuevo intento también tiene que esperar más.</item>
+    </plurals>
+    <plurals name="settings_erase_detail_password">
+        <item quantity="one">Tras %1$d contraseña incorrecta, AgePony borra la bóveda en la pantalla de bloqueo igual que la contraseña de coacción. A partir de %2$d intentos fallidos, cada nuevo intento también tiene que esperar más.</item>
+        <item quantity="many">Tras %1$d contraseñas incorrectas seguidas, AgePony borra la bóveda en la pantalla de bloqueo igual que la contraseña de coacción. A partir de %2$d intentos fallidos, cada nuevo intento también tiene que esperar más.</item>
+        <item quantity="other">Tras %1$d contraseñas incorrectas seguidas, AgePony borra la bóveda en la pantalla de bloqueo igual que la contraseña de coacción. A partir de %2$d intentos fallidos, cada nuevo intento también tiene que esperar más.</item>
+    </plurals>
+    <string name="settings_confirm_stop_erasing">Dejar de borrar tras intentos fallidos</string>
+    <string name="settings_screenshots">Permitir capturas de pantalla</string>
+    <string name="settings_screenshots_detail">Desactivado: las pantallas de AgePony no aparecen en capturas, grabaciones de pantalla ni en la vista previa de apps recientes. Actívalo solo mientras necesites capturar una pantalla.</string>
+
+    <string name="settings_set_secret_title">Configurar una contraseña o un PIN</string>
+    <string name="settings_set_duress_title_pin">Configurar un PIN de coacción</string>
+    <string name="settings_set_duress_title_password">Configurar una contraseña de coacción</string>
+    <string name="settings_set_duress_confirm">Configurar</string>
+    <string name="settings_set_duress_body_pin">Introduce un segundo PIN, distinto del real. Si lo introduces al desbloquear, la bóveda se borra en silencio. Elige algo que puedas recordar bajo presión, pero que no uses por costumbre. La huella dactilar y el desbloqueo del dispositivo se desactivan mientras esté configurado, así que primero confirma tu PIN actual.</string>
+    <string name="settings_set_duress_body_password">Introduce una segunda contraseña, distinta de la real. Si la introduces al desbloquear, la bóveda se borra en silencio. Elige algo que puedas recordar bajo presión, pero que no uses por costumbre. La huella dactilar y el desbloqueo del dispositivo se desactivan mientras esté configurada, así que primero confirma tu contraseña actual.</string>
+    <string name="settings_current_pin">PIN actual</string>
+    <string name="settings_current_password">Contraseña actual</string>
+    <string name="settings_remove_title_pin">¿Quitar tu PIN?</string>
+    <string name="settings_remove_title_password">¿Quitar tu contraseña?</string>
+    <string name="settings_remove_body_duress_pin">La bóveda dejará de pedirlo, y también se quitará tu PIN de coacción.</string>
+    <string name="settings_remove_body_duress_password">La bóveda dejará de pedirla, y también se quitará tu contraseña de coacción.</string>
+    <string name="settings_remove_body">La bóveda dejará de pedirlo. A partir de entonces se abre solo con el modo de bloqueo de arriba.</string>
+    <string name="settings_confirm_remove_pin">Quitar tu PIN</string>
+    <string name="settings_confirm_remove_password">Quitar tu contraseña</string>
+    <string name="settings_cant_remove_title">Todavía no se puede quitar</string>
+    <string name="settings_save">Guardar</string>
+    <string name="settings_kind_password">Contraseña</string>
+    <string name="settings_kind_pin">PIN</string>
+    <string name="settings_pin_min">Al menos %1$d dígitos.</string>
+    <string name="settings_password_min">Al menos %1$d caracteres.</string>
+    <string name="settings_confirm_field">Confirmar</string>
+    <string name="settings_mismatch">No coinciden.</string>
+
+    <string name="settings_encrypt_to_self">Cifrar para ti por defecto</string>
+    <string name="settings_encrypt_to_self_detail">Preselecciona tu identidad activa al elegir destinatarios, para que siempre puedas descifrar tus propios archivos.</string>
+    <string name="settings_armor_default">Guardar como texto (armor) por defecto</string>
+    <string name="settings_armor_default_detail">Abre la pantalla de cifrado con el formato de texto ASCII (armor) activado. La salida en formato de texto se puede pegar en un mensaje; la binaria ocupa aproximadamente un tercio menos. Si cambias el interruptor al cifrar, este ajuste también se actualiza.</string>
+    <string name="settings_passphrase_default">Solo frase de contraseña por defecto</string>
+    <string name="settings_passphrase_default_detail">Abre el selector de destinatarios en modo frase de contraseña (scrypt) en lugar de selección de claves, por si sueles cifrar con frase de contraseña.</string>
+    <string name="settings_forget_passphrase">Olvidar la frase de contraseña recordada</string>
+    <string name="settings_forget">Olvidar</string>
+    <string name="settings_forget_passphrase_detail">Hay una frase de contraseña en memoria para que, al procesar varios archivos seguidos, solo se pida una vez. Nunca se escribe en el disco y se descarta cada vez que se bloquea la bóveda.</string>
+    <string name="settings_work_factor">Factor de trabajo de la frase de contraseña</string>
+    <string name="settings_work_factor_detail_default">2^%1$d: scrypt ocupa unos %2$d MB mientras deriva la clave, sea cual sea el tamaño del archivo. Es el valor predeterminado de age. El valor se guarda en el archivo, así que cualquier herramienta age puede abrirlo igualmente.</string>
+    <string name="settings_work_factor_detail_custom">2^%1$d: scrypt ocupa unos %2$d MB mientras deriva la clave, sea cual sea el tamaño del archivo. El valor predeterminado de age es 2^%3$d. El valor se guarda en el archivo, así que cualquier herramienta age puede abrirlo igualmente.</string>
+
+    <string name="settings_section_autolock">Bloqueo automático</string>
+    <string name="settings_autolock_label">Bloquear al salir de la app</string>
+    <string name="settings_confirm_lock_less">Bloquear con menos frecuencia</string>
+    <string name="settings_autolock_detail">Cuánto espera AgePony después de que cambies de app antes de bloquear la bóveda. Menos tiempo es más seguro; más tiempo conserva tu sitio si cambias de app un momento. Apagar la pantalla cuenta como cambiar de app.</string>
+    <string name="settings_autolock_immediately">Inmediatamente</string>
+    <plurals name="settings_autolock_seconds">
+        <item quantity="one">%1$d segundo</item>
+        <item quantity="many">%1$d segundos</item>
+        <item quantity="other">%1$d segundos</item>
+    </plurals>
+    <plurals name="settings_autolock_minutes">
+        <item quantity="one">%1$d minuto</item>
+        <item quantity="many">%1$d minutos</item>
+        <item quantity="other">%1$d minutos</item>
+    </plurals>
+
+    <string name="settings_section_network">Red</string>
+    <string name="settings_network_intro">Envía a través de un proxy la única conexión de red, la descarga de claves de GitHub. Todo lo demás en AgePony ya funciona sin conexión.</string>
+    <string name="settings_proxy_off">Desactivado</string>
+    <string name="settings_proxy_off_detail">Conexión directa (predeterminado).</string>
+    <string name="settings_proxy_orbot">Orbot (Tor)</string>
+    <string name="settings_proxy_orbot_detail">SOCKS5 a %1$s:%2$d.</string>
+    <string name="settings_proxy_custom">Personalizado</string>
+    <string name="settings_proxy_custom_detail">Tu propio proxy SOCKS5 o HTTP.</string>
+    <string name="settings_orbot_missing">Parece que Orbot no está instalado. Instálalo desde Google Play o F-Droid, o elige «Personalizado» para usar otro puerto SOCKS de Tor.</string>
+    <string name="settings_proxy_socks">SOCKS5 (Tor)</string>
+    <string name="settings_proxy_host">Host del proxy</string>
+    <string name="settings_proxy_port">Puerto</string>
+    <string name="settings_proxy_username">Usuario del proxy (opcional)</string>
+    <string name="settings_proxy_password">Contraseña del proxy (opcional)</string>
+    <string name="settings_proxy_credentials_detail">Con Tor/Orbot, un usuario y una contraseña hacen que el tráfico de AgePony vaya por su propio circuito (aislamiento de flujos). Con un proxy normal son credenciales corrientes. Déjalos en blanco si no los necesitas.</string>
+    <string name="settings_proxy_no_fallback">Si no se puede acceder al proxy, la descarga de claves falla en lugar de usar una conexión directa.</string>
+
+    <string name="settings_section_active_identity">Identidad activa</string>
+    <string name="settings_no_identities">Aún no hay identidades. Añade una desde la pestaña Identidades.</string>
+    <string name="settings_active_identity_detail">La identidad activa es el destinatario predeterminado de «cifrar para ti» y la primera que se prueba al descifrar.</string>
+
+    <string name="settings_section_keys">Mover y hacer copia de las claves</string>
+    <string name="settings_send_keys">Enviar claves a otro dispositivo</string>
+    <string name="settings_receive_keys">Recibir claves de otro dispositivo</string>
+    <string name="settings_paper_restore">Restaurar desde copia en papel</string>
+    <string name="settings_keys_detail">Para hacer una copia en papel, abre una identidad en la pestaña Identidades. Las claves de hardware se quedan en este dispositivo y no se pueden mover ni copiar.</string>
+    <string name="settings_lock_now">Bloquear la bóveda ahora</string>
+
+    <string name="settings_section_about">Acerca de</string>
+    <string name="settings_version">Versión</string>
+    <string name="settings_website">Sitio web</string>
+    <string name="settings_source_code">Código fuente</string>
+    <string name="settings_age_spec">Especificación de age</string>
+    <string name="settings_licenses">Licencias de código abierto</string>
+    <string name="settings_made_by">Creado por</string>
+    <string name="settings_desktop">AgePony para escritorio</string>
+    <string name="settings_desktop_detail">Cifrado age para macOS, Linux y Windows</string>
+
+    <string name="settings_section_more">Más de NorseHorse</string>
+    <string name="settings_more_all">Todas las apps Pony</string>
+    <string name="settings_more_all_detail">Toda la familia en pony.norsehor.se</string>
+    <string name="settings_more_pgpony_detail">Cifrado OpenPGP para mensajes y archivos</string>
+    <string name="settings_more_quorumpony_detail">Divide un secreto en tarjetas que juntas lo reconstruyen</string>
+    <string name="settings_more_carrierpony_detail">Mensajería y transferencia de archivos privadas, selladas de extremo a extremo</string>
+    <string name="settings_more_burnpony_detail">Notas cifradas que se autodestruyen, cifradas en tu teléfono</string>
+    <string name="settings_more_vaultpony_detail">Bóvedas cifradas compatibles con VeraCrypt, todo en tu dispositivo</string>
+    <string name="settings_more_passpony_detail">Un cliente para almacenes de contraseñas de pass y passage</string>
+    <string name="settings_more_relaypony_detail">Transferencia de archivos cifrada, de teléfono a teléfono</string>
+    <string name="settings_more_scrubpony_detail">Elimina de las imágenes los metadatos que te identifican sin cambiar ni un píxel</string>
+
+    <string name="settings_section_help">Ayuda y comentarios</string>
+    <string name="settings_help">Ayuda y preguntas frecuentes</string>
+    <string name="settings_security_info">Cómo protege AgePony tus archivos</string>
+    <string name="settings_replay_intro">Volver a ver la introducción</string>
+    <string name="settings_replay_intro_detail">Repasa qué hace AgePony y cómo tus claves se mantienen privadas en este dispositivo.</string>
+    <string name="settings_rate">Valorar AgePony</string>
+    <string name="settings_rate_detail">Si AgePony te ha resultado útil, una valoración ayuda a que otras personas lo encuentren.</string>
+    <string name="settings_send_feedback">Enviar comentarios</string>
+    <string name="settings_send_feedback_detail">¿Has encontrado un error o tienes una idea? Se abrirá un correo a NorseHorse con los datos de la app y del dispositivo ya rellenados.</string>
+    <string name="settings_recently_deleted">Eliminados recientemente</string>
+    <string name="settings_recently_deleted_detail">Restaura una identidad o un destinatario que hayas eliminado, durante un máximo de 30 días.</string>
+
+    <string name="settings_reset">Restablecer</string>
+    <string name="settings_reset_button">Restablecer AgePony</string>
+    <string name="settings_reset_detail">Borra todas las identidades, destinatarios y notas guardados. Los archivos que ya hayas guardado fuera de AgePony no se tocan. No se puede deshacer.</string>
+    <string name="settings_reset_title">¿Restablecer AgePony?</string>
+    <string name="settings_reset_body">Esto elimina todas las identidades, destinatarios y notas cifradas de la bóveda. Los archivos ya guardados fuera de AgePony no se ven afectados. No se puede deshacer.</string>
+
+    <string name="settings_trash_intro">Las identidades y los destinatarios eliminados esperan aquí %1$d días antes de borrarse definitivamente. Al restaurar una identidad, su clave privada vuelve intacta.</string>
+    <string name="settings_trash_empty_state_title">No hay nada eliminado recientemente</string>
+    <string name="settings_trash_empty">Las identidades y los destinatarios que elimines aparecen aquí, donde puedes restaurarlos.</string>
+    <string name="settings_trash_identities">Identidades</string>
+    <string name="settings_trash_recipients">Destinatarios</string>
+    <string name="settings_trash_empty_bin">Vaciar papelera</string>
+    <string name="settings_trash_empty_title">¿Vaciar la papelera?</string>
+    <string name="settings_trash_empty_body">Esto borra definitivamente todo lo que hay aquí. La clave privada de cualquier identidad eliminada se pierde para siempre. No se puede deshacer.</string>
+    <string name="settings_trash_empty_confirm">Vaciar</string>
+    <string name="settings_trash_purge_title">¿Eliminar «%1$s» definitivamente?</string>
+    <string name="settings_trash_purge_identity_body">Esto elimina la identidad y su clave privada de forma permanente. Los archivos cifrados para ella no se podrán volver a abrir nunca. No se puede deshacer.</string>
+    <string name="settings_trash_purge_recipient_body">Esto elimina el destinatario de forma permanente. No se puede deshacer.</string>
+    <string name="settings_trash_restore">Restaurar</string>
+    <string name="settings_trash_deleted_just_now">Se eliminó hace un momento</string>
+    <plurals name="settings_trash_deleted_minutes">
+        <item quantity="one">Se eliminó hace %1$d minuto</item>
+        <item quantity="many">Se eliminó hace %1$d minutos</item>
+        <item quantity="other">Se eliminó hace %1$d minutos</item>
+    </plurals>
+    <plurals name="settings_trash_deleted_hours">
+        <item quantity="one">Se eliminó hace %1$d hora</item>
+        <item quantity="many">Se eliminó hace %1$d horas</item>
+        <item quantity="other">Se eliminó hace %1$d horas</item>
+    </plurals>
+    <plurals name="settings_trash_deleted_days">
+        <item quantity="one">Se eliminó hace %1$d día</item>
+        <item quantity="many">Se eliminó hace %1$d días</item>
+        <item quantity="other">Se eliminó hace %1$d días</item>
+    </plurals>
+
+    <string name="settings_security_intro">Lo que la app hace por ti, en pocas palabras, y lo que deliberadamente no hace.</string>
+    <string name="settings_security_device_title">Todo ocurre en este dispositivo</string>
+    <string name="settings_security_device_body">AgePony no tiene cuentas y no se comunica con ningún servidor nuestro. El cifrado, el descifrado y tus claves se quedan en este teléfono. La única excepción es obtener la clave pública de un destinatario desde GitHub, que solo se hace cuando lo pides y que puedes enviar a través de un proxy.</string>
+    <string name="settings_security_format_title">El formato age y sus algoritmos</string>
+    <string name="settings_security_format_body">Los archivos usan el formato age: X25519 para destinatarios de clave pública, ChaCha20-Poly1305 para el contenido y scrypt cuando cifras con una frase de contraseña. Las identidades poscuánticas añaden ML-KEM al intercambio de claves. Son opciones modernas y bien revisadas, y el formato es el mismo que usa la herramienta de línea de comandos age.</string>
+    <string name="settings_security_vault_title">Tu bóveda en reposo</string>
+    <string name="settings_security_vault_body">Las identidades, los destinatarios y las notas se guardan en un archivo de bóveda cifrado. Su clave la custodia Android Keystore, y puedes exigir la credencial del dispositivo o una huella dactilar para desbloquearla. Bloqueada, la bóveda es solo texto cifrado en el disco.</string>
+    <string name="settings_security_passphrase_title">Frases de contraseña solo en memoria</string>
+    <string name="settings_security_passphrase_body">La frase de contraseña que escribes para cifrar un archivo se mantiene en memoria para que no tengas que volver a escribirla con varios archivos seguidos. Nunca se escribe en el disco ni se guarda en la bóveda, y se descarta cuando la app pasa a segundo plano o se bloquea la bóveda.</string>
+    <string name="settings_security_duress_title">Una contraseña de coacción, si la configuras</string>
+    <string name="settings_security_duress_body">Puedes configurar una segunda contraseña que, al introducirla para desbloquear, borra la bóveda en silencio. Existe para el momento en que te obliguen a abrir la app y prefieras que aparezca vacía.</string>
+    <string name="settings_security_not_doing_title">Lo que AgePony no hace</string>
+    <string name="settings_security_no_cloud">No hace copias de tus claves en ninguna nube. Si pierdes este dispositivo sin haberlas exportado, las claves se pierden.</string>
+    <string name="settings_security_no_recovery">No puede recuperar una clave privada que hayas eliminado definitivamente, y nosotros tampoco.</string>
+    <string name="settings_security_no_telemetry">No envía analíticas ni telemetría. Nada sobre tus archivos o tu uso sale del dispositivo.</string>
+    <string name="settings_security_no_outside">No puede proteger los archivos una vez que salen de AgePony, ni defenderte de un teléfono que ya esté comprometido a nivel de sistema.</string>
+    <string name="settings_security_footer">AgePony es de código abierto. Si quieres comprobar algo de esto, el enlace al código fuente está en Ajustes, en Acerca de.</string>
+
+    <string name="settings_help_intro">Respuestas breves a lo que más se pregunta.</string>
+    <string name="settings_help_what_q">¿Qué es age y qué es AgePony?</string>
+    <string name="settings_help_what_a">age es un formato de cifrado de archivos moderno y abierto: pequeño, auditado y libre del lastre de las herramientas antiguas. AgePony es un cliente de age sencillo para tu teléfono. Los archivos que crea son archivos age normales que cualquier herramienta age puede abrir.</string>
+    <string name="settings_help_recipient_q">¿Qué es un destinatario?</string>
+    <string name="settings_help_recipient_a">Un destinatario es alguien para quien cifras, identificado por su clave pública (una cadena age1... o una clave pública SSH). Añade un destinatario una vez y podrás cifrar archivos que solo esa persona puede abrir. Nunca necesitas su clave privada, solo la pública que te comparta.</string>
+    <string name="settings_help_choice_q">¿Frase de contraseña o clave? ¿Cuál debo usar?</string>
+    <string name="settings_help_choice_a">Una clave (una identidad) es lo mejor cuando cifras para ti o para personas con las que intercambias claves: nada que recordar, nada que escribir. Una frase de contraseña es lo mejor para un archivo puntual que quieres pasarle a alguien que no usa AgePony. Solo necesita la frase, no una clave.</string>
+    <string name="settings_help_armor_q">¿Qué significa «Guardar como texto (armor)»?</string>
+    <string name="settings_help_armor_a">El formato de texto (armor) escribe el archivo cifrado como letras y números en lugar de bytes sin procesar, para que puedas pegarlo en un chat o un correo. Ocupa un poco más. Déjalo desactivado para los archivos que envíes como adjuntos.</string>
+    <string name="settings_help_archive_q">Cifré varios archivos a la vez. ¿Dónde están?</string>
+    <string name="settings_help_archive_a">Al cifrar más de un archivo, se juntan en un solo paquete para que viajen como un único archivo. Al descifrarlo, AgePony ofrece «Extraer archivos en una carpeta», que vuelve a guardar cada original. Un solo archivo se cifra y se descifra por sí mismo, sin paquete.</string>
+    <string name="settings_help_compat_q">¿Alguien puede abrir mi archivo sin AgePony?</string>
+    <string name="settings_help_compat_a">Sí. AgePony crea archivos age estándar, así que la herramienta de línea de comandos age y otros clientes de age los abren con la clave o la frase de contraseña correspondiente. No quedas atado a la app.</string>
+    <string name="settings_help_lose_q">¿Qué pasa si elimino o pierdo una identidad?</string>
+    <string name="settings_help_lose_a">Una identidad contiene una clave privada. Sin ella, nadie puede abrir los archivos cifrados para esa identidad, ni siquiera tú. Ahora, al eliminar una identidad, pasa a Eliminados recientemente durante un tiempo para que puedas restaurarla, pero cuando se borra definitivamente no se puede recuperar. Si es importante, exporta una copia y guárdala en un lugar seguro.</string>
+    <string name="settings_help_pq_q">¿Qué es una identidad poscuántica?</string>
+    <string name="settings_help_pq_a">Es una identidad híbrida que combina X25519 clásico con ML-KEM, un esquema diseñado para resistir las futuras computadoras cuánticas. Los archivos cifrados para ella siguen protegidos incluso frente a un atacante que los guarde ahora para romperlos más adelante. Es totalmente compatible con las herramientas age que admiten el destinatario híbrido.</string>
+    <string name="settings_help_sign_q">¿Puedo firmar un archivo sin cifrarlo?</string>
+    <string name="settings_help_sign_a">Sí. «Firmar un archivo», en la pestaña Archivos, crea una firma separada para que otros puedan comprobar que un archivo viene de ti, y «Verificar una firma» comprueba las firmas de las personas de tu lista de «Firmantes de confianza». Firmar y cifrar son independientes: puedes hacer una, la otra o las dos.</string>
+    <string name="settings_help_footer">¿Sigues con dudas? En Ajustes hay un botón «Enviar comentarios» que abre un correo a NorseHorse.</string>
+
+    <string name="settings_licenses_intro">AgePony es de código abierto y se apoya en estos proyectos. Cada uno mantiene su propia licencia, y los textos completos de las licencias están disponibles en cada proyecto.</string>
+    <string name="settings_licenses_footer">AgePony implementa el formato de archivo abierto age. Su propio código de cifrado (agepony-core) forma parte de AgePony y se publica con la misma licencia que la app. El enlace al código fuente está en Ajustes, en Acerca de.</string>
+    <string name="settings_dep_jetpack">Android Jetpack (Core, Lifecycle, Activity, Fragment, Biometric)</string>
+    <string name="settings_dep_compose">Jetpack Compose (UI, Foundation, Material 3, Material Icons)</string>
+    <string name="settings_dep_kotlin">Biblioteca estándar de Kotlin</string>
+    <string name="settings_dep_zxing">ZXing core (codificación y decodificación de QR)</string>
+    <string name="settings_dep_desugar">Desugaring de la biblioteca principal de Android (desugar_jdk_libs)</string>
+    <string name="settings_dep_play_review">Google Play In-App Review (solo en la versión de Play, no en la de F-Droid)</string>
+    <string name="settings_lock_biometric_only">Solo biometría</string>
+    <string name="settings_lock_fingerprint_only">Solo huella dactilar</string>
+    <string name="settings_lock_biometric_only_detail_pin">Solo la biometría o tu PIN abren la bóveda. El bloqueo de pantalla del teléfono no. Si se añade o se quita una huella dactilar o una cara, introduce tu PIN una vez y vuelve a activar la biometría.</string>
+    <string name="settings_lock_biometric_only_detail_password">Solo la biometría o tu contraseña abren la bóveda. El bloqueo de pantalla del teléfono no. Si se añade o se quita una huella dactilar o una cara, introduce tu contraseña una vez y vuelve a activar la biometría.</string>
+    <string name="settings_lock_biometric_only_detail_none">Solo la biometría o una contraseña de la app abren la bóveda, nunca el bloqueo de pantalla del teléfono. Necesita una contraseña o un PIN como forma de volver a entrar.</string>
+    <string name="settings_biometric_only_dialog_body">Solo la biometría o la contraseña o el PIN de la app abrirán la bóveda. El bloqueo de pantalla del teléfono no. Si se añade o se quita una huella dactilar o una cara, la biometría deja de abrir la bóveda hasta que introduzcas tu contraseña o tu PIN una vez.</string>
+    <string name="settings_biometric_only_dialog_needs_secret">Primero configura una contraseña o un PIN. Es la forma de volver a entrar.</string>
+    <string name="settings_biometric_only_turn_on">Activar</string>
+    <string name="settings_biometric_only_set_secret">Configurar una contraseña o un PIN</string>
+    <string name="settings_confirm_set_secret">Confirma que eres tú para configurar una contraseña o un PIN</string>
+    <string name="settings_confirm_change_lock">Confirma que eres tú para cambiar cómo se bloquea AgePony</string>
+    <string name="settings_biometric_only_off_note">El desbloqueo biométrico está desactivado hasta que vuelvas a confirmar con biometría. Mientras tanto, la contraseña o el PIN de la app abren la bóveda.</string>
+    <string name="settings_biometric_only_turn_on_again">Volver a activar</string>
+    <string name="settings_secret_type">Tipo</string>
+    <string name="settings_work_factor_option">2^%1$d, unos %2$d MB</string>
+    <string name="settings_work_factor_option_default">2^%1$d, unos %2$d MB (predeterminado de age)</string>
+    <string name="settings_language">Idioma</string>
+    <string name="settings_language_app">Idioma de la app</string>
+    <string name="settings_language_system">Idioma del sistema</string>
+    <string name="settings_language_footer">AgePony usa el idioma de tu teléfono, salvo que elijas otro aquí. En Android 13 y versiones posteriores también puedes cambiarlo en los ajustes de idioma de apps de Android.</string>
+</resources>

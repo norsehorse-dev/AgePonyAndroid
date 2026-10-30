@@ -1,0 +1,16 @@
+AgePony 5.1.0
+
+Neu:
+- YubiKey: erst PIN, dann einmal antippen
+- Sperre „Nur Biometrie“
+- Tab „Dateien“: Ver- und Entschlüsseln oben
+- Schlüsselauswahl zeigt Typ und Kurzform
+- Einfügen-Button beim Entschlüsseln von Text
+- Klarere Fehlermeldungen
+
+Sicherheit:
+- Besitzerprüfung vor dem ersten App-Passwort
+- Entschlüsselte Temp-Dateien beim Sperren gelöscht
+- Text-Entschlüsselung prüft Signaturen
+- Sicherere NFC-Wiederholungen mit Sicherheitsschlüsseln
+- Getestet mit den age-Testvektoren von C2SP

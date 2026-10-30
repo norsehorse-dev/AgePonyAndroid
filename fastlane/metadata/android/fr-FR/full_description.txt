@@ -1,0 +1,33 @@
+AgePony est une application de chiffrement rapide et respectueuse de votre vie privée, basée sur age, un format de chiffrement moderne. Chiffrez vos fichiers et vos messages pour que seule la bonne personne puisse les ouvrir, signez-les pour que vos destinataires sachent qu'ils viennent bien de vous, et gardez vos clés et vos données sur votre appareil. Pas de compte, pas de pistage, pas de statistiques d'utilisation.
+
+CHIFFREMENT POST-QUANTIQUE
+Protégez vos données contre les attaques de type « collecter maintenant, déchiffrer plus tard ». AgePony génère des clés hybrides post-quantiques (ML-KEM-768 combiné à X25519) qui restent sûres même face à un futur ordinateur quantique, tout en restant entièrement compatibles avec l'outil age en ligne de commande. Tout ce qui est chiffré pour un destinataire post-quantique porte un badge bien visible : vous savez toujours quelle protection vous utilisez.
+
+Également inclus :
+- Chiffrement et signature en une seule étape : vos destinataires peuvent ouvrir votre fichier et vérifier qu'il vient bien de vous.
+- Un outil de migration intégré pour faire passer vos anciens fichiers au chiffrement post-quantique. Rechiffrez vos fichiers existants par lots vers une nouvelle clé post-quantique ; les originaux sont conservés jusqu'à ce que la nouvelle copie soit vérifiée.
+
+POURQUOI AGEPONY
+- Le chiffrement age standard. AgePony lit et écrit le même format que l'outil age en ligne de commande : vos fichiers fonctionnent avec les autres outils age, sur ordinateur comme sur serveur.
+- Clé publique ou phrase secrète. Chiffrez pour la clé publique d'une personne, ou protégez un fichier avec une phrase secrète que vous transmettez à part.
+- Une signature SSH bien faite. Signez et vérifiez des fichiers depuis l'onglet Fichiers avec des clés SSH Ed25519 ou RSA, une clé matérielle ou une clé de sécurité via NFC, et tenez une liste de signataires de confiance. Les signatures suivent le standard SSHSIG : ssh-keygen sait les vérifier.
+- Tout sur l'appareil par défaut. Le chiffrement, le déchiffrement, la signature et la génération de clés se font localement sur votre téléphone, et vos clés privées ne quittent jamais votre appareil.
+- Une seule étape en ligne, facultative. Quand vous importez un destinataire depuis GitHub, AgePony récupère les clés SSH publiques de cette personne sur github.com. C'est la seule requête réseau de l'application, elle n'a lieu que lorsque vous appuyez sur Récupérer, et rien vous concernant n'est envoyé.
+- Pas de pistage, pas de publicité, pas de compte. AgePony ne collecte ni statistiques d'utilisation ni données personnelles.
+- Open source. L'intégralité du code source peut être examinée.
+
+FONCTIONNALITÉS
+- Générez et stockez des paires de clés age dans un coffre, déverrouillé par la biométrie de votre appareil.
+- Clés hybrides post-quantiques (ML-KEM-768 + X25519) en plus des clés X25519 classiques.
+- Chiffrement et déchiffrement de fichiers et de messages texte.
+- Chiffrement par phrase secrète pour partager rapidement, sans clé.
+- Signature et vérification de fichiers (SSHSIG) avec des clés SSH Ed25519 ou RSA, des clés matérielles ou une clé de sécurité via NFC, avec une liste de signataires de confiance.
+- Déverrouillage par biométrie, mot de passe ou code PIN : l'application fonctionne même sans verrouillage de l'écran.
+- Mot de passe de contrainte facultatif, qui efface le coffre quand il est saisi.
+- Scan des clés des destinataires par code QR avec l'appareil photo.
+- Import d'un destinataire à partir d'un nom d'utilisateur GitHub, avec récupération de ses clés SSH publiques sur github.com.
+- Migration par lots de fichiers existants vers le chiffrement post-quantique.
+
+Journaliste, militant, développeur ou simplement soucieux de garder la main sur vos fichiers privés : AgePony vous offre un chiffrement solide et standard, sans complexité.
+
+AgePony est une application indépendante basée sur le format de chiffrement ouvert age. Elle n'est pas affiliée au projet age.

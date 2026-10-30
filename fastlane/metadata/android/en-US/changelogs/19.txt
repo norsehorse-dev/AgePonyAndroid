@@ -1,0 +1,3 @@
+AgePony 5.1.1
+
+- AgePony is now in German, Spanish, French, Brazilian Portuguese, Russian and Simplified Chinese. It follows your phone's language, or pick one under Settings, Language. The switch happens right away, no restart.

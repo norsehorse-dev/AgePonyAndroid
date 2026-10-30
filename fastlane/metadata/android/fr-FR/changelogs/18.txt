@@ -1,0 +1,16 @@
+AgePony 5.1.0
+
+Nouveautés :
+- YubiKey : code PIN d'abord, puis un seul contact
+- Verrouillage Biométrie uniquement
+- Onglet Fichiers : Chiffrer et Déchiffrer en tête
+- Type de clé et clé abrégée à la sélection
+- Bouton Coller au déchiffrement de texte
+- Erreurs plus claires
+
+Sécurité :
+- Contrôle du titulaire avant le 1er mot de passe
+- Fichiers temporaires effacés au verrouillage
+- Texte déchiffré : signatures vérifiées
+- NFC plus sûr avec les clés de sécurité
+- Testé sur les vecteurs age C2SP

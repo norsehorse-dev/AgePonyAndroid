@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="error_cancelled">Cancelado.</string>
+    <string name="error_passthrough">%1$s</string>
+    <string name="error_out_of_memory">No hay suficiente memoria libre en este teléfono para hacer esto. Cierra otras apps y vuelve a intentarlo.</string>
+    <string name="error_no_space">No hay suficiente almacenamiento libre en este teléfono.</string>
+    <string name="error_file_missing">El archivo ya no está o AgePony no puede abrirlo. Vuelve a elegirlo.</string>
+    <string name="error_file_permission">AgePony ya no tiene permiso para usar ese archivo. Vuelve a elegirlo.</string>
+    <string name="error_integrity">Los datos no superaron la comprobación de integridad. Se modificaron o están dañados, o la clave no es la correcta.</string>
+
+    <string name="error_network_offline">No hay conexión a internet o no se encontró el nombre del servidor.</string>
+    <string name="error_network_timeout">El servidor tardó demasiado en responder.</string>
+    <string name="error_network_connect">No se pudo conectar con el servidor. Revisa la conexión y los ajustes del proxy.</string>
+    <string name="error_network_tls">Falló la conexión segura con el servidor.</string>
+
+    <string name="error_no_recipients">Elige al menos un destinatario.</string>
+    <string name="error_passphrase_with_recipients">No se puede combinar una frase de contraseña con destinatarios en el mismo archivo.</string>
+    <string name="error_encrypt_failed">No se pudo cifrar.</string>
+    <string name="error_decrypt_failed">No se pudo descifrar.</string>
+    <string name="error_no_matching_identity">Ninguna de tus identidades puede abrir este archivo.</string>
+    <string name="error_wrong_passphrase">La frase de contraseña es incorrecta o este archivo no está cifrado con una frase de contraseña.</string>
+    <string name="error_mismatched_labels">Algunos de estos destinatarios no pueden compartir un archivo con los demás, por ejemplo las claves poscuánticas y las clásicas.</string>
+    <string name="error_scrypt_memory_decrypt">Para abrir este archivo hacen falta unos %1$d MB para derivar la clave de su frase de contraseña, y en este teléfono solo hay unos %2$d MB libres. El factor de trabajo se fijó al crear el archivo, así que, si tienes el original, vuelve a cifrarlo con un factor de trabajo más bajo.</string>
+    <string name="error_scrypt_memory_encrypt">Una frase de contraseña con factor de trabajo 2^%1$d necesita unos %2$d MB, y en este teléfono solo hay unos %3$d MB libres. Baja el factor de trabajo de la frase de contraseña en Ajustes o cifra para un destinatario.</string>
+
+    <string name="error_not_age_file">Ese archivo no está cifrado con age.</string>
+    <string name="error_header_damaged">El encabezado age del archivo está dañado.</string>
+    <string name="error_header_too_large">El encabezado age del archivo es demasiado grande para leerlo.</string>
+    <string name="error_header_mac">El encabezado del archivo no superó la comprobación de integridad. Se modificó o está dañado.</string>
+    <string name="error_header_scrypt_not_alone">Este archivo mezcla una frase de contraseña con otros destinatarios, algo que age no permite.</string>
+    <string name="error_file_truncated">El archivo está incompleto. Puede que se cortara al copiarlo.</string>
+    <string name="error_payload_auth">El contenido cifrado no superó la comprobación de integridad. El archivo se modificó o está dañado.</string>
+    <string name="error_payload_damaged">El contenido cifrado está dañado o incompleto.</string>
+    <string name="error_armor_damaged">El bloque en formato de texto (armor) está dañado o incompleto.</string>
+    <string name="error_bech32">Esa no es una clave age válida. Comprueba que no tenga errores de escritura ni le falte ninguna parte.</string>
+    <string name="error_low_order">Este archivo no se creó para ninguna de tus claves o fue manipulado.</string>
+    <string name="error_rsa_unwrap">La clave RSA no pudo abrir este archivo.</string>
+    <string name="error_ssh_key_damaged">La clave SSH está dañada o no está en un formato que AgePony pueda leer.</string>
+    <string name="error_ssh_key_decrypt">No se pudo descifrar esta clave SSH. Puede que esté dañada.</string>
+    <string name="error_ssh_kdf">No se puede usar la configuración de la frase de contraseña de esta clave SSH.</string>
+    <string name="error_diceware">No se pudo cargar la lista de palabras para las frases de contraseña.</string>
+    <string name="error_sign_failed">No se pudo crear la firma.</string>
+    <string name="error_bundle_damaged">El paquete firmado está dañado.</string>
+    <string name="error_tar_damaged">El paquete está dañado o incompleto.</string>
+
+    <string name="error_signing_only_key">Las claves de firma de hardware y las llaves de seguridad pueden firmar, pero no pueden descifrar ni usarse como destinatarios de cifrado.</string>
+    <string name="error_stored_key_damaged">Esta clave guardada está dañada.</string>
+    <string name="error_vault_key_missing">Falta la clave de la bóveda en el Android Keystore. Normalmente esto significa que AgePony se reinstaló o se restauró desde una copia de seguridad.</string>
+    <string name="error_password_device_key_missing">Falta la clave de este teléfono para la contraseña de la app, así que la contraseña no puede abrir la bóveda.</string>
+    <string name="error_password_data_damaged">Los datos guardados de la contraseña de la app están dañados.</string>
+
+    <string name="error_import_passphrase_required">Esta clave está protegida con una frase de contraseña. Introdúcela y vuelve a intentarlo.</string>
+    <string name="error_import_wrong_passphrase">La frase de contraseña de esta clave es incorrecta.</string>
+    <string name="error_import_unsupported">AgePony no puede importar este tipo de clave. Admite claves age, claves SSH Ed25519 y RSA, e identidades de YubiKey.</string>
+    <string name="error_import_malformed">Esa no es una clave que AgePony pueda leer. Comprueba que la copiaste entera.</string>
+
+    <string name="error_recipient_empty">Primero pega un destinatario.</string>
+    <string name="error_recipient_bad_quantum_safe">Ese no es un destinatario age poscuántico válido.</string>
+    <string name="error_recipient_bad_tag">Ese no es un destinatario age de clave de hardware válido.</string>
+    <string name="error_recipient_bad_yubikey">Ese no es un destinatario de YubiKey válido.</string>
+    <string name="error_recipient_bad_age">Ese no es un destinatario age válido. Comprueba que no tenga errores de escritura ni le falte ninguna parte.</string>
+    <string name="error_recipient_bad_ssh">Esa no es una clave pública SSH que AgePony pueda usar.</string>
+    <string name="error_recipient_bad_ssh_ed25519">Esa clave ssh-ed25519 no es una clave pública válida.</string>
+    <string name="error_recipient_unrecognized">AgePony no reconoce ese destinatario. Pega un destinatario age1 o una línea ssh-ed25519 o ssh-rsa.</string>
+    <string name="error_github_username">Los nombres de usuario de GitHub tienen de 1 a 39 caracteres entre letras (de la A a la Z), dígitos y guiones, y no empiezan por guion.</string>
+    <string name="error_github_no_keys">GitHub no tiene claves públicas de %1$s.</string>
+    <string name="error_github_no_usable_keys">%1$s tiene claves en GitHub, pero AgePony no puede usar ninguna. Admite claves ssh-ed25519 y ssh-rsa.</string>
+    <string name="error_github_no_user">No existe ninguna cuenta de GitHub llamada %1$s.</string>
+    <string name="error_github_http">GitHub no devolvió las claves (HTTP %1$d).</string>
+    <string name="error_github_empty">GitHub envió una respuesta vacía. Vuelve a intentarlo.</string>
+    <string name="error_github_network">No se pudo conectar con GitHub. Revisa la conexión y los ajustes del proxy.</string>
+    <string name="error_github_too_large">La respuesta de GitHub era demasiado grande para ser una lista de claves, así que no se importó nada.</string>
+
+    <string name="error_sign_x25519">Las identidades age no pueden firmar. Elige una clave SSH, una clave de firma de hardware o una llave de seguridad.</string>
+    <string name="error_sign_quantum_safe">Las identidades poscuánticas sirven para cifrar, no para firmar. Elige una clave SSH, una clave de firma de hardware o una llave de seguridad.</string>
+    <string name="error_sign_decrypt_only">Las claves de descifrado de hardware no pueden firmar. Elige una clave SSH o una clave de firma de hardware.</string>
+    <string name="error_sign_security_key_here">Una llave de seguridad no puede firmar aquí. Usa «Firmar un archivo».</string>
+    <string name="error_sign_key_damaged">La clave guardada de esta identidad está dañada.</string>
+
+    <string name="error_auth_failed">La autenticación no se completó.</string>
+    <string name="error_auth_failed_code">La autenticación no se completó (error de BiometricPrompt %1$d).</string>
+    <string name="error_auth_no_result">La autenticación no devolvió ningún resultado. Vuelve a intentarlo.</string>
+    <string name="error_auth_timed_out">Se agotó el tiempo de espera de la autenticación.</string>
+    <string name="error_biometric_lockout">La biometría se bloqueó tras demasiados intentos. Espera un momento y vuelve a intentarlo.</string>
+    <string name="error_biometric_lockout_permanent">La biometría se bloqueó tras demasiados intentos. Desbloquea el teléfono con su PIN, patrón o contraseña para reactivarla.</string>
+    <string name="error_biometric_none_enrolled">No hay ninguna huella dactilar ni cara configurada en este teléfono.</string>
+    <string name="error_biometric_hardware">La biometría no está disponible en este teléfono en este momento.</string>
+    <string name="error_no_screen_lock">Configura un bloqueo de pantalla en este teléfono para usar esta función.</string>
+    <string name="error_security_update">Se necesita una actualización de seguridad para poder usar la biometría.</string>
+    <string name="error_hardware_app_not_open">AgePony tiene que estar abierto para usar esta clave de hardware.</string>
+    <string name="error_key_invalidated">Esta clave se invalidó porque cambió el bloqueo de pantalla o la biometría del teléfono. Ya no se puede usar.</string>
+    <string name="error_not_authenticated">Primero confirma que eres tú y luego vuelve a intentarlo.</string>
+    <string name="error_hardware_sign_failed">La clave de hardware no pudo firmar.</string>
+    <string name="error_hardware_key_gone">Esta clave de hardware ya no está en el almacén de claves del teléfono, así que ya no se puede usar.</string>
+    <string name="error_hardware_decrypt_failed">La clave de hardware no pudo abrir este archivo.</string>
+    <string name="error_keystore_code">El Android Keystore rechazó la operación (error de Keystore %1$d).</string>
+
+    <string name="error_sk_pin_required">Esta llave de seguridad necesita su PIN.</string>
+    <string name="error_sk_wrong_pin">PIN incorrecto.</string>
+    <string name="error_sk_no_pin_set">Esta llave de seguridad no tiene PIN. Primero configura un PIN FIDO2 en la llave y luego vuelve a intentarlo.</string>
+    <string name="error_sk_bad_answer">La respuesta de la llave de seguridad no tiene sentido. Vuelve a acercarla.</string>
+    <string name="error_sk_denied">La llave de seguridad rechazó la solicitud.</string>
+    <string name="error_sk_no_credential">Esta llave de seguridad no contiene la clave de esta identidad.</string>
+    <string name="error_sk_touch_timeout">Se agotó el tiempo de espera para tocar la llave de seguridad. Vuelve a intentarlo.</string>
+    <string name="error_sk_pin_blocked">El PIN de la llave de seguridad está bloqueado. Restablece la llave para volver a usarla.</string>
+    <string name="error_sk_pin_auth_blocked">Demasiados PIN incorrectos. Aleja la llave y vuelve a acercarla.</string>
+    <string name="error_sk_code">La llave de seguridad devolvió un error (CTAP %1$s).</string>
+    <string name="error_nfc_missing">Este teléfono no tiene NFC.</string>
+    <string name="error_nfc_off">El NFC está desactivado. Actívalo en los ajustes del teléfono.</string>
+    <string name="error_nfc_not_security_key">Esa etiqueta NFC no es una llave de seguridad.</string>
+    <string name="error_nfc_reader">No se pudo iniciar el lector NFC. Vuelve a intentarlo.</string>
+    <string name="error_nfc_lost">La llave se alejó antes de que terminara el intercambio. Mantenla quieta y vuelve a intentarlo.</string>
+    <string name="error_nfc_no_fido">Esa llave no tiene un applet FIDO2 (estado %1$s).</string>
+    <string name="error_nfc_bad_answer">La llave de seguridad envió una respuesta que AgePony no puede usar.</string>
+    <string name="error_nfc_timeout">La llave de seguridad no respondió a tiempo. Vuelve a acercarla.</string>
+    <string name="error_nfc_status">Falló el intercambio NFC (estado %1$s).</string>
+
+    <string name="error_piv_pin_required">Esta clave de la YubiKey necesita su PIN.</string>
+    <string name="error_piv_pin_blocked">El PIN PIV está bloqueado. Desbloquéalo con el PUK en YubiKey Manager.</string>
+    <plurals name="error_piv_wrong_pin">
+        <item quantity="one">PIN incorrecto. Te queda %1$d intento antes de que se bloquee.</item>
+        <item quantity="many">PIN incorrecto. Te quedan %1$d intentos antes de que se bloquee.</item>
+        <item quantity="other">PIN incorrecto. Te quedan %1$d intentos antes de que se bloquee.</item>
+    </plurals>
+    <string name="error_piv_not_piv">Esa llave no tiene un applet PIV (estado %1$s).</string>
+    <string name="error_piv_pin_check">La YubiKey no pudo comprobar el PIN (estado %1$s).</string>
+    <string name="error_piv_no_key_code">Esa YubiKey no tiene ninguna clave en la ranura que usa esta identidad (estado %1$s).</string>
+    <string name="error_piv_no_key">Esa YubiKey no tiene ninguna clave en la ranura que usa esta identidad.</string>
+    <string name="error_piv_not_p256">La clave de esa ranura no es una clave P-256.</string>
+    <string name="error_piv_refused">La YubiKey rechazó la solicitud (estado %1$s).</string>
+    <string name="error_piv_bad_answer">La respuesta de la YubiKey no tiene sentido. Vuelve a acercarla.</string>
+    <string name="error_piv_key_mismatch">La clave de esa ranura no es la que indica esta identidad.</string>
+    <string name="error_piv_wrong_yubikey">Esa es la YubiKey %1$s. Esta identidad está en la YubiKey %2$s.</string>
+    <string name="error_piv_app_not_open">AgePony tiene que estar abierto para usar una YubiKey.</string>
+    <string name="error_piv_not_smart_card">Esa etiqueta NFC no es una tarjeta inteligente.</string>
+    <string name="error_piv_moved_away">La YubiKey se alejó demasiado pronto. Mantenla quieta hasta que termine.</string>
+
+    <string name="error_transfer_not_transfer">Eso no es una transferencia de claves de AgePony.</string>
+    <string name="error_transfer_too_many">Esa transferencia tiene más claves de las que AgePony admite a la vez.</string>
+    <string name="error_transfer_newer">Esa transferencia se creó con una versión más reciente de AgePony. Actualiza AgePony en este teléfono.</string>
+    <string name="error_transfer_wrong_session">Esa transferencia se selló para otra sesión de recepción. Vuelve a abrir «Recibir claves» y escanea de nuevo.</string>
+    <string name="error_transfer_not_recipient">Esa no es una clave de recepción de otro teléfono.</string>
+    <string name="error_lan_not_invite">Ese código QR no viene de «Recibir claves» en otro teléfono.</string>
+    <string name="error_lan_damaged_invite">Ese código QR de recepción está dañado. Vuelve a escanearlo.</string>
+    <string name="error_lan_protocol">El otro teléfono envió algo inesperado. Vuelve a iniciar la transferencia.</string>
+    <string name="error_lan_wrong_token">El código del otro teléfono no coincide. Vuelve a abrir «Recibir claves» y escanea de nuevo.</string>
+    <string name="error_lan_too_large">La transferencia es demasiado grande para enviarla directamente.</string>
+    <string name="error_lan_closed">El otro teléfono cerró la conexión antes de que terminara la transferencia.</string>
+    <string name="error_lan_refused">El otro teléfono rechazó la transferencia. Vuelve a abrir «Recibir claves» y escanea de nuevo.</string>
+    <string name="error_lan_unreachable">No se pudo conectar con el otro teléfono. Conecta los dos a la misma red Wi-Fi, o uno al punto de acceso del otro.</string>
+    <string name="error_paper_not_sealed">Esa no es una copia en papel de AgePony protegida con frase de contraseña.</string>
+    <string name="error_paper_damaged">La copia en papel está dañada o no se escaneó por completo.</string>
+    <string name="error_paper_wrong_passphrase">La frase de contraseña de la copia en papel es incorrecta.</string>
+</resources>

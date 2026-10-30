@@ -1,0 +1,53 @@
+default_platform(:android)
+
+before_all do
+  Dotenv.overload("../.env") if File.exist?("../.env")
+end
+
+def version_code
+  File.read("../app/build.gradle.kts")[/versionCode\s*=\s*(\d+)/, 1].to_i
+end
+
+platform :android do
+  desc "Store screenshots in every listing language, from an Android 13+ emulator (tools/play-screenshots.sh)"
+  lane :screenshots do
+    sh("cd .. && tools/play-screenshots.sh")
+  end
+
+  desc "Upload the store listing text, images and screenshots, every language. Attaches to the production release for the current versionCode; pass version_code:N or track:NAME to pick another"
+  lane :metadata do |options|
+    upload_to_play_store(
+      track: options[:track] || "production",
+      version_code: (options[:version_code] || version_code).to_i,
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_changelogs: true,
+      sync_image_upload: true
+    )
+  end
+
+  desc "Upload What's new (changelogs/<versionCode>.txt) in every language to a release already on Play. Usage: fastlane whats_new version_code:18"
+  lane :whats_new do |options|
+    upload_to_play_store(
+      track: options[:track] || "production",
+      version_code: (options[:version_code] || version_code).to_i,
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+
+  desc "Upload a signed bundle to a track. The bundle is signed by hand with the upload key first. Usage: fastlane upload aab:~/keys/AgePony-5.1.1-play.aab track:production"
+  lane :upload do |options|
+    upload_to_play_store(
+      track: options[:track] || "production",
+      aab: File.expand_path(options[:aab]),
+      release_status: options[:status] || "completed",
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+end

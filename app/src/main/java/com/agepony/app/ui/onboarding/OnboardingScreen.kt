@@ -33,6 +33,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import com.agepony.app.ui.settings.LanguageOptions
 
 //
 // First-run dynamic walkthrough (Phase 2e). Shown once after the vault is first
@@ -51,11 +54,18 @@ import androidx.compose.foundation.layout.systemBarsPadding
 
 // No hero icon on the slides (5.1.0, U4): the title and text carry the page, as on iOS.
 private data class OnboardingPage(
-    @StringRes val title: Int,
-    @StringRes val body: Int,
+    @param:StringRes val title: Int,
+    @param:StringRes val body: Int,
+    /** 5.1.1: the first page picks the app language, so the rest of the tour reads in it. */
+    val languagePicker: Boolean = false,
 )
 
 private fun onboardingPages(): List<OnboardingPage> = listOf(
+    OnboardingPage(
+        title = R.string.settings_language,
+        body = R.string.settings_language_footer,
+        languagePicker = true,
+    ),
     OnboardingPage(
         title = R.string.app_welcome_title,
         body = R.string.app_onboarding_welcome_body,
@@ -149,6 +159,34 @@ fun OnboardingScreen(onFinish: () -> Unit) {
 
 @Composable
 private fun PageContent(page: OnboardingPage) {
+    if (page.languagePicker) {
+        // Taller than the other pages, so it scrolls instead of centring.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 8.dp, vertical = 16.dp),
+        ) {
+            Text(
+                text = stringResource(page.title),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = stringResource(page.body),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(16.dp))
+            LanguageOptions()
+        }
+        return
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AgePony</string>
+    <string name="share_label">AgePony</string>
+    <string name="action_back">Retour</string>
+    <string name="action_copy">Copier</string>
+    <string name="action_copied">Copié</string>
+    <string name="action_reveal">Afficher</string>
+    <string name="action_hide">Masquer</string>
+    <string name="action_cancel">Annuler</string>
+    <string name="action_delete">Supprimer</string>
+    <string name="post_quantum_label">Post-quantique</string>
+    <string name="action_more_options">Plus d\'options</string>
+    <string name="action_add_identity">Ajouter une identité</string>
+    <string name="action_add_recipient">Ajouter un destinataire</string>
+    <string name="scan_title">Scanner un code QR</string>
+    <string name="recipient_title">Destinataire</string>
+    <string name="identity_title">Identité</string>
+    <string name="note_title">Note</string>
+    <string name="identity_no_backup_title">Aucune sauvegarde possible</string>
+    <string name="send_keys_title">Envoyer des clés</string>
+    <string name="settings_identity_label">Identité</string>
+    <string name="files_title">Fichiers</string>
+    <string name="files_section_encryption">Chiffrement</string>
+    <string name="files_encrypt">Chiffrer un fichier</string>
+    <string name="files_decrypt">Déchiffrer un fichier</string>
+    <string name="files_inspect">Examiner un fichier</string>
+    <string name="files_migrate">Mettre à niveau des fichiers en post-quantique</string>
+    <string name="files_section_signatures">Signatures</string>
+    <string name="files_sign">Signer un fichier</string>
+    <string name="files_signatures_footer">Une signature indique qui a créé un fichier et qu\'il n\'a pas été modifié depuis. AgePony utilise le même format de signature que ssh-keygen.</string>
+    <string name="files_section_tools">Autres outils</string>
+    <string name="files_tools_footer">Examiner indique qui peut ouvrir un fichier sans le déchiffrer. Mettre à niveau rechiffre les fichiers pour qu\'une identité post-quantique puisse les ouvrir.</string>
+    <string name="files_verify">Vérifier une signature</string>
+    <string name="files_signers">Signataires de confiance</string>
+    <string name="decrypt_verdict_trusted">Signature vérifiée</string>
+    <string name="decrypt_verdict_unknown">Signature valide, signataire inconnu</string>
+    <string name="decrypt_verdict_untrusted">Signature non approuvée</string>
+    <string name="decrypt_verdict_failed">Échec de la vérification de la signature</string>
+    <plurals name="migrate_files_chosen">
+        <item quantity="one">%1$d fichier choisi</item>
+        <item quantity="many">%1$d de fichiers choisis</item>
+        <item quantity="other">%1$d fichiers choisis</item>
+    </plurals>
+    <plurals name="migrate_upgrade_files">
+        <item quantity="one">Mettre à niveau %1$d fichier</item>
+        <item quantity="many">Mettre à niveau %1$d de fichiers</item>
+        <item quantity="other">Mettre à niveau %1$d fichiers</item>
+    </plurals>
+    <plurals name="signers_exported">
+        <item quantity="one">%1$d signataire exporté.</item>
+        <item quantity="many">%1$d de signataires exportés.</item>
+        <item quantity="other">%1$d signataires exportés.</item>
+    </plurals>
+    <plurals name="signers_unreadable_lines">
+        <item quantity="one">%1$d ligne illisible a été ignorée.</item>
+        <item quantity="many">%1$d de lignes illisibles ont été ignorées.</item>
+        <item quantity="other">%1$d lignes illisibles ont été ignorées.</item>
+    </plurals>
+    <plurals name="recipients_found">
+        <item quantity="one">%1$d destinataire trouvé</item>
+        <item quantity="many">%1$d de destinataires trouvés</item>
+        <item quantity="other">%1$d destinataires trouvés</item>
+    </plurals>
+    <string name="recipient_delete_title">Supprimer « %1$s » ?</string>
+    <string name="recipient_delete_body">Il sera placé dans Supprimés récemment, où vous pourrez le restaurer.</string>
+    <string name="note_delete_title">Supprimer cette note ?</string>
+    <string name="note_delete_body">La note et son texte chiffré seront définitivement supprimés. Cette action est irréversible.</string>
+    <plurals name="transfer_identities">
+        <item quantity="one">%1$d identité</item>
+        <item quantity="many">%1$d d\'identités</item>
+        <item quantity="other">%1$d identités</item>
+    </plurals>
+    <plurals name="transfer_recipients">
+        <item quantity="one">%1$d destinataire</item>
+        <item quantity="many">%1$d de destinataires</item>
+        <item quantity="other">%1$d destinataires</item>
+    </plurals>
+    <plurals name="transfer_signers">
+        <item quantity="one">%1$d signataire</item>
+        <item quantity="many">%1$d de signataires</item>
+        <item quantity="other">%1$d signataires</item>
+    </plurals>
+    <plurals name="paper_restored">
+        <item quantity="one">%1$d identité restaurée</item>
+        <item quantity="many">%1$d d\'identités restaurées</item>
+        <item quantity="other">%1$d identités restaurées</item>
+    </plurals>
+</resources>

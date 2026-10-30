@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -61,6 +62,8 @@ import com.agepony.app.ui.components.SwitchRow
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.agepony.app.R
+import com.agepony.app.i18n.AppLanguage
+import com.agepony.app.i18n.AppLanguageOption
 
 //
 // Settings tab (expanded in Phase 2d-3a). Android counterpart of iOS's
@@ -80,7 +83,7 @@ import com.agepony.app.R
 // password can't be removed while it is the mode. Setting the first password asks the owner to
 // confirm with a biometric or the screen lock first (iOS H-1).
 //
-private enum class SettingsSub { HELP, SECURITY, LICENSES, TRASH, SEND_KEYS, RECEIVE_KEYS, PAPER_RESTORE }
+private enum class SettingsSub { HELP, SECURITY, LICENSES, TRASH, SEND_KEYS, RECEIVE_KEYS, PAPER_RESTORE, LANGUAGE }
 private enum class ProxyMode { OFF, ORBOT, CUSTOM }
 
 @Composable
@@ -154,7 +157,9 @@ fun SettingsScreen(
         runCatching { context.startActivity(intent) }
     }
 
-    var subScreen by remember { mutableStateOf<SettingsSub?>(null) }
+    // Saveable: on Android 8 to 12 a language switch recreates the activity, and the picker
+    // should still be open afterwards.
+    var subScreen by rememberSaveable { mutableStateOf<SettingsSub?>(null) }
     when (subScreen) {
         SettingsSub.HELP -> { HelpScreen(onBack = { subScreen = null }, modifier = modifier); return }
         SettingsSub.SECURITY -> { SecurityInfoScreen(onBack = { subScreen = null }, modifier = modifier); return }
@@ -163,6 +168,7 @@ fun SettingsScreen(
         SettingsSub.SEND_KEYS -> { SendKeysScreen(vault = vault, onBack = { subScreen = null }, modifier = modifier); return }
         SettingsSub.RECEIVE_KEYS -> { ReceiveKeysScreen(vault = vault, onBack = { subScreen = null }, modifier = modifier); return }
         SettingsSub.PAPER_RESTORE -> { PaperRestoreScreen(vault = vault, onBack = { subScreen = null }, modifier = modifier); return }
+        SettingsSub.LANGUAGE -> { LanguageScreen(onBack = { subScreen = null }, modifier = modifier); return }
         null -> {}
     }
 
@@ -719,6 +725,18 @@ fun SettingsScreen(
         if (vm.error != null) {
             Text(vm.error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
+
+        ListDivider()
+
+        // Language (5.1.1): live switch, see AppLanguage.
+        SectionHeader(stringResource(R.string.settings_language))
+        val chosenLanguage by AppLanguage.chosen
+        ActionRow(
+            label = stringResource(R.string.settings_language_app),
+            trailing = AppLanguageOption.resolve(chosenLanguage)?.nativeName
+                ?: stringResource(R.string.settings_language_system),
+            onClick = { subScreen = SettingsSub.LANGUAGE },
+        )
 
         ListDivider()
 

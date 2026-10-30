@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="error_cancelled">Отменено.</string>
+    <string name="error_passthrough">%1$s</string>
+    <string name="error_out_of_memory">На этом телефоне недостаточно свободной памяти для этого действия. Закройте другие приложения и повторите попытку.</string>
+    <string name="error_no_space">На этом телефоне недостаточно свободного места.</string>
+    <string name="error_file_missing">Файла больше нет, или AgePony не может его открыть. Выберите его снова.</string>
+    <string name="error_file_permission">У AgePony больше нет доступа к этому файлу. Выберите его снова.</string>
+    <string name="error_integrity">Данные не прошли проверку целостности. Они были изменены или повреждены, либо ключ неверный.</string>
+
+    <string name="error_network_offline">Нет подключения к интернету, или не удалось найти имя сервера.</string>
+    <string name="error_network_timeout">Сервер слишком долго не отвечал.</string>
+    <string name="error_network_connect">Не удалось подключиться к серверу. Проверьте подключение и настройки прокси.</string>
+    <string name="error_network_tls">Не удалось установить защищённое соединение с сервером.</string>
+
+    <string name="error_no_recipients">Выберите хотя бы одного получателя.</string>
+    <string name="error_passphrase_with_recipients">В одном файле нельзя совместить парольную фразу и получателей.</string>
+    <string name="error_encrypt_failed">Не удалось зашифровать.</string>
+    <string name="error_decrypt_failed">Не удалось расшифровать.</string>
+    <string name="error_no_matching_identity">Ни одна из ваших идентичностей не может открыть этот файл.</string>
+    <string name="error_wrong_passphrase">Неверная парольная фраза, или этот файл зашифрован не парольной фразой.</string>
+    <string name="error_mismatched_labels">Некоторых из этих получателей нельзя объединить в одном файле с остальными, например постквантовые и классические ключи.</string>
+    <string name="error_scrypt_memory_decrypt">Чтобы открыть этот файл, нужно около %1$d МБ для вычисления ключа из парольной фразы, а на этом телефоне свободно только около %2$d МБ. Коэффициент сложности задаётся при создании файла, поэтому, если оригинал у вас, зашифруйте его заново с меньшим коэффициентом сложности.</string>
+    <string name="error_scrypt_memory_encrypt">Парольной фразе с коэффициентом сложности 2^%1$d нужно около %2$d МБ, а на этом телефоне свободно только около %3$d МБ. Уменьшите коэффициент сложности парольной фразы в настройках или зашифруйте для получателя.</string>
+
+    <string name="error_not_age_file">Это не файл, зашифрованный age.</string>
+    <string name="error_header_damaged">Заголовок age в файле повреждён.</string>
+    <string name="error_header_too_large">Заголовок age в файле слишком велик, его нельзя прочитать.</string>
+    <string name="error_header_mac">Заголовок файла не прошёл проверку целостности. Он был изменён или повреждён.</string>
+    <string name="error_header_scrypt_not_alone">В этом файле парольная фраза смешана с другими получателями, а age этого не допускает.</string>
+    <string name="error_file_truncated">Файл неполный. Возможно, он был обрезан при копировании.</string>
+    <string name="error_payload_auth">Зашифрованное содержимое не прошло проверку целостности. Файл был изменён или повреждён.</string>
+    <string name="error_payload_damaged">Зашифрованное содержимое повреждено или неполно.</string>
+    <string name="error_armor_damaged">Текст в текстовом формате (armor) повреждён или неполон.</string>
+    <string name="error_bech32">Это недействительный ключ age. Проверьте, нет ли в нём опечаток и не пропущена ли часть.</string>
+    <string name="error_low_order">Этот файл создан не для ваших ключей, или его подделали.</string>
+    <string name="error_rsa_unwrap">Ключ RSA не смог открыть этот файл.</string>
+    <string name="error_ssh_key_damaged">Ключ SSH повреждён или имеет формат, который AgePony не читает.</string>
+    <string name="error_ssh_key_decrypt">Не удалось расшифровать этот ключ SSH. Возможно, он повреждён.</string>
+    <string name="error_ssh_kdf">Параметры парольной фразы этого ключа SSH не поддерживаются.</string>
+    <string name="error_diceware">Не удалось загрузить список слов для парольных фраз.</string>
+    <string name="error_sign_failed">Не удалось создать подпись.</string>
+    <string name="error_bundle_damaged">Подписанный пакет повреждён.</string>
+    <string name="error_tar_damaged">Пакет повреждён или неполон.</string>
+
+    <string name="error_signing_only_key">Аппаратные ключи подписи и ключи безопасности могут подписывать, но не могут расшифровывать или быть получателями при шифровании.</string>
+    <string name="error_stored_key_damaged">Этот сохранённый ключ повреждён.</string>
+    <string name="error_vault_key_missing">Ключ хранилища в Android Keystore отсутствует. Обычно это значит, что AgePony был переустановлен или восстановлен из резервной копии.</string>
+    <string name="error_password_device_key_missing">Ключ этого телефона для пароля приложения отсутствует, поэтому пароль не может открыть хранилище.</string>
+    <string name="error_password_data_damaged">Сохранённые данные пароля приложения повреждены.</string>
+
+    <string name="error_import_passphrase_required">Этот ключ защищён парольной фразой. Введите её и повторите попытку.</string>
+    <string name="error_import_wrong_passphrase">Неверная парольная фраза для этого ключа.</string>
+    <string name="error_import_unsupported">AgePony не может импортировать ключ такого типа. Поддерживаются ключи age, ключи SSH Ed25519 и RSA, а также идентичности YubiKey.</string>
+    <string name="error_import_malformed">AgePony не может прочитать этот ключ. Проверьте, что вы скопировали его целиком.</string>
+
+    <string name="error_recipient_empty">Сначала вставьте получателя.</string>
+    <string name="error_recipient_bad_quantum_safe">Это недействительный постквантовый получатель age.</string>
+    <string name="error_recipient_bad_tag">Это недействительный получатель age для аппаратного ключа.</string>
+    <string name="error_recipient_bad_yubikey">Это недействительный получатель YubiKey.</string>
+    <string name="error_recipient_bad_age">Это недействительный получатель age. Проверьте, нет ли в нём опечаток и не пропущена ли часть.</string>
+    <string name="error_recipient_bad_ssh">Это не открытый ключ SSH, который может использовать AgePony.</string>
+    <string name="error_recipient_bad_ssh_ed25519">Этот ключ ssh-ed25519 не является действительным открытым ключом.</string>
+    <string name="error_recipient_unrecognized">AgePony не распознаёт этого получателя. Вставьте получателя age1 или строку ssh-ed25519 либо ssh-rsa.</string>
+    <string name="error_github_username">Имя пользователя GitHub состоит из 1–39 латинских букв (A–Z), цифр и дефисов и не может начинаться с дефиса.</string>
+    <string name="error_github_no_keys">На GitHub нет открытых ключей для %1$s.</string>
+    <string name="error_github_no_usable_keys">У %1$s есть ключи на GitHub, но AgePony не может использовать ни один из них. Поддерживаются ключи ssh-ed25519 и ssh-rsa.</string>
+    <string name="error_github_no_user">На GitHub нет аккаунта с именем %1$s.</string>
+    <string name="error_github_http">GitHub не вернул ключи (HTTP %1$d).</string>
+    <string name="error_github_empty">GitHub прислал пустой ответ. Повторите попытку.</string>
+    <string name="error_github_network">Не удалось связаться с GitHub. Проверьте подключение и настройки прокси.</string>
+    <string name="error_github_too_large">Ответ GitHub слишком велик для списка ключей, поэтому ничего не импортировано.</string>
+
+    <string name="error_sign_x25519">Идентичности age не могут подписывать. Выберите ключ SSH, аппаратный ключ подписи или ключ безопасности.</string>
+    <string name="error_sign_quantum_safe">Постквантовые идентичности предназначены для шифрования, а не для подписи. Выберите ключ SSH, аппаратный ключ подписи или ключ безопасности.</string>
+    <string name="error_sign_decrypt_only">Аппаратные ключи расшифровки не могут подписывать. Выберите ключ SSH или аппаратный ключ подписи.</string>
+    <string name="error_sign_security_key_here">Ключ безопасности не может подписывать здесь. Подпишите файл через «Подписать файл».</string>
+    <string name="error_sign_key_damaged">Сохранённый ключ этой идентичности повреждён.</string>
+
+    <string name="error_auth_failed">Не удалось пройти проверку подлинности.</string>
+    <string name="error_auth_failed_code">Не удалось пройти проверку подлинности (ошибка BiometricPrompt %1$d).</string>
+    <string name="error_auth_no_result">Проверка подлинности не вернула результат. Повторите попытку.</string>
+    <string name="error_auth_timed_out">Время ожидания проверки подлинности истекло.</string>
+    <string name="error_biometric_lockout">Биометрия заблокирована после слишком большого числа попыток. Подождите немного и повторите попытку.</string>
+    <string name="error_biometric_lockout_permanent">Биометрия заблокирована после слишком большого числа попыток. Разблокируйте телефон PIN-кодом, графическим ключом или паролем, чтобы снова её включить.</string>
+    <string name="error_biometric_none_enrolled">На этом телефоне не настроен ни отпечаток пальца, ни лицо.</string>
+    <string name="error_biometric_hardware">Биометрия на этом телефоне сейчас недоступна.</string>
+    <string name="error_no_screen_lock">Чтобы использовать эту функцию, настройте блокировку экрана на этом телефоне.</string>
+    <string name="error_security_update">Чтобы использовать биометрию, нужно обновление системы безопасности.</string>
+    <string name="error_hardware_app_not_open">Чтобы использовать этот аппаратный ключ, AgePony должен быть открыт.</string>
+    <string name="error_key_invalidated">Этот ключ стал недействительным, потому что изменилась блокировка экрана или биометрия телефона. Использовать его больше нельзя.</string>
+    <string name="error_not_authenticated">Сначала подтвердите, что это вы, затем повторите попытку.</string>
+    <string name="error_hardware_sign_failed">Аппаратный ключ не смог создать подпись.</string>
+    <string name="error_hardware_key_gone">Этот аппаратный ключ исчез из хранилища ключей телефона, поэтому использовать его больше нельзя.</string>
+    <string name="error_hardware_decrypt_failed">Аппаратный ключ не смог открыть этот файл.</string>
+    <string name="error_keystore_code">Android Keystore отклонил операцию (ошибка Keystore %1$d).</string>
+
+    <string name="error_sk_pin_required">Этому ключу безопасности нужен PIN-код.</string>
+    <string name="error_sk_wrong_pin">Неверный PIN-код.</string>
+    <string name="error_sk_no_pin_set">На этом ключе безопасности не задан PIN-код. Сначала задайте на ключе PIN-код FIDO2, затем повторите попытку.</string>
+    <string name="error_sk_bad_answer">Ключ безопасности дал непонятный ответ. Приложите его ещё раз.</string>
+    <string name="error_sk_denied">Ключ безопасности отклонил запрос.</string>
+    <string name="error_sk_no_credential">На этом ключе безопасности нет ключа для этой идентичности.</string>
+    <string name="error_sk_touch_timeout">Ключ безопасности не дождался касания. Повторите попытку.</string>
+    <string name="error_sk_pin_blocked">PIN-код ключа безопасности заблокирован. Чтобы снова пользоваться ключом, сбросьте его.</string>
+    <string name="error_sk_pin_auth_blocked">Слишком много неверных PIN-кодов. Уберите ключ, затем приложите его снова.</string>
+    <string name="error_sk_code">Ключ безопасности вернул ошибку (CTAP %1$s).</string>
+    <string name="error_nfc_missing">На этом телефоне нет NFC.</string>
+    <string name="error_nfc_off">NFC выключен. Включите его в настройках телефона.</string>
+    <string name="error_nfc_not_security_key">Эта NFC-метка не является ключом безопасности.</string>
+    <string name="error_nfc_reader">Не удалось запустить считыватель NFC. Повторите попытку.</string>
+    <string name="error_nfc_lost">Ключ отодвинулся до завершения обмена. Держите его неподвижно и повторите попытку.</string>
+    <string name="error_nfc_no_fido">На этом ключе нет апплета FIDO2 (статус %1$s).</string>
+    <string name="error_nfc_bad_answer">Ключ безопасности прислал ответ, который AgePony не может использовать.</string>
+    <string name="error_nfc_timeout">Ключ безопасности не ответил вовремя. Приложите его ещё раз.</string>
+    <string name="error_nfc_status">Обмен по NFC не удался (статус %1$s).</string>
+
+    <string name="error_piv_pin_required">Этому ключу YubiKey нужен PIN-код.</string>
+    <string name="error_piv_pin_blocked">PIN-код PIV заблокирован. Разблокируйте его с помощью PUK-кода в YubiKey Manager.</string>
+    <plurals name="error_piv_wrong_pin">
+        <item quantity="one">Неверный PIN-код. До блокировки осталась %1$d попытка.</item>
+        <item quantity="few">Неверный PIN-код. До блокировки осталось %1$d попытки.</item>
+        <item quantity="many">Неверный PIN-код. До блокировки осталось %1$d попыток.</item>
+        <item quantity="other">Неверный PIN-код. До блокировки осталось %1$d попытки.</item>
+    </plurals>
+    <string name="error_piv_not_piv">На этом ключе нет апплета PIV (статус %1$s).</string>
+    <string name="error_piv_pin_check">YubiKey не смог проверить PIN-код (статус %1$s).</string>
+    <string name="error_piv_no_key_code">В слоте, который использует эта идентичность, на этом YubiKey нет ключа (статус %1$s).</string>
+    <string name="error_piv_no_key">В слоте, который использует эта идентичность, на этом YubiKey нет ключа.</string>
+    <string name="error_piv_not_p256">Ключ в этом слоте не является ключом P-256.</string>
+    <string name="error_piv_refused">YubiKey отклонил запрос (статус %1$s).</string>
+    <string name="error_piv_bad_answer">YubiKey дал непонятный ответ. Приложите его ещё раз.</string>
+    <string name="error_piv_key_mismatch">Ключ в этом слоте не тот, на который указывает эта идентичность.</string>
+    <string name="error_piv_wrong_yubikey">Это YubiKey %1$s. Эта идентичность находится на YubiKey %2$s.</string>
+    <string name="error_piv_app_not_open">Чтобы использовать YubiKey, AgePony должен быть открыт.</string>
+    <string name="error_piv_not_smart_card">Эта NFC-метка не является смарт-картой.</string>
+    <string name="error_piv_moved_away">YubiKey убрали слишком рано. Держите его неподвижно до завершения.</string>
+
+    <string name="error_transfer_not_transfer">Это не передача ключей AgePony.</string>
+    <string name="error_transfer_too_many">В этой передаче больше ключей, чем AgePony принимает за один раз.</string>
+    <string name="error_transfer_newer">Эта передача создана более новой версией AgePony. Обновите AgePony на этом телефоне.</string>
+    <string name="error_transfer_wrong_session">Эта передача запечатана для другого сеанса получения. Снова откройте «Получить ключи» и отсканируйте код заново.</string>
+    <string name="error_transfer_not_recipient">Это не ключ получения с другого телефона.</string>
+    <string name="error_lan_not_invite">Этот QR-код не из раздела «Получить ключи» на другом телефоне.</string>
+    <string name="error_lan_damaged_invite">QR-код для получения повреждён. Отсканируйте его ещё раз.</string>
+    <string name="error_lan_protocol">Другой телефон прислал что-то неожиданное. Начните передачу заново.</string>
+    <string name="error_lan_wrong_token">Код другого телефона не совпал. Снова откройте «Получить ключи» и отсканируйте код заново.</string>
+    <string name="error_lan_too_large">Передача слишком велика, чтобы отправить её напрямую.</string>
+    <string name="error_lan_closed">Другой телефон закрыл соединение до завершения передачи.</string>
+    <string name="error_lan_refused">Другой телефон отклонил передачу. Снова откройте «Получить ключи» и отсканируйте код заново.</string>
+    <string name="error_lan_unreachable">Не удалось связаться с другим телефоном. Подключите оба к одной сети Wi-Fi или один к точке доступа другого.</string>
+    <string name="error_paper_not_sealed">Это не резервная копия AgePony, защищённая парольной фразой.</string>
+    <string name="error_paper_damaged">Резервная копия повреждена или отсканирована не полностью.</string>
+    <string name="error_paper_wrong_passphrase">Неверная парольная фраза резервной копии.</string>
+</resources>

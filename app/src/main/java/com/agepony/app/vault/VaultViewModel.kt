@@ -2,6 +2,7 @@ package com.agepony.app.vault
 
 import com.agepony.app.ui.UserMessage
 import android.app.Application
+import android.content.Context
 import android.os.Build
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.getValue
@@ -11,6 +12,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.agepony.app.R
+import com.agepony.app.i18n.AppLanguage
 import com.agepony.app.security.AutoLock
 import com.agepony.app.security.BiometricGate
 import com.agepony.app.security.BiometricGateException
@@ -169,7 +171,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             isBusy = true
             error = null
             try {
-                PasswordVault.secretPolicyError(getApplication<Application>(), CharBuffer.wrap(secret), kind)?.let {
+                PasswordVault.secretPolicyError(appText(), CharBuffer.wrap(secret), kind)?.let {
                     throw ShownMessageException(it)
                 }
                 withContext(Dispatchers.IO) {
@@ -573,7 +575,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val wait = vault.unlockAttempts.remainingLockoutMillis()
                 if (wait > 0L) {
-                    error = UnlockAttempts.lockoutMessage(getApplication<Application>(), wait)
+                    error = UnlockAttempts.lockoutMessage(appText(), wait)
                     return@launch
                 }
                 val belowMinimum =
@@ -620,7 +622,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                         if (vault.eraseAfterFailedAttempts && attemptCount >= UnlockAttempts.ERASE_AFTER) {
                             val erasedId = pick(R.plurals.core_vault_erased_pin, R.plurals.core_vault_erased_password)
                             withContext(Dispatchers.IO) { performFailedAttemptsWipe() }
-                            error = getApplication<Application>().resources.getQuantityString(
+                            error = appText().resources.getQuantityString(
                                 erasedId, UnlockAttempts.ERASE_AFTER, UnlockAttempts.ERASE_AFTER,
                             )
                         } else {
@@ -699,7 +701,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         if (vault.eraseAfterFailedAttempts) {
             val left = UnlockAttempts.ERASE_AFTER - attemptCount
             if (left in 1..3) {
-                return getApplication<Application>().resources.getQuantityString(
+                return appText().resources.getQuantityString(
                     pick(R.plurals.core_wrong_pin_erase_warning, R.plurals.core_wrong_password_erase_warning),
                     left, left,
                 )
@@ -727,7 +729,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
             isBusy = true
             error = null
             try {
-                PasswordVault.secretPolicyError(getApplication<Application>(), CharBuffer.wrap(secret), kind)?.let {
+                PasswordVault.secretPolicyError(appText(), CharBuffer.wrap(secret), kind)?.let {
                     throw ShownMessageException(it)
                 }
                 // The duress secret is typed on the same keyboard; a PIN pad can't enter a
@@ -809,7 +811,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 if (!vault.passwordKeyBlobExists()) {
                     throw ShownMessageException(str(pick(R.string.core_duress_needs_secret_pin, R.string.core_duress_needs_secret_password)))
                 }
-                PasswordVault.secretPolicyError(getApplication<Application>(), CharBuffer.wrap(secret), vault.unlockSecretKind ?: "password")?.let {
+                PasswordVault.secretPolicyError(appText(), CharBuffer.wrap(secret), vault.unlockSecretKind ?: "password")?.let {
                     throw ShownMessageException(it)
                 }
                 val vk = vault.snapshotVaultKey()
@@ -852,7 +854,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun verifyCurrentSecret(current: CharArray, vk: ByteArray) {
         val wait = vault.unlockAttempts.remainingLockoutMillis()
-        if (wait > 0L) throw ShownMessageException(UnlockAttempts.lockoutMessage(getApplication<Application>(), wait))
+        if (wait > 0L) throw ShownMessageException(UnlockAttempts.lockoutMessage(appText(), wait))
         vault.unlockAttempts.recordAttempt()
         val outcome = PasswordVault.tryUnlock(current, vault.readPasswordKeyBlob(), null)
         try {
@@ -956,7 +958,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
                 when (val check = withContext(Dispatchers.IO) { vault.verifyAppPassword(secret) }) {
                     PasswordCheck.Ok -> onVerified()
                     PasswordCheck.Wrong -> error = str(pick(R.string.security_wrong_pin, R.string.security_wrong_password))
-                    is PasswordCheck.LockedOut -> error = UnlockAttempts.lockoutMessage(getApplication<Application>(), check.remainingMillis)
+                    is PasswordCheck.LockedOut -> error = UnlockAttempts.lockoutMessage(appText(), check.remainingMillis)
                 }
             } catch (e: Exception) {
                 error = failureText(e, pick(R.string.security_check_pin_failed, R.string.security_check_password_failed))
@@ -1030,12 +1032,15 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The sentence for [e] from resources, or [fallback] when the app doesn't know it (5.1.0, U5). */
     private fun failureText(e: Throwable, fallback: Int): String =
-        UserMessage.text(getApplication<Application>(), e, fallback)
+        UserMessage.text(appText(), e, fallback)
+
+    /** The application context in the language picked in Settings (see [AppLanguage.localized]). */
+    private fun appText(): Context = AppLanguage.localized(getApplication<Application>())
 
     /** A string resource in the app's current language. */
     private fun str(id: Int, vararg args: Any): String =
-        if (args.isEmpty()) getApplication<Application>().getString(id)
-        else getApplication<Application>().getString(id, *args)
+        if (args.isEmpty()) appText().getString(id)
+        else appText().getString(id, *args)
 
     private fun syncSecretFlags() {
         provisioned = vault.isProvisioned()
@@ -1207,7 +1212,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
      * pending background timer is dropped with it (there is only the one, audit H-3).
      */
     fun lock() {
-        AutoLock.lockNow(getApplication<Application>())
+        AutoLock.lockNow(appText())
     }
 
     /**

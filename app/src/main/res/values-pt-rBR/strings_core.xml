@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="core_vault_no_screen_lock">Configure um bloqueio de tela ou a biometria para proteger seu cofre do AgePony.</string>
+    <string name="core_prompt_create_title">Criar cofre do AgePony</string>
+    <string name="core_prompt_create_subtitle">Confirme que é você para proteger suas chaves</string>
+    <string name="core_prompt_add_lock_subtitle">Adicione este bloqueio ao seu cofre do AgePony</string>
+    <string name="core_auth_failed">Falha na autenticação.</string>
+    <string name="core_vault_create_failed">Não foi possível criar o cofre.</string>
+    <string name="core_vault_unlock_failed">Não foi possível desbloquear o cofre.</string>
+    <string name="core_vault_orphaned">O AgePony foi reinstalado ou restaurado de um backup, e a chave do dispositivo que selou seu cofre antigo não existe mais, então ele não pode ser reaberto. Crie um novo cofre para continuar.</string>
+    <string name="core_unlock_vault_first">Desbloqueie o cofre primeiro.</string>
+    <string name="core_set_device_lock_first">Defina primeiro um PIN, padrão ou senha do dispositivo nas configurações do Android.</string>
+    <string name="core_lock_change_failed">Não foi possível alterar a configuração de bloqueio.</string>
+
+    <plurals name="core_vault_erased_pin">
+        <item quantity="one">O PIN foi digitado errado %1$d vez, então o cofre foi apagado, conforme definido em Configurações.</item>
+        <item quantity="many">O PIN foi digitado errado %1$d de vezes, então o cofre foi apagado, conforme definido em Configurações.</item>
+        <item quantity="other">O PIN foi digitado errado %1$d vezes, então o cofre foi apagado, conforme definido em Configurações.</item>
+    </plurals>
+    <plurals name="core_vault_erased_password">
+        <item quantity="one">A senha foi digitada errada %1$d vez, então o cofre foi apagado, conforme definido em Configurações.</item>
+        <item quantity="many">A senha foi digitada errada %1$d de vezes, então o cofre foi apagado, conforme definido em Configurações.</item>
+        <item quantity="other">A senha foi digitada errada %1$d vezes, então o cofre foi apagado, conforme definido em Configurações.</item>
+    </plurals>
+    <plurals name="core_wrong_pin_erase_warning">
+        <item quantity="one">PIN incorreto. Mais %1$d tentativa errada vai apagar o cofre.</item>
+        <item quantity="many">PIN incorreto. Mais %1$d de tentativas erradas vão apagar o cofre.</item>
+        <item quantity="other">PIN incorreto. Mais %1$d tentativas erradas vão apagar o cofre.</item>
+    </plurals>
+    <plurals name="core_wrong_password_erase_warning">
+        <item quantity="one">Senha incorreta. Mais %1$d tentativa errada vai apagar o cofre.</item>
+        <item quantity="many">Senha incorreta. Mais %1$d de tentativas erradas vão apagar o cofre.</item>
+        <item quantity="other">Senha incorreta. Mais %1$d tentativas erradas vão apagar o cofre.</item>
+    </plurals>
+
+    <string name="core_remove_duress_first_pin">Remova primeiro o PIN de coação para alternar entre senha e PIN.</string>
+    <string name="core_remove_duress_first_password">Remova primeiro a senha de coação para alternar entre senha e PIN.</string>
+    <string name="core_differs_from_duress_pin">O novo PIN precisa ser diferente do seu PIN de coação.</string>
+    <string name="core_differs_from_duress_password">A nova senha precisa ser diferente da sua senha de coação.</string>
+    <string name="core_secret_set_device_failed_pin">Não foi possível definir o PIN neste dispositivo.</string>
+    <string name="core_secret_set_device_failed_password">Não foi possível definir a senha neste dispositivo.</string>
+    <string name="core_secret_save_failed_pin">Não foi possível salvar o PIN.</string>
+    <string name="core_secret_save_failed_password">Não foi possível salvar a senha.</string>
+    <string name="core_secret_set_failed_pin">Não foi possível definir o PIN.</string>
+    <string name="core_secret_set_failed_password">Não foi possível definir a senha.</string>
+    <string name="core_secret_remove_failed_pin">Não foi possível remover o PIN.</string>
+    <string name="core_secret_remove_failed_password">Não foi possível remover a senha.</string>
+    <string name="core_duress_needs_secret_pin">Defina um PIN antes de um PIN de coação.</string>
+    <string name="core_duress_needs_secret_password">Defina uma senha antes de uma senha de coação.</string>
+    <string name="core_enter_current_pin">Digite primeiro seu PIN atual.</string>
+    <string name="core_enter_current_password">Digite primeiro sua senha atual.</string>
+    <string name="core_duress_differs_pin">O PIN de coação precisa ser diferente do seu PIN real.</string>
+    <string name="core_duress_differs_password">A senha de coação precisa ser diferente da sua senha real.</string>
+    <string name="core_duress_set_failed_pin">Não foi possível definir o PIN de coação.</string>
+    <string name="core_duress_set_failed_password">Não foi possível definir a senha de coação.</string>
+    <string name="core_duress_remove_failed_pin">Não foi possível remover o PIN de coação.</string>
+    <string name="core_duress_remove_failed_password">Não foi possível remover a senha de coação.</string>
+    <string name="core_password_only_pin">Seu PIN é a única forma de entrar no cofre. Escolha “Biometria” ou “PIN, padrão ou senha do dispositivo” acima antes de removê-lo.</string>
+    <string name="core_password_only_password">Sua senha é a única forma de entrar no cofre. Escolha “Biometria” ou “PIN, padrão ou senha do dispositivo” acima antes de removê-la.</string>
+    <string name="core_password_only_duress_pin">Seu PIN é a única forma de entrar no cofre. Remova o PIN de coação e depois escolha “Biometria” ou “PIN, padrão ou senha do dispositivo” acima antes de remover o PIN.</string>
+    <string name="core_password_only_duress_password">Sua senha é a única forma de entrar no cofre. Remova a senha de coação e depois escolha “Biometria” ou “PIN, padrão ou senha do dispositivo” acima antes de remover a senha.</string>
+
+    <string name="core_pin_digits_only">Um PIN só pode conter dígitos.</string>
+    <plurals name="core_pin_min_digits">
+        <item quantity="one">Use pelo menos %1$d dígito.</item>
+        <item quantity="many">Use pelo menos %1$d de dígitos.</item>
+        <item quantity="other">Use pelo menos %1$d dígitos.</item>
+    </plurals>
+    <plurals name="core_password_min_chars">
+        <item quantity="one">Use pelo menos %1$d caractere.</item>
+        <item quantity="many">Use pelo menos %1$d de caracteres.</item>
+        <item quantity="other">Use pelo menos %1$d caracteres.</item>
+    </plurals>
+
+    <plurals name="core_wait_seconds">
+        <item quantity="one">%1$d segundo</item>
+        <item quantity="many">%1$d de segundos</item>
+        <item quantity="other">%1$d segundos</item>
+    </plurals>
+    <plurals name="core_wait_minutes">
+        <item quantity="one">%1$d minuto</item>
+        <item quantity="many">%1$d de minutos</item>
+        <item quantity="other">%1$d minutos</item>
+    </plurals>
+    <plurals name="core_wait_hours">
+        <item quantity="one">%1$d hora</item>
+        <item quantity="many">%1$d de horas</item>
+        <item quantity="other">%1$d horas</item>
+    </plurals>
+
+    <string name="core_prompt_sign_title">Assinar com chave de hardware</string>
+    <string name="core_prompt_hw_decrypt_title">Descriptografar com sua chave de hardware</string>
+    <string name="core_prompt_hw_decrypt_subtitle">Confirme que é você para usar esta chave</string>
+    <string name="core_yubikey_tap_read">Aproxime sua YubiKey da parte de trás do celular para ler a chave age dela.</string>
+    <string name="core_yubikey_tap_decrypt">Aproxime sua YubiKey da parte de trás do celular para descriptografar.</string>
+
+    <string name="core_private_ssh_ed25519">SSH Ed25519: a chave privada fica guardada no cofre e não pode ser exportada como texto.</string>
+    <string name="core_private_hardware">Chave de hardware: a chave privada fica no keystore do dispositivo e não pode ser exportada.</string>
+    <string name="core_private_security_key">Chave de segurança: a assinatura acontece no dispositivo FIDO por NFC. Não há chave privada para exportar.</string>
+    <string name="core_private_hardware_tag">Chave de hardware: a descriptografia acontece dentro do hardware seguro deste dispositivo. A chave não pode ser exportada.</string>
+
+    <string name="core_transfer_lives_on_security_key">Fica em uma chave de segurança: a chave pública dela não pode ser verificada sem essa chave.</string>
+    <string name="core_transfer_lives_on_yubikey">Fica em uma YubiKey: para descriptografar com ela é preciso essa YubiKey.</string>
+
+    <string name="core_signer_opt_cert_authority">Autoridade certificadora (assina certificados, não arquivos)</string>
+    <string name="core_signer_opt_only_for">Somente para %1$s</string>
+    <string name="core_signer_opt_not_for">Não para %1$s</string>
+    <string name="core_signer_opt_valid_from">Válida a partir de %1$s</string>
+    <string name="core_signer_opt_valid_until">Válida até %1$s</string>
+    <string name="core_signer_opt_no_touch">Toque na chave de segurança não exigido</string>
+    <string name="core_signer_opt_verify_required">PIN ou impressão digital da chave de segurança exigido</string>
+    <string name="core_signer_opt_unknown">Opção desconhecida: %1$s</string>
+    <string name="core_signer_opt_unreadable">Opções ilegíveis: %1$s</string>
+
+    <string name="core_signer_blocked_cert_authority">Uma chave de autoridade certificadora. O AgePony não suporta certificados SSH, então não consegue aplicar esta entrada.</string>
+    <string name="core_signer_blocked_unreadable">As opções dela não podem ser lidas (%1$s), então o AgePony não consegue aplicá-las.</string>
+    <string name="core_signer_blocked_unknown">Ela tem opções que o AgePony não entende (%1$s), então o AgePony não consegue aplicá-las.</string>
+    <string name="core_signer_blocked_bad_key">A chave dela não pode ser lida.</string>
+
+    <string name="core_signer_warn_expired">Expirou em %1$s.</string>
+    <string name="core_signer_warn_not_yet_valid">Só é válida a partir de %1$s.</string>
+    <string name="core_signer_warn_not_agepony">Não tem permissão para assinar arquivos do AgePony (somente para %1$s).</string>
+    <string name="core_share_chooser_text">Compartilhar</string>
+    <string name="core_share_chooser_file">Compartilhar arquivo criptografado</string>
+
+    <string name="core_yubikey_pin_body">Digite o PIN PIV desta YubiKey e depois aproxime a chave da parte de trás do celular. O AgePony guarda o PIN só até terminar esta descriptografia.</string>
+    <string name="core_yubikey_no_pin">Esta chave não tem PIN</string>
+    <string name="core_yubikey_pin_note_needs">Esta chave da YubiKey precisa do PIN.</string>
+    <string name="core_yubikey_pin_note_length">Um PIN de YubiKey tem de 6 a 8 caracteres.</string>
+    <plurals name="core_yubikey_pin_note_wrong">
+        <item quantity="one">PIN incorreto. Resta %1$d tentativa antes do bloqueio.</item>
+        <item quantity="many">PIN incorreto. Restam %1$d de tentativas antes do bloqueio.</item>
+        <item quantity="other">PIN incorreto. Restam %1$d tentativas antes do bloqueio.</item>
+    </plurals>
+    <string name="core_yubikey_hold_again">A YubiKey perdeu o contato durante a verificação do PIN. Aproxime-a da parte de trás do celular e tente de novo.</string>
+    <string name="core_nfc_hold_key_again">A chave perdeu o contato durante a verificação do PIN. Aproxime-a da parte de trás do celular e tente de novo.</string>
+    <string name="core_owner_check_needed">Confirme que é você com sua impressão digital, rosto ou bloqueio de tela e depois defina a senha ou o PIN de novo.</string>
+    <string name="core_biometric_changed_pin">Uma impressão digital ou um rosto foi adicionado ou removido neste celular, então a biometria não pode abrir o cofre até você digitar seu PIN uma vez. Depois disso, você pode reativar o desbloqueio por biometria. Se não foi você que fez essa mudança, antes de digitar o PIN, procure nas configurações de segurança do celular uma impressão digital ou um rosto que você não adicionou.</string>
+    <string name="core_biometric_changed_password">Uma impressão digital ou um rosto foi adicionado ou removido neste celular, então a biometria não pode abrir o cofre até você digitar sua senha uma vez. Depois disso, você pode reativar o desbloqueio por biometria. Se não foi você que fez essa mudança, antes de digitar a senha, procure nas configurações de segurança do celular uma impressão digital ou um rosto que você não adicionou.</string>
+    <string name="core_biometric_unavailable_pin">A biometria não está disponível no momento. Digite seu PIN para abrir o cofre. O bloqueio de tela do celular não abre o cofre.</string>
+    <string name="core_biometric_unavailable_password">A biometria não está disponível no momento. Digite sua senha para abrir o cofre. O bloqueio de tela do celular não abre o cofre.</string>
+    <string name="core_biometric_lockout_pin">A biometria foi bloqueada depois de muitas tentativas. Digite seu PIN para abrir o cofre. Desbloquear o celular com o bloqueio de tela reativa a biometria, mas o bloqueio de tela não abre o AgePony.</string>
+    <string name="core_biometric_lockout_password">A biometria foi bloqueada depois de muitas tentativas. Digite sua senha para abrir o cofre. Desbloquear o celular com o bloqueio de tela reativa a biometria, mas o bloqueio de tela não abre o AgePony.</string>
+    <string name="core_biometric_only_needs_secret">Defina primeiro uma senha ou um PIN. É a forma de voltar a entrar se sua biometria mudar.</string>
+    <string name="core_biometric_only_no_biometric">Este bloqueio precisa de uma impressão digital ou um rosto configurado neste celular, nas configurações de segurança do Android.</string>
+    <string name="core_biometric_only_refused">O Android não quis guardar a chave do cofre protegida só pela biometria. O bloqueio não foi alterado.</string>
+    <string name="core_biometric_only_refused_code">O Android não quis guardar a chave do cofre protegida só pela biometria (erro %1$d do Keystore). O bloqueio não foi alterado.</string>
+    <string name="core_prompt_biometric_only_subtitle">Use só a biometria para desbloquear o AgePony</string>
+    <string name="core_password_only_biometric_pin">O modo Somente biometria precisa do seu PIN como forma de voltar a entrar se sua biometria mudar. Escolha outro bloqueio acima antes de remover o PIN.</string>
+    <string name="core_password_only_biometric_password">O modo Somente biometria precisa da sua senha como forma de voltar a entrar se sua biometria mudar. Escolha outro bloqueio acima antes de remover a senha.</string>
+</resources>

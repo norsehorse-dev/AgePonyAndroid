@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="error_cancelled">已取消。</string>
+    <string name="error_passthrough">%1$s</string>
+    <string name="error_out_of_memory">这部手机的可用内存不足，无法完成此操作。请关闭其他应用后重试。</string>
+    <string name="error_no_space">这部手机的可用存储空间不足。</string>
+    <string name="error_file_missing">该文件已不存在，或者 AgePony 无法打开它。请重新选择。</string>
+    <string name="error_file_permission">AgePony 已无权使用该文件。请重新选择。</string>
+    <string name="error_integrity">数据未通过完整性检查。数据可能被改动或损坏，也可能是密钥不对。</string>
+
+    <string name="error_network_offline">没有网络连接，或者找不到服务器的域名。</string>
+    <string name="error_network_timeout">服务器响应超时。</string>
+    <string name="error_network_connect">无法连接到服务器。请检查网络连接和代理设置。</string>
+    <string name="error_network_tls">与服务器的安全连接失败。</string>
+
+    <string name="error_no_recipients">请至少选择一个收件人。</string>
+    <string name="error_passphrase_with_recipients">同一个文件不能同时使用密码短语和收件人。</string>
+    <string name="error_encrypt_failed">无法加密。</string>
+    <string name="error_decrypt_failed">无法解密。</string>
+    <string name="error_no_matching_identity">你的身份都无法打开这个文件。</string>
+    <string name="error_wrong_passphrase">密码短语错误，或者这个文件不是用密码短语加密的。</string>
+    <string name="error_mismatched_labels">其中有些收件人不能与其他收件人共用一个文件，例如抗量子密钥和传统密钥。</string>
+    <string name="error_scrypt_memory_decrypt">打开这个文件需要大约 %1$d MB 内存来派生密码短语密钥，而这部手机只有大约 %2$d MB 可用。工作因子是在创建文件时设定的，如果原文件在你手上，请用较低的工作因子重新加密。</string>
+    <string name="error_scrypt_memory_encrypt">工作因子为 2^%1$d 的密码短语需要大约 %2$d MB 内存，而这部手机只有大约 %3$d MB 可用。请在“设置”中降低密码短语的工作因子，或改为加密给收件人。</string>
+
+    <string name="error_not_age_file">这不是 age 加密文件。</string>
+    <string name="error_header_damaged">文件的 age 头部已损坏。</string>
+    <string name="error_header_too_large">文件的 age 头部过大，无法读取。</string>
+    <string name="error_header_mac">文件头部未通过完整性检查，可能已被改动或损坏。</string>
+    <string name="error_header_scrypt_not_alone">这个文件同时使用了密码短语和其他收件人，age 不允许这样做。</string>
+    <string name="error_file_truncated">文件不完整，可能在复制时被截断了。</string>
+    <string name="error_payload_auth">加密内容未通过完整性检查，文件可能已被改动或损坏。</string>
+    <string name="error_payload_damaged">加密内容已损坏或不完整。</string>
+    <string name="error_armor_damaged">文本格式（armor）的内容已损坏或不完整。</string>
+    <string name="error_bech32">这不是有效的 age 密钥。请检查是否有错字或缺少部分内容。</string>
+    <string name="error_low_order">这个文件不是为你的任何密钥制作的，或者已被篡改。</string>
+    <string name="error_rsa_unwrap">该 RSA 密钥无法打开这个文件。</string>
+    <string name="error_ssh_key_damaged">该 SSH 密钥已损坏，或者不是 AgePony 能读取的格式。</string>
+    <string name="error_ssh_key_decrypt">无法解密这个 SSH 密钥，它可能已损坏。</string>
+    <string name="error_ssh_kdf">这个 SSH 密钥的密码短语设置无法使用。</string>
+    <string name="error_diceware">无法加载用于生成密码短语的词表。</string>
+    <string name="error_sign_failed">无法生成签名。</string>
+    <string name="error_bundle_damaged">已签名的文件包已损坏。</string>
+    <string name="error_tar_damaged">文件包已损坏或不完整。</string>
+
+    <string name="error_signing_only_key">硬件签名密钥和安全密钥可以签名，但不能解密，也不能作为加密的收件人。</string>
+    <string name="error_stored_key_damaged">这个已保存的密钥已损坏。</string>
+    <string name="error_vault_key_missing">Android Keystore 中保险库的密钥丢失了。这通常是因为 AgePony 被重新安装过，或者从备份中恢复过。</string>
+    <string name="error_password_device_key_missing">这部手机上用于应用密码的密钥丢失了，因此密码无法打开保险库。</string>
+    <string name="error_password_data_damaged">已保存的应用密码数据已损坏。</string>
+
+    <string name="error_import_passphrase_required">这个密钥受密码短语保护。请输入密码短语后重试。</string>
+    <string name="error_import_wrong_passphrase">这个密钥的密码短语错误。</string>
+    <string name="error_import_unsupported">AgePony 无法导入这类密钥。支持的有 age 密钥、SSH Ed25519 和 RSA 密钥，以及 YubiKey 身份。</string>
+    <string name="error_import_malformed">这不是 AgePony 能读取的密钥。请检查是否完整复制了全部内容。</string>
+
+    <string name="error_recipient_empty">请先粘贴收件人。</string>
+    <string name="error_recipient_bad_quantum_safe">这不是有效的抗量子 age 收件人。</string>
+    <string name="error_recipient_bad_tag">这不是有效的 age 硬件密钥收件人。</string>
+    <string name="error_recipient_bad_yubikey">这不是有效的 YubiKey 收件人。</string>
+    <string name="error_recipient_bad_age">这不是有效的 age 收件人。请检查是否有错字或缺少部分内容。</string>
+    <string name="error_recipient_bad_ssh">这不是 AgePony 能使用的 SSH 公钥。</string>
+    <string name="error_recipient_bad_ssh_ed25519">这个 ssh-ed25519 密钥不是有效的公钥。</string>
+    <string name="error_recipient_unrecognized">AgePony 无法识别这个收件人。请粘贴 age1 收件人，或者一行 ssh-ed25519 或 ssh-rsa 公钥。</string>
+    <string name="error_github_username">GitHub 用户名由 1 到 39 个字母（A 到 Z）、数字和连字符组成，且不能以连字符开头。</string>
+    <string name="error_github_no_keys">GitHub 上没有 %1$s 的公钥。</string>
+    <string name="error_github_no_usable_keys">%1$s 在 GitHub 上有密钥，但没有 AgePony 能用的。AgePony 支持 ssh-ed25519 和 ssh-rsa 密钥。</string>
+    <string name="error_github_no_user">GitHub 上没有名为 %1$s 的账号。</string>
+    <string name="error_github_http">GitHub 没有返回密钥（HTTP %1$d）。</string>
+    <string name="error_github_empty">GitHub 返回了空的响应。请重试。</string>
+    <string name="error_github_network">无法连接到 GitHub。请检查网络连接和代理设置。</string>
+    <string name="error_github_too_large">GitHub 返回的内容过大，不像是密钥列表，因此没有导入任何内容。</string>
+
+    <string name="error_sign_x25519">age 身份不能签名。请选择 SSH 密钥、硬件签名密钥或安全密钥。</string>
+    <string name="error_sign_quantum_safe">抗量子身份只用于加密，不能签名。请选择 SSH 密钥、硬件签名密钥或安全密钥。</string>
+    <string name="error_sign_decrypt_only">硬件解密密钥不能签名。请选择 SSH 密钥或硬件签名密钥。</string>
+    <string name="error_sign_security_key_here">安全密钥不能在这里签名。请改用“为文件签名”来签名。</string>
+    <string name="error_sign_key_damaged">这个身份保存的密钥已损坏。</string>
+
+    <string name="error_auth_failed">身份验证未成功。</string>
+    <string name="error_auth_failed_code">身份验证未成功（BiometricPrompt 错误 %1$d）。</string>
+    <string name="error_auth_no_result">身份验证没有返回结果。请重试。</string>
+    <string name="error_auth_timed_out">等待身份验证超时。</string>
+    <string name="error_biometric_lockout">尝试次数过多，生物识别已被锁定。请稍等片刻后重试。</string>
+    <string name="error_biometric_lockout_permanent">尝试次数过多，生物识别已被锁定。请用手机的 PIN 码、图案或密码解锁手机，以重新启用生物识别。</string>
+    <string name="error_biometric_none_enrolled">这部手机上没有设置指纹或面孔。</string>
+    <string name="error_biometric_hardware">这部手机目前无法使用生物识别。</string>
+    <string name="error_no_screen_lock">请先为这部手机设置屏幕锁定，才能使用此功能。</string>
+    <string name="error_security_update">需要先安装安全更新，才能使用生物识别。</string>
+    <string name="error_hardware_app_not_open">使用这个硬件密钥时，AgePony 需要保持打开状态。</string>
+    <string name="error_key_invalidated">由于手机的屏幕锁定或生物识别发生了变化，这个密钥已失效，无法再使用。</string>
+    <string name="error_not_authenticated">请先确认是你本人，然后重试。</string>
+    <string name="error_hardware_sign_failed">硬件密钥无法签名。</string>
+    <string name="error_hardware_key_gone">这个硬件密钥已不在手机的密钥库中，无法再使用。</string>
+    <string name="error_hardware_decrypt_failed">硬件密钥无法打开这个文件。</string>
+    <string name="error_keystore_code">Android Keystore 拒绝了此操作（Keystore 错误 %1$d）。</string>
+
+    <string name="error_sk_pin_required">这个安全密钥需要输入 PIN 码。</string>
+    <string name="error_sk_wrong_pin">PIN 码错误。</string>
+    <string name="error_sk_no_pin_set">这个安全密钥还没有设置 PIN 码。请先在密钥上设置 FIDO2 PIN 码，然后重试。</string>
+    <string name="error_sk_bad_answer">安全密钥的响应无法识别。请再次贴近。</string>
+    <string name="error_sk_denied">安全密钥拒绝了该请求。</string>
+    <string name="error_sk_no_credential">这个安全密钥中没有此身份的密钥。</string>
+    <string name="error_sk_touch_timeout">等待触摸安全密钥超时。请重试。</string>
+    <string name="error_sk_pin_blocked">安全密钥的 PIN 码已被锁定。需要重置密钥才能再次使用。</string>
+    <string name="error_sk_pin_auth_blocked">PIN 码错误次数过多。请先把密钥拿开，然后再次贴近。</string>
+    <string name="error_sk_code">安全密钥返回了错误（CTAP %1$s）。</string>
+    <string name="error_nfc_missing">这部手机不支持 NFC。</string>
+    <string name="error_nfc_off">NFC 已关闭。请在手机设置中开启。</string>
+    <string name="error_nfc_not_security_key">这个 NFC 标签不是安全密钥。</string>
+    <string name="error_nfc_reader">无法启动 NFC 读取器。请重试。</string>
+    <string name="error_nfc_lost">数据交换完成前密钥被移开了。请保持不动并重试。</string>
+    <string name="error_nfc_no_fido">这个密钥没有 FIDO2 小程序（状态 %1$s）。</string>
+    <string name="error_nfc_bad_answer">安全密钥发送的响应 AgePony 无法使用。</string>
+    <string name="error_nfc_timeout">安全密钥没有及时响应。请再次贴近。</string>
+    <string name="error_nfc_status">NFC 数据交换失败（状态 %1$s）。</string>
+
+    <string name="error_piv_pin_required">这个 YubiKey 密钥需要输入 PIN 码。</string>
+    <string name="error_piv_pin_blocked">PIV PIN 码已被锁定。请在 YubiKey Manager 中用 PUK 解锁。</string>
+    <plurals name="error_piv_wrong_pin">
+        <item quantity="other">PIN 码错误。还剩 %1$d 次尝试机会，之后将被锁定。</item>
+    </plurals>
+    <string name="error_piv_not_piv">这个密钥没有 PIV 小程序（状态 %1$s）。</string>
+    <string name="error_piv_pin_check">YubiKey 无法检查 PIN 码（状态 %1$s）。</string>
+    <string name="error_piv_no_key_code">这个 YubiKey 中此身份使用的插槽里没有密钥（状态 %1$s）。</string>
+    <string name="error_piv_no_key">这个 YubiKey 中此身份使用的插槽里没有密钥。</string>
+    <string name="error_piv_not_p256">该插槽中的密钥不是 P-256 密钥。</string>
+    <string name="error_piv_refused">YubiKey 拒绝了该请求（状态 %1$s）。</string>
+    <string name="error_piv_bad_answer">YubiKey 的响应无法识别。请再次贴近。</string>
+    <string name="error_piv_key_mismatch">该插槽中的密钥不是此身份所指向的那个。</string>
+    <string name="error_piv_wrong_yubikey">这是 YubiKey %1$s，而此身份在 YubiKey %2$s 上。</string>
+    <string name="error_piv_app_not_open">使用 YubiKey 时，AgePony 需要保持打开状态。</string>
+    <string name="error_piv_not_smart_card">这个 NFC 标签不是智能卡。</string>
+    <string name="error_piv_moved_away">YubiKey 移开得太早了。请保持不动，直到操作完成。</string>
+
+    <string name="error_transfer_not_transfer">这不是 AgePony 的密钥传输。</string>
+    <string name="error_transfer_too_many">这次传输包含的密钥数量超过了 AgePony 一次能接收的上限。</string>
+    <string name="error_transfer_newer">这次传输由更新版本的 AgePony 创建。请更新这部手机上的 AgePony。</string>
+    <string name="error_transfer_wrong_session">这次传输是为另一个接收会话加密的。请重新打开“接收密钥”并重新扫描。</string>
+    <string name="error_transfer_not_recipient">这不是来自另一部手机的接收密钥。</string>
+    <string name="error_lan_not_invite">这个二维码不是来自另一部手机上的“接收密钥”。</string>
+    <string name="error_lan_damaged_invite">这个接收二维码已损坏。请重新扫描。</string>
+    <string name="error_lan_protocol">另一部手机发来了意外的内容。请重新开始传输。</string>
+    <string name="error_lan_wrong_token">另一部手机的代码不匹配。请重新打开“接收密钥”并重新扫描。</string>
+    <string name="error_lan_too_large">传输内容过大，无法直接发送。</string>
+    <string name="error_lan_closed">传输完成前，另一部手机关闭了连接。</string>
+    <string name="error_lan_refused">另一部手机拒绝了传输。请重新打开“接收密钥”并重新扫描。</string>
+    <string name="error_lan_unreachable">无法连接到另一部手机。请让两部手机连接同一个 Wi-Fi，或让一部手机连接另一部的热点。</string>
+    <string name="error_paper_not_sealed">这不是受密码短语保护的 AgePony 备份。</string>
+    <string name="error_paper_damaged">备份已损坏，或者没有完整扫描。</string>
+    <string name="error_paper_wrong_passphrase">备份密码短语错误。</string>
+</resources>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AgePony</string>
+    <string name="share_label">AgePony</string>
+
+    <string name="action_back">Voltar</string>
+    <string name="action_copy">Copiar</string>
+    <string name="action_copied">Copiado</string>
+    <string name="action_reveal">Mostrar</string>
+    <string name="action_hide">Ocultar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_delete">Excluir</string>
+    <string name="post_quantum_label">Pós-quântico</string>
+    <string name="action_more_options">Mais opções</string>
+    <string name="action_add_identity">Adicionar identidade</string>
+    <string name="action_add_recipient">Adicionar destinatário</string>
+    <string name="scan_title">Escanear um código QR</string>
+    <string name="recipient_title">Destinatário</string>
+    <string name="identity_title">Identidade</string>
+    <string name="note_title">Nota</string>
+    <string name="identity_no_backup_title">Não é possível fazer backup</string>
+    <string name="send_keys_title">Enviar chaves</string>
+    <string name="settings_identity_label">Identidade</string>
+
+    <string name="files_title">Arquivos</string>
+    <string name="files_section_encryption">Criptografia</string>
+    <string name="files_encrypt">Criptografar um arquivo</string>
+    <string name="files_decrypt">Descriptografar um arquivo</string>
+    <string name="files_inspect">Inspecionar um arquivo</string>
+    <string name="files_migrate">Atualizar arquivos para pós-quântico</string>
+    <string name="files_section_signatures">Assinaturas</string>
+    <string name="files_sign">Assinar um arquivo</string>
+    <string name="files_signatures_footer">Uma assinatura mostra quem criou um arquivo e que ele não foi alterado desde então. O AgePony usa o mesmo formato de assinatura do ssh-keygen.</string>
+    <string name="files_section_tools">Outras ferramentas</string>
+    <string name="files_tools_footer">Inspecionar mostra quem pode abrir um arquivo sem descriptografá-lo. Atualizar criptografa os arquivos de novo para que uma identidade pós-quântica possa abri-los.</string>
+    <string name="files_verify">Verificar uma assinatura</string>
+    <string name="files_signers">Signatários confiáveis</string>
+
+    <string name="decrypt_verdict_trusted">Assinatura verificada</string>
+    <string name="decrypt_verdict_unknown">Assinatura válida, signatário desconhecido</string>
+    <string name="decrypt_verdict_untrusted">Assinatura não confiável</string>
+    <string name="decrypt_verdict_failed">Falha na verificação da assinatura</string>
+
+    <plurals name="migrate_files_chosen">
+        <item quantity="one">%1$d arquivo escolhido</item>
+        <item quantity="many">%1$d de arquivos escolhidos</item>
+        <item quantity="other">%1$d arquivos escolhidos</item>
+    </plurals>
+    <plurals name="migrate_upgrade_files">
+        <item quantity="one">Atualizar %1$d arquivo</item>
+        <item quantity="many">Atualizar %1$d de arquivos</item>
+        <item quantity="other">Atualizar %1$d arquivos</item>
+    </plurals>
+
+    <plurals name="signers_exported">
+        <item quantity="one">%1$d signatário exportado.</item>
+        <item quantity="many">%1$d de signatários exportados.</item>
+        <item quantity="other">%1$d signatários exportados.</item>
+    </plurals>
+    <plurals name="signers_unreadable_lines">
+        <item quantity="one">%1$d linha não pôde ser lida e foi ignorada.</item>
+        <item quantity="many">%1$d de linhas não puderam ser lidas e foram ignoradas.</item>
+        <item quantity="other">%1$d linhas não puderam ser lidas e foram ignoradas.</item>
+    </plurals>
+
+    <plurals name="recipients_found">
+        <item quantity="one">%1$d destinatário encontrado</item>
+        <item quantity="many">%1$d de destinatários encontrados</item>
+        <item quantity="other">%1$d destinatários encontrados</item>
+    </plurals>
+    <string name="recipient_delete_title">Excluir “%1$s”?</string>
+    <string name="recipient_delete_body">Ele vai para Excluídos recentemente, onde você pode restaurá-lo.</string>
+
+    <string name="note_delete_title">Excluir esta nota?</string>
+    <string name="note_delete_body">A nota e o texto criptografado dela são removidos de vez. Não é possível desfazer.</string>
+
+    <plurals name="transfer_identities">
+        <item quantity="one">%1$d identidade</item>
+        <item quantity="many">%1$d de identidades</item>
+        <item quantity="other">%1$d identidades</item>
+    </plurals>
+    <plurals name="transfer_recipients">
+        <item quantity="one">%1$d destinatário</item>
+        <item quantity="many">%1$d de destinatários</item>
+        <item quantity="other">%1$d destinatários</item>
+    </plurals>
+    <plurals name="transfer_signers">
+        <item quantity="one">%1$d signatário</item>
+        <item quantity="many">%1$d de signatários</item>
+        <item quantity="other">%1$d signatários</item>
+    </plurals>
+
+    <plurals name="paper_restored">
+        <item quantity="one">%1$d identidade restaurada</item>
+        <item quantity="many">%1$d de identidades restauradas</item>
+        <item quantity="other">%1$d identidades restauradas</item>
+    </plurals>
+</resources>

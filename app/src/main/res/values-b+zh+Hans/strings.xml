@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AgePony</string>
+    <string name="share_label">AgePony</string>
+
+    <string name="action_back">返回</string>
+    <string name="action_copy">复制</string>
+    <string name="action_copied">已复制</string>
+    <string name="action_reveal">显示</string>
+    <string name="action_hide">隐藏</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_delete">删除</string>
+    <string name="post_quantum_label">抗量子</string>
+    <string name="action_more_options">更多选项</string>
+    <string name="action_add_identity">添加身份</string>
+    <string name="action_add_recipient">添加收件人</string>
+    <string name="scan_title">扫描二维码</string>
+    <string name="recipient_title">收件人</string>
+    <string name="identity_title">身份</string>
+    <string name="note_title">笔记</string>
+    <string name="identity_no_backup_title">无法备份</string>
+    <string name="send_keys_title">发送密钥</string>
+    <string name="settings_identity_label">身份</string>
+
+    <string name="files_title">文件</string>
+    <string name="files_section_encryption">加密</string>
+    <string name="files_encrypt">加密文件</string>
+    <string name="files_decrypt">解密文件</string>
+    <string name="files_inspect">检查文件</string>
+    <string name="files_migrate">将文件升级为抗量子加密</string>
+    <string name="files_section_signatures">签名</string>
+    <string name="files_sign">为文件签名</string>
+    <string name="files_signatures_footer">签名可以证明文件出自谁手，并且之后没有被改动过。AgePony 使用与 ssh-keygen 相同的签名格式。</string>
+    <string name="files_section_tools">其他工具</string>
+    <string name="files_tools_footer">“检查”可在不解密的情况下查看谁能打开某个文件。“升级”会重新加密文件，让抗量子身份可以打开它们。</string>
+    <string name="files_verify">验证签名</string>
+    <string name="files_signers">受信任的签名者</string>
+
+    <string name="decrypt_verdict_trusted">签名已验证</string>
+    <string name="decrypt_verdict_unknown">签名有效，签名者未知</string>
+    <string name="decrypt_verdict_untrusted">签名不受信任</string>
+    <string name="decrypt_verdict_failed">签名验证失败</string>
+
+    <plurals name="migrate_files_chosen">
+        <item quantity="other">已选择 %1$d 个文件</item>
+    </plurals>
+    <plurals name="migrate_upgrade_files">
+        <item quantity="other">升级 %1$d 个文件</item>
+    </plurals>
+
+    <plurals name="signers_exported">
+        <item quantity="other">已导出 %1$d 个签名者。</item>
+    </plurals>
+    <plurals name="signers_unreadable_lines">
+        <item quantity="other">有 %1$d 行无法读取，已跳过。</item>
+    </plurals>
+
+    <plurals name="recipients_found">
+        <item quantity="other">找到 %1$d 个收件人</item>
+    </plurals>
+    <string name="recipient_delete_title">删除“%1$s”？</string>
+    <string name="recipient_delete_body">它会移到“最近删除”，你可以在那里恢复。</string>
+
+    <string name="note_delete_title">删除这条笔记？</string>
+    <string name="note_delete_body">这条笔记及其加密文本将被永久删除，且无法撤消。</string>
+
+    <plurals name="transfer_identities">
+        <item quantity="other">%1$d 个身份</item>
+    </plurals>
+    <plurals name="transfer_recipients">
+        <item quantity="other">%1$d 个收件人</item>
+    </plurals>
+    <plurals name="transfer_signers">
+        <item quantity="other">%1$d 个签名者</item>
+    </plurals>
+
+    <plurals name="paper_restored">
+        <item quantity="other">已恢复 %1$d 个身份</item>
+    </plurals>
+</resources>

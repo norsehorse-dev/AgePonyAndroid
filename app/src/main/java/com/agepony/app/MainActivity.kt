@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.snapshotFlow
+import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.agepony.app.security.ClipboardGuard
@@ -19,7 +20,7 @@ import com.agepony.app.vault.Vault
 import com.agepony.app.vault.VaultViewModel
 import kotlinx.coroutines.launch
 
-class MainActivity : FragmentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val vaultViewModel: VaultViewModel by viewModels()
 
@@ -44,6 +45,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.agepony.app.i18n.AppLanguage.init(this)
+        // Debug builds only: store screenshot seeding (src/debug/Demo.kt). A no-op in release.
+        if (savedInstanceState == null) Demo.handle(this, intent)
         // Count fresh launches only (not configuration-change recreations) so the
         // in-app review nudge fires after genuine repeat use. See AgePonyApp.
         if (savedInstanceState == null) {

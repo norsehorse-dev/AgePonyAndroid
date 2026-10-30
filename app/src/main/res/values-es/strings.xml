@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AgePony</string>
+    <string name="share_label">AgePony</string>
+
+    <string name="action_back">Atrás</string>
+    <string name="action_copy">Copiar</string>
+    <string name="action_copied">Copiado</string>
+    <string name="action_reveal">Mostrar</string>
+    <string name="action_hide">Ocultar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_delete">Eliminar</string>
+    <string name="post_quantum_label">Poscuántico</string>
+    <string name="action_more_options">Más opciones</string>
+    <string name="action_add_identity">Añadir identidad</string>
+    <string name="action_add_recipient">Añadir destinatario</string>
+    <string name="scan_title">Escanear un código QR</string>
+    <string name="recipient_title">Destinatario</string>
+    <string name="identity_title">Identidad</string>
+    <string name="note_title">Nota</string>
+    <string name="identity_no_backup_title">No se puede hacer copia de seguridad</string>
+    <string name="send_keys_title">Enviar claves</string>
+    <string name="settings_identity_label">Identidad</string>
+
+    <string name="files_title">Archivos</string>
+    <string name="files_section_encryption">Cifrado</string>
+    <string name="files_encrypt">Cifrar un archivo</string>
+    <string name="files_decrypt">Descifrar un archivo</string>
+    <string name="files_inspect">Inspeccionar un archivo</string>
+    <string name="files_migrate">Actualizar archivos a cifrado poscuántico</string>
+    <string name="files_section_signatures">Firmas</string>
+    <string name="files_sign">Firmar un archivo</string>
+    <string name="files_signatures_footer">Una firma muestra quién creó un archivo y que no ha cambiado desde entonces. AgePony usa el mismo formato de firma que ssh-keygen.</string>
+    <string name="files_section_tools">Otras herramientas</string>
+    <string name="files_tools_footer">Inspeccionar muestra quién puede abrir un archivo sin descifrarlo. Actualizar vuelve a cifrar los archivos para que una identidad poscuántica pueda abrirlos.</string>
+    <string name="files_verify">Verificar una firma</string>
+    <string name="files_signers">Firmantes de confianza</string>
+
+    <string name="decrypt_verdict_trusted">Firma verificada</string>
+    <string name="decrypt_verdict_unknown">Firma válida, firmante desconocido</string>
+    <string name="decrypt_verdict_untrusted">Firma no fiable</string>
+    <string name="decrypt_verdict_failed">Error al verificar la firma</string>
+
+    <plurals name="migrate_files_chosen">
+        <item quantity="one">%1$d archivo elegido</item>
+        <item quantity="many">%1$d archivos elegidos</item>
+        <item quantity="other">%1$d archivos elegidos</item>
+    </plurals>
+    <plurals name="migrate_upgrade_files">
+        <item quantity="one">Actualizar %1$d archivo</item>
+        <item quantity="many">Actualizar %1$d archivos</item>
+        <item quantity="other">Actualizar %1$d archivos</item>
+    </plurals>
+
+    <plurals name="signers_exported">
+        <item quantity="one">Se exportó %1$d firmante.</item>
+        <item quantity="many">Se exportaron %1$d firmantes.</item>
+        <item quantity="other">Se exportaron %1$d firmantes.</item>
+    </plurals>
+    <plurals name="signers_unreadable_lines">
+        <item quantity="one">No se pudo leer %1$d línea y se omitió.</item>
+        <item quantity="many">No se pudieron leer %1$d líneas y se omitieron.</item>
+        <item quantity="other">No se pudieron leer %1$d líneas y se omitieron.</item>
+    </plurals>
+
+    <plurals name="recipients_found">
+        <item quantity="one">Se encontró %1$d destinatario</item>
+        <item quantity="many">Se encontraron %1$d destinatarios</item>
+        <item quantity="other">Se encontraron %1$d destinatarios</item>
+    </plurals>
+    <string name="recipient_delete_title">¿Eliminar «%1$s»?</string>
+    <string name="recipient_delete_body">Se moverá a Eliminados recientemente, donde podrás restaurarlo.</string>
+
+    <string name="note_delete_title">¿Eliminar esta nota?</string>
+    <string name="note_delete_body">La nota y su texto cifrado se eliminarán para siempre. Esta acción no se puede deshacer.</string>
+
+    <plurals name="transfer_identities">
+        <item quantity="one">%1$d identidad</item>
+        <item quantity="many">%1$d identidades</item>
+        <item quantity="other">%1$d identidades</item>
+    </plurals>
+    <plurals name="transfer_recipients">
+        <item quantity="one">%1$d destinatario</item>
+        <item quantity="many">%1$d destinatarios</item>
+        <item quantity="other">%1$d destinatarios</item>
+    </plurals>
+    <plurals name="transfer_signers">
+        <item quantity="one">%1$d firmante</item>
+        <item quantity="many">%1$d firmantes</item>
+        <item quantity="other">%1$d firmantes</item>
+    </plurals>
+
+    <plurals name="paper_restored">
+        <item quantity="one">Se restauró %1$d identidad</item>
+        <item quantity="many">Se restauraron %1$d identidades</item>
+        <item quantity="other">Se restauraron %1$d identidades</item>
+    </plurals>
+</resources>

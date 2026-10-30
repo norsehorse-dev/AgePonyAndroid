@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="core_vault_no_screen_lock">Configura un bloqueo de pantalla o la biometría para proteger tu bóveda de AgePony.</string>
+    <string name="core_prompt_create_title">Crear bóveda de AgePony</string>
+    <string name="core_prompt_create_subtitle">Confirma que eres tú para proteger tus claves</string>
+    <string name="core_prompt_add_lock_subtitle">Añade este bloqueo a tu bóveda de AgePony</string>
+    <string name="core_auth_failed">Error de autenticación.</string>
+    <string name="core_vault_create_failed">No se pudo crear la bóveda.</string>
+    <string name="core_vault_unlock_failed">No se pudo desbloquear la bóveda.</string>
+    <string name="core_vault_orphaned">AgePony se reinstaló o se restauró desde una copia de seguridad, y la clave del dispositivo que sellaba tu bóveda anterior ya no existe, así que no se puede volver a abrir. Configura una bóveda nueva para continuar.</string>
+    <string name="core_unlock_vault_first">Primero desbloquea la bóveda.</string>
+    <string name="core_set_device_lock_first">Primero configura un PIN, un patrón o una contraseña del dispositivo en los ajustes de Android.</string>
+    <string name="core_lock_change_failed">No se pudo cambiar el ajuste de bloqueo.</string>
+
+    <plurals name="core_vault_erased_pin">
+        <item quantity="one">El PIN se introdujo mal %1$d vez, así que la bóveda se borró según lo configurado en Ajustes.</item>
+        <item quantity="many">El PIN se introdujo mal %1$d veces, así que la bóveda se borró según lo configurado en Ajustes.</item>
+        <item quantity="other">El PIN se introdujo mal %1$d veces, así que la bóveda se borró según lo configurado en Ajustes.</item>
+    </plurals>
+    <plurals name="core_vault_erased_password">
+        <item quantity="one">La contraseña se introdujo mal %1$d vez, así que la bóveda se borró según lo configurado en Ajustes.</item>
+        <item quantity="many">La contraseña se introdujo mal %1$d veces, así que la bóveda se borró según lo configurado en Ajustes.</item>
+        <item quantity="other">La contraseña se introdujo mal %1$d veces, así que la bóveda se borró según lo configurado en Ajustes.</item>
+    </plurals>
+    <plurals name="core_wrong_pin_erase_warning">
+        <item quantity="one">PIN incorrecto. Si fallas %1$d vez más, se borrará la bóveda.</item>
+        <item quantity="many">PIN incorrecto. Si fallas %1$d veces más, se borrará la bóveda.</item>
+        <item quantity="other">PIN incorrecto. Si fallas %1$d veces más, se borrará la bóveda.</item>
+    </plurals>
+    <plurals name="core_wrong_password_erase_warning">
+        <item quantity="one">Contraseña incorrecta. Si fallas %1$d vez más, se borrará la bóveda.</item>
+        <item quantity="many">Contraseña incorrecta. Si fallas %1$d veces más, se borrará la bóveda.</item>
+        <item quantity="other">Contraseña incorrecta. Si fallas %1$d veces más, se borrará la bóveda.</item>
+    </plurals>
+
+    <string name="core_remove_duress_first_pin">Para cambiar entre contraseña y PIN, primero quita el PIN de coacción.</string>
+    <string name="core_remove_duress_first_password">Para cambiar entre contraseña y PIN, primero quita la contraseña de coacción.</string>
+    <string name="core_differs_from_duress_pin">El nuevo PIN debe ser distinto de tu PIN de coacción.</string>
+    <string name="core_differs_from_duress_password">La nueva contraseña debe ser distinta de tu contraseña de coacción.</string>
+    <string name="core_secret_set_device_failed_pin">No se pudo configurar el PIN en este dispositivo.</string>
+    <string name="core_secret_set_device_failed_password">No se pudo configurar la contraseña en este dispositivo.</string>
+    <string name="core_secret_save_failed_pin">No se pudo guardar el PIN.</string>
+    <string name="core_secret_save_failed_password">No se pudo guardar la contraseña.</string>
+    <string name="core_secret_set_failed_pin">No se pudo configurar el PIN.</string>
+    <string name="core_secret_set_failed_password">No se pudo configurar la contraseña.</string>
+    <string name="core_secret_remove_failed_pin">No se pudo quitar el PIN.</string>
+    <string name="core_secret_remove_failed_password">No se pudo quitar la contraseña.</string>
+    <string name="core_duress_needs_secret_pin">Configura un PIN antes de un PIN de coacción.</string>
+    <string name="core_duress_needs_secret_password">Configura una contraseña antes de una contraseña de coacción.</string>
+    <string name="core_enter_current_pin">Primero introduce tu PIN actual.</string>
+    <string name="core_enter_current_password">Primero introduce tu contraseña actual.</string>
+    <string name="core_duress_differs_pin">El PIN de coacción debe ser distinto de tu PIN real.</string>
+    <string name="core_duress_differs_password">La contraseña de coacción debe ser distinta de tu contraseña real.</string>
+    <string name="core_duress_set_failed_pin">No se pudo configurar el PIN de coacción.</string>
+    <string name="core_duress_set_failed_password">No se pudo configurar la contraseña de coacción.</string>
+    <string name="core_duress_remove_failed_pin">No se pudo quitar el PIN de coacción.</string>
+    <string name="core_duress_remove_failed_password">No se pudo quitar la contraseña de coacción.</string>
+    <string name="core_password_only_pin">Tu PIN es la única forma de entrar en la bóveda. Antes de quitarlo, elige arriba «Biometría» o «PIN, patrón o contraseña del dispositivo».</string>
+    <string name="core_password_only_password">Tu contraseña es la única forma de entrar en la bóveda. Antes de quitarla, elige arriba «Biometría» o «PIN, patrón o contraseña del dispositivo».</string>
+    <string name="core_password_only_duress_pin">Tu PIN es la única forma de entrar en la bóveda. Quita el PIN de coacción y luego, antes de quitar el PIN, elige arriba «Biometría» o «PIN, patrón o contraseña del dispositivo».</string>
+    <string name="core_password_only_duress_password">Tu contraseña es la única forma de entrar en la bóveda. Quita la contraseña de coacción y luego, antes de quitar la contraseña, elige arriba «Biometría» o «PIN, patrón o contraseña del dispositivo».</string>
+
+    <string name="core_pin_digits_only">Un PIN solo puede contener dígitos.</string>
+    <plurals name="core_pin_min_digits">
+        <item quantity="one">Usa al menos %1$d dígito.</item>
+        <item quantity="many">Usa al menos %1$d dígitos.</item>
+        <item quantity="other">Usa al menos %1$d dígitos.</item>
+    </plurals>
+    <plurals name="core_password_min_chars">
+        <item quantity="one">Usa al menos %1$d carácter.</item>
+        <item quantity="many">Usa al menos %1$d caracteres.</item>
+        <item quantity="other">Usa al menos %1$d caracteres.</item>
+    </plurals>
+
+    <plurals name="core_wait_seconds">
+        <item quantity="one">%1$d segundo</item>
+        <item quantity="many">%1$d segundos</item>
+        <item quantity="other">%1$d segundos</item>
+    </plurals>
+    <plurals name="core_wait_minutes">
+        <item quantity="one">%1$d minuto</item>
+        <item quantity="many">%1$d minutos</item>
+        <item quantity="other">%1$d minutos</item>
+    </plurals>
+    <plurals name="core_wait_hours">
+        <item quantity="one">%1$d hora</item>
+        <item quantity="many">%1$d horas</item>
+        <item quantity="other">%1$d horas</item>
+    </plurals>
+
+    <string name="core_prompt_sign_title">Firmar con clave de hardware</string>
+    <string name="core_prompt_hw_decrypt_title">Descifrar con tu clave de hardware</string>
+    <string name="core_prompt_hw_decrypt_subtitle">Confirma que eres tú para usar esta clave</string>
+    <string name="core_yubikey_tap_read">Acerca tu YubiKey a la parte trasera del teléfono para leer su clave age.</string>
+    <string name="core_yubikey_tap_decrypt">Acerca tu YubiKey a la parte trasera del teléfono para descifrar.</string>
+
+    <string name="core_private_ssh_ed25519">SSH Ed25519: la clave privada se guarda en la bóveda y no se puede exportar como texto.</string>
+    <string name="core_private_hardware">Clave de hardware: la clave privada se queda en el almacén de claves del dispositivo y no se puede exportar.</string>
+    <string name="core_private_security_key">Llave de seguridad: la firma se hace en el dispositivo FIDO mediante NFC. No hay ninguna clave privada que exportar.</string>
+    <string name="core_private_hardware_tag">Clave de hardware: el descifrado se hace dentro del hardware seguro de este dispositivo. La clave no se puede exportar.</string>
+
+    <string name="core_transfer_lives_on_security_key">Está en una llave de seguridad: su clave pública no se puede comprobar sin esa llave.</string>
+    <string name="core_transfer_lives_on_yubikey">Está en una YubiKey: para descifrar con ella hace falta esa YubiKey.</string>
+
+    <string name="core_signer_opt_cert_authority">Autoridad de certificación (firma certificados, no archivos)</string>
+    <string name="core_signer_opt_only_for">Solo para %1$s</string>
+    <string name="core_signer_opt_not_for">No para %1$s</string>
+    <string name="core_signer_opt_valid_from">Válida desde el %1$s</string>
+    <string name="core_signer_opt_valid_until">Válida hasta el %1$s</string>
+    <string name="core_signer_opt_no_touch">No exige tocar la llave de seguridad</string>
+    <string name="core_signer_opt_verify_required">Exige el PIN o la huella dactilar de la llave de seguridad</string>
+    <string name="core_signer_opt_unknown">Opción desconocida: %1$s</string>
+    <string name="core_signer_opt_unreadable">Opciones ilegibles: %1$s</string>
+
+    <string name="core_signer_blocked_cert_authority">Es la clave de una autoridad de certificación. AgePony no admite certificados SSH, así que no puede aplicar esta entrada.</string>
+    <string name="core_signer_blocked_unreadable">Sus opciones no se pueden leer (%1$s), así que AgePony no puede aplicarlas.</string>
+    <string name="core_signer_blocked_unknown">Tiene opciones que AgePony no entiende (%1$s), así que AgePony no puede aplicarlas.</string>
+    <string name="core_signer_blocked_bad_key">Su clave no se puede leer.</string>
+
+    <string name="core_signer_warn_expired">Caducó el %1$s.</string>
+    <string name="core_signer_warn_not_yet_valid">No es válida hasta el %1$s.</string>
+    <string name="core_signer_warn_not_agepony">No puede firmar archivos de AgePony (solo para %1$s).</string>
+    <string name="core_share_chooser_text">Compartir</string>
+    <string name="core_share_chooser_file">Compartir archivo cifrado</string>
+
+    <string name="core_yubikey_pin_body">Introduce el PIN PIV de esta YubiKey y luego acerca la llave a la parte trasera del teléfono. AgePony solo guarda el PIN hasta que termina este descifrado.</string>
+    <string name="core_yubikey_no_pin">Esta llave no tiene PIN</string>
+    <string name="core_yubikey_pin_note_needs">Esta clave de la YubiKey necesita su PIN.</string>
+    <string name="core_yubikey_pin_note_length">El PIN de una YubiKey tiene de 6 a 8 caracteres.</string>
+    <plurals name="core_yubikey_pin_note_wrong">
+        <item quantity="one">PIN incorrecto. Te queda %1$d intento antes de que se bloquee.</item>
+        <item quantity="many">PIN incorrecto. Te quedan %1$d intentos antes de que se bloquee.</item>
+        <item quantity="other">PIN incorrecto. Te quedan %1$d intentos antes de que se bloquee.</item>
+    </plurals>
+    <string name="core_yubikey_hold_again">La YubiKey perdió el contacto durante la comprobación del PIN. Acércala a la parte trasera del teléfono y vuelve a intentarlo.</string>
+    <string name="core_nfc_hold_key_again">La llave perdió el contacto durante la comprobación del PIN. Acércala a la parte trasera del teléfono y vuelve a intentarlo.</string>
+    <string name="core_owner_check_needed">Confirma que eres tú con tu huella dactilar, tu cara o el bloqueo de pantalla y luego vuelve a configurar la contraseña o el PIN.</string>
+    <string name="core_biometric_changed_pin">Se añadió o quitó una huella dactilar o una cara en este teléfono, así que la biometría no puede abrir la bóveda hasta que introduzcas tu PIN una vez. Después podrás volver a activar el desbloqueo biométrico. Si no hiciste tú este cambio, antes de introducir el PIN revisa los ajustes de seguridad del teléfono por si hay alguna huella o cara que no añadiste.</string>
+    <string name="core_biometric_changed_password">Se añadió o quitó una huella dactilar o una cara en este teléfono, así que la biometría no puede abrir la bóveda hasta que introduzcas tu contraseña una vez. Después podrás volver a activar el desbloqueo biométrico. Si no hiciste tú este cambio, antes de introducir la contraseña revisa los ajustes de seguridad del teléfono por si hay alguna huella o cara que no añadiste.</string>
+    <string name="core_biometric_unavailable_pin">La biometría no está disponible en este momento. Introduce tu PIN para abrir la bóveda. El bloqueo de pantalla del teléfono no la abre.</string>
+    <string name="core_biometric_unavailable_password">La biometría no está disponible en este momento. Introduce tu contraseña para abrir la bóveda. El bloqueo de pantalla del teléfono no la abre.</string>
+    <string name="core_biometric_lockout_pin">La biometría se bloqueó tras demasiados intentos. Introduce tu PIN para abrir la bóveda. Desbloquear el teléfono con su bloqueo de pantalla reactiva la biometría, pero el bloqueo de pantalla no abre AgePony.</string>
+    <string name="core_biometric_lockout_password">La biometría se bloqueó tras demasiados intentos. Introduce tu contraseña para abrir la bóveda. Desbloquear el teléfono con su bloqueo de pantalla reactiva la biometría, pero el bloqueo de pantalla no abre AgePony.</string>
+    <string name="core_biometric_only_needs_secret">Primero configura una contraseña o un PIN. Te servirá para volver a entrar si tu biometría cambia.</string>
+    <string name="core_biometric_only_no_biometric">Este bloqueo necesita una huella dactilar o una cara configurada en este teléfono, en los ajustes de seguridad de Android.</string>
+    <string name="core_biometric_only_refused">Android no permitió proteger la clave de la bóveda solo con biometría. El bloqueo no ha cambiado.</string>
+    <string name="core_biometric_only_refused_code">Android no permitió proteger la clave de la bóveda solo con biometría (error de Keystore %1$d). El bloqueo no ha cambiado.</string>
+    <string name="core_prompt_biometric_only_subtitle">Usa solo la biometría para desbloquear AgePony</string>
+    <string name="core_password_only_biometric_pin">«Solo biometría» necesita tu PIN para volver a entrar si tu biometría cambia. Antes de quitarlo, elige otro bloqueo arriba.</string>
+    <string name="core_password_only_biometric_password">«Solo biometría» necesita tu contraseña para volver a entrar si tu biometría cambia. Antes de quitarla, elige otro bloqueo arriba.</string>
+</resources>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AgePony</string>
+    <string name="share_label">AgePony</string>
+
+    <string name="action_back">Zurück</string>
+    <string name="action_copy">Kopieren</string>
+    <string name="action_copied">Kopiert</string>
+    <string name="action_reveal">Anzeigen</string>
+    <string name="action_hide">Ausblenden</string>
+    <string name="action_cancel">Abbrechen</string>
+    <string name="action_delete">Löschen</string>
+    <string name="post_quantum_label">Quantensicher</string>
+    <string name="action_more_options">Weitere Optionen</string>
+    <string name="action_add_identity">Identität hinzufügen</string>
+    <string name="action_add_recipient">Empfänger hinzufügen</string>
+    <string name="scan_title">QR-Code scannen</string>
+    <string name="recipient_title">Empfänger</string>
+    <string name="identity_title">Identität</string>
+    <string name="note_title">Notiz</string>
+    <string name="identity_no_backup_title">Kein Backup möglich</string>
+    <string name="send_keys_title">Schlüssel senden</string>
+    <string name="settings_identity_label">Identität</string>
+
+    <string name="files_title">Dateien</string>
+    <string name="files_section_encryption">Verschlüsselung</string>
+    <string name="files_encrypt">Datei verschlüsseln</string>
+    <string name="files_decrypt">Datei entschlüsseln</string>
+    <string name="files_inspect">Datei untersuchen</string>
+    <string name="files_migrate">Dateien auf quantensicher umstellen</string>
+    <string name="files_section_signatures">Signaturen</string>
+    <string name="files_sign">Datei signieren</string>
+    <string name="files_signatures_footer">Eine Signatur zeigt, wer eine Datei erstellt hat und dass sie seitdem nicht verändert wurde. AgePony nutzt dasselbe Signaturformat wie ssh-keygen.</string>
+    <string name="files_section_tools">Weitere Werkzeuge</string>
+    <string name="files_tools_footer">„Datei untersuchen“ zeigt, wer eine Datei öffnen kann, ohne sie zu entschlüsseln. „Dateien auf quantensicher umstellen“ verschlüsselt Dateien neu, damit eine quantensichere Identität sie öffnen kann.</string>
+    <string name="files_verify">Signatur prüfen</string>
+    <string name="files_signers">Vertrauenswürdige Signierer</string>
+
+    <string name="decrypt_verdict_trusted">Signatur geprüft</string>
+    <string name="decrypt_verdict_unknown">Gültige Signatur, unbekannter Signierer</string>
+    <string name="decrypt_verdict_untrusted">Signatur nicht vertrauenswürdig</string>
+    <string name="decrypt_verdict_failed">Signaturprüfung fehlgeschlagen</string>
+
+    <plurals name="migrate_files_chosen">
+        <item quantity="one">%1$d Datei ausgewählt</item>
+        <item quantity="other">%1$d Dateien ausgewählt</item>
+    </plurals>
+    <plurals name="migrate_upgrade_files">
+        <item quantity="one">%1$d Datei umstellen</item>
+        <item quantity="other">%1$d Dateien umstellen</item>
+    </plurals>
+
+    <plurals name="signers_exported">
+        <item quantity="one">%1$d Signierer exportiert.</item>
+        <item quantity="other">%1$d Signierer exportiert.</item>
+    </plurals>
+    <plurals name="signers_unreadable_lines">
+        <item quantity="one">%1$d Zeile konnte nicht gelesen werden und wurde übersprungen.</item>
+        <item quantity="other">%1$d Zeilen konnten nicht gelesen werden und wurden übersprungen.</item>
+    </plurals>
+
+    <plurals name="recipients_found">
+        <item quantity="one">%1$d Empfänger gefunden</item>
+        <item quantity="other">%1$d Empfänger gefunden</item>
+    </plurals>
+    <string name="recipient_delete_title">„%1$s“ löschen?</string>
+    <string name="recipient_delete_body">Er wird nach „Zuletzt gelöscht“ verschoben und kann dort wiederhergestellt werden.</string>
+
+    <string name="note_delete_title">Diese Notiz löschen?</string>
+    <string name="note_delete_body">Die Notiz und ihr verschlüsselter Text werden endgültig entfernt. Das kann nicht rückgängig gemacht werden.</string>
+
+    <plurals name="transfer_identities">
+        <item quantity="one">%1$d Identität</item>
+        <item quantity="other">%1$d Identitäten</item>
+    </plurals>
+    <plurals name="transfer_recipients">
+        <item quantity="one">%1$d Empfänger</item>
+        <item quantity="other">%1$d Empfänger</item>
+    </plurals>
+    <plurals name="transfer_signers">
+        <item quantity="one">%1$d Signierer</item>
+        <item quantity="other">%1$d Signierer</item>
+    </plurals>
+
+    <plurals name="paper_restored">
+        <item quantity="one">%1$d Identität wiederhergestellt</item>
+        <item quantity="other">%1$d Identitäten wiederhergestellt</item>
+    </plurals>
+</resources>

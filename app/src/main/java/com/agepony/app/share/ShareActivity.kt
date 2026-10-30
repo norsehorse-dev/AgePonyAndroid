@@ -5,7 +5,7 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.fragment.app.FragmentActivity
+import androidx.appcompat.app.AppCompatActivity
 import com.agepony.app.installWindowProtection
 import com.agepony.app.security.ClipboardGuard
 import com.agepony.app.security.keystore.HardwareAuthBroker
@@ -25,7 +25,7 @@ import com.agepony.app.vault.VaultViewModel
  * then carries on with the shared content. Input is streamed from the sender's URIs or held in
  * memory; nothing is copied into AgePony's storage.
  */
-class ShareActivity : FragmentActivity() {
+class ShareActivity : AppCompatActivity() {
 
     private val vaultViewModel: VaultViewModel by viewModels()
 

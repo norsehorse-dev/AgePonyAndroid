@@ -1,0 +1,3 @@
+AgePony 5.1.1
+
+- AgePony gibt es jetzt auf Deutsch, Spanisch, Französisch, brasilianischem Portugiesisch, Russisch und vereinfachtem Chinesisch. Die App folgt der Sprache deines Telefons, oder du wählst unter Einstellungen, Sprache eine andere. Der Wechsel wirkt sofort, ohne Neustart.

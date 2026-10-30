@@ -435,7 +435,7 @@ class Vault(context: Context) {
             deviceSecure = BiometricGate.isDeviceSecure(appContext),
             ownerConfirmedRecently = BiometricGate.ownerConfirmed(OwnerCheckPolicy.FIRST_PASSWORD_WINDOW_MILLIS),
         )
-        if (!allowed) throw OwnerCheckNeededException(appContext.getString(R.string.core_owner_check_needed))
+        if (!allowed) throw OwnerCheckNeededException(com.agepony.app.i18n.AppLanguage.localized(appContext).getString(R.string.core_owner_check_needed))
         // Often the only wrap of the VK (password-only vaults), and now rewritten on upgrade
         // from v1 to v2, so never leave it half-written.
         writeAtomically(passwordKeyFile, blob)

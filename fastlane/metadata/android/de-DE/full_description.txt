@@ -1,0 +1,33 @@
+AgePony ist eine schnelle, private Verschlüsselungs-App für dein Smartphone. Sie basiert auf dem modernen Verschlüsselungsformat age. Verschlüssele Dateien und Nachrichten so, dass nur die richtige Person sie öffnen kann, signiere sie, damit Empfänger wissen, dass sie wirklich von dir stammen, und behalte deine Schlüssel und Daten auf deinem Gerät. Keine Konten, kein Tracking, keine Analyse.
+
+QUANTENSICHERE VERSCHLÜSSELUNG
+Schütze deine Daten vor Angriffen nach dem Muster „Jetzt speichern, später entschlüsseln“. AgePony erzeugt quantensichere Hybridschlüssel (ML-KEM-768 kombiniert mit X25519), die auch gegen einen künftigen Quantencomputer sicher bleiben und trotzdem voll kompatibel mit dem age-Kommandozeilenprogramm sind. Alles, was für einen quantensicheren Empfänger verschlüsselt ist, wird deutlich gekennzeichnet. So weißt du immer, welchen Schutz du gerade nutzt.
+
+Außerdem dabei:
+- Verschlüsseln und Signieren in einem Schritt: Empfänger können deine Datei öffnen und gleichzeitig prüfen, dass sie wirklich von dir kommt.
+- Ein eingebautes Werkzeug, mit dem du ältere Dateien auf quantensichere Verschlüsselung umstellst. Verschlüssele vorhandene Dateien gesammelt für einen neuen quantensicheren Schlüssel. Deine Originale bleiben erhalten, bis die neue Kopie geprüft ist.
+
+WARUM AGEPONY
+- Standardverschlüsselung mit age. AgePony liest und schreibt dasselbe Format wie das age-Kommandozeilenprogramm. Deine Dateien funktionieren also auch mit anderen age-Programmen auf Desktop und Server.
+- Öffentlicher Schlüssel oder Passphrase. Verschlüssele für den öffentlichen Schlüssel einer Person oder sichere eine Datei mit einer Passphrase, die du getrennt weitergibst.
+- SSH-Signaturen, richtig umgesetzt. Signiere und prüfe Dateien im Tab „Dateien“ mit SSH-Schlüsseln (Ed25519 oder RSA), einem Hardwareschlüssel oder einem Sicherheitsschlüssel über NFC, und führe eine Liste vertrauenswürdiger Signierer. Die Signaturen folgen dem SSHSIG-Standard, ssh-keygen kann sie also prüfen.
+- Standardmäßig auf dem Gerät. Verschlüsseln, Entschlüsseln, Signieren und Schlüsselerzeugung laufen lokal auf deinem Smartphone, und deine privaten Schlüssel verlassen dein Gerät nie.
+- Ein einziger optionaler Online-Schritt. Wenn du einen Empfänger von GitHub importierst, lädt AgePony die öffentlichen SSH-Schlüssel dieser Person von github.com. Das ist die einzige Netzwerkanfrage der App. Sie erfolgt nur, wenn du auf „Abrufen“ tippst, und dabei wird nichts über dich gesendet.
+- Kein Tracking, keine Werbung, kein Konto nötig. AgePony sammelt keine Analysedaten und keine persönlichen Daten.
+- Open Source. Der gesamte Quellcode ist öffentlich einsehbar.
+
+FUNKTIONEN
+- age-Schlüsselpaare erzeugen und in einem App-Tresor speichern, entsperrt mit der Biometrie deines Geräts.
+- Quantensichere Hybridschlüssel (ML-KEM-768 + X25519) neben klassischen X25519-Schlüsseln.
+- Dateien und Textnachrichten ver- und entschlüsseln.
+- Verschlüsselung mit Passphrase, um schnell und ohne Schlüssel zu teilen.
+- Dateien signieren und prüfen (SSHSIG) mit SSH-Schlüsseln (Ed25519 oder RSA), Hardwareschlüsseln oder einem Sicherheitsschlüssel über NFC, inklusive Liste vertrauenswürdiger Signierer.
+- Entsperren mit Biometrie, Passwort oder PIN. Die App funktioniert also auch ohne eingerichtete Displaysperre.
+- Optionales Notfall-Passwort, das bei Eingabe den Tresor löscht.
+- Empfängerschlüssel per QR-Code mit der Kamera scannen.
+- Empfänger über einen GitHub-Benutzernamen importieren. Dabei werden die öffentlichen SSH-Schlüssel der Person von github.com geladen.
+- Vorhandene Dateien gesammelt auf quantensichere Verschlüsselung umstellen.
+
+Ob Journalistin, Aktivist, Entwicklerin oder einfach jemand, der wirklich selbst bestimmen will, was mit den eigenen privaten Dateien passiert: AgePony bietet dir starke Standardverschlüsselung ohne unnötige Komplexität.
+
+AgePony ist eine unabhängige App, die auf dem offenen Verschlüsselungsformat age basiert, und steht in keiner Verbindung zum age-Projekt.

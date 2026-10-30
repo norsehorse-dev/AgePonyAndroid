@@ -26,8 +26,8 @@ android {
         applicationId = "com.agepony.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 18
-        versionName = "5.1.0"
+        versionCode = 19
+        versionName = "5.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -125,6 +125,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.biometric)
+    // Per-app language picker (Settings, Language): AppCompat persists the choice and applies it on API 26 to 32.
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.fragment)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)

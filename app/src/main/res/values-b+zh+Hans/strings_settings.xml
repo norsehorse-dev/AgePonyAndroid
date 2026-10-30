@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">设置</string>
+    <string name="settings_ok">确定</string>
+    <string name="settings_action_change">更改</string>
+    <string name="settings_action_remove">移除</string>
+
+    <string name="settings_section_security">安全</string>
+    <string name="settings_lock_intro">AgePony 保险库的锁定方式。在下方设置的密码或 PIN 码是与“生物识别”或“设备 PIN 码、图案或密码”并列的另一种解锁途径，而不是额外的步骤。选择“不锁定”时，密码是唯一的解锁途径。</string>
+    <string name="settings_pin_only_note_pin">关闭胁迫 PIN 码后才能使用指纹或设备解锁。</string>
+    <string name="settings_pin_only_note_password">关闭胁迫密码后才能使用指纹或设备解锁。</string>
+    <string name="settings_lock_biometric">生物识别</string>
+    <string name="settings_lock_biometric_detail">用指纹或面孔解锁保险库，设备凭据作为备用方式。</string>
+    <string name="settings_lock_biometric_unavailable">需要先在本设备上录入指纹或面孔。</string>
+    <string name="settings_lock_device">设备 PIN 码、图案或密码</string>
+    <string name="settings_lock_device_no_screen_lock">请先在 Android 设置中设置屏幕锁定，才能使用此方式。</string>
+    <string name="settings_lock_device_legacy">每次解锁都需要验证。在此 Android 版本上，它只控制访问，不会增加硬件支持的加密；下方的保险库密码则可以。</string>
+    <string name="settings_lock_device_detail">每次解锁都需要输入设备 PIN 码、图案或密码，并通过硬件中的密钥进行验证。</string>
+    <string name="settings_lock_off">不锁定</string>
+    <string name="settings_lock_off_detail_pin">不进行指纹或设备验证。下方的 PIN 码将是唯一的解锁途径。</string>
+    <string name="settings_lock_off_detail_password">不进行指纹或设备验证。下方的密码将是唯一的解锁途径。</string>
+    <string name="settings_lock_off_detail_open">打开保险库无需任何确认：任何打开应用的人都能进入。在下方设置密码，即可使其成为唯一的解锁途径。</string>
+    <string name="settings_confirm_lock_off">关闭指纹和设备解锁</string>
+
+    <string name="settings_set_secret_button">设置密码或 PIN 码…</string>
+    <string name="settings_set_secret_hint">即使未录入生物识别信息也能用来解锁的密码，也是设置胁迫密码的前提。</string>
+    <string name="settings_secret_set_pin">已设置解锁 PIN 码。</string>
+    <string name="settings_secret_set_password">已设置解锁密码。</string>
+    <string name="settings_pin_too_short">你的 PIN 码短于 AgePony 现在要求的 %1$d 位。它仍然有效，但更长的 PIN 码要难猜得多。请在下方更改。</string>
+    <string name="settings_password_too_short">你的密码短于 AgePony 现在要求的 %1$d 个字符。它仍然有效，但更长的密码要难猜得多。请在下方更改。</string>
+    <string name="settings_confirm_change_pin">更改你的 PIN 码</string>
+    <string name="settings_confirm_change_password">更改你的密码</string>
+    <string name="settings_set_duress_button_pin">设置胁迫 PIN 码…</string>
+    <string name="settings_set_duress_button_password">设置胁迫密码…</string>
+    <string name="settings_duress_hint_pin">另一个不同的 PIN 码，输入后会静默清空保险库，而不是打开它。在被胁迫时输入，留下的只是一个空的应用，没有任何可泄露的内容。不会有确认提示，也无法撤销。设置后，指纹和设备解锁将被关闭，锁定界面始终要求输入你的 PIN 码。</string>
+    <string name="settings_duress_hint_password">另一个不同的密码，输入后会静默清空保险库，而不是打开它。在被胁迫时输入，留下的只是一个空的应用，没有任何可泄露的内容。不会有确认提示，也无法撤销。设置后，指纹和设备解锁将被关闭，锁定界面始终要求输入你的密码。</string>
+    <string name="settings_duress_set_pin">已设置胁迫 PIN 码。输入它会清空保险库。设置期间，指纹和设备解锁保持关闭。</string>
+    <string name="settings_duress_set_password">已设置胁迫密码。输入它会清空保险库。设置期间，指纹和设备解锁保持关闭。</string>
+    <string name="settings_confirm_remove_duress_pin">移除胁迫 PIN 码</string>
+    <string name="settings_confirm_remove_duress_password">移除胁迫密码</string>
+    <plurals name="settings_erase_title">
+        <item quantity="other">输错 %1$d 次后清空保险库</item>
+    </plurals>
+    <plurals name="settings_erase_detail_pin">
+        <item quantity="other">连续输错 %1$d 次 PIN 码后，AgePony 会在锁定界面清空保险库，效果与胁迫 PIN 码相同。从第 %2$d 次错误尝试起，每次重试都需要等待更长时间。</item>
+    </plurals>
+    <plurals name="settings_erase_detail_password">
+        <item quantity="other">连续输错 %1$d 次密码后，AgePony 会在锁定界面清空保险库，效果与胁迫密码相同。从第 %2$d 次错误尝试起，每次重试都需要等待更长时间。</item>
+    </plurals>
+    <string name="settings_confirm_stop_erasing">不再在多次输错后清空保险库</string>
+    <string name="settings_screenshots">允许截屏</string>
+    <string name="settings_screenshots_detail">关闭时，AgePony 的界面不会出现在截屏、屏幕录制和最近使用的应用预览中。仅在需要截取界面时开启。</string>
+
+    <string name="settings_set_secret_title">设置密码或 PIN 码</string>
+    <string name="settings_set_duress_title_pin">设置胁迫 PIN 码</string>
+    <string name="settings_set_duress_title_password">设置胁迫密码</string>
+    <string name="settings_set_duress_confirm">设置</string>
+    <string name="settings_set_duress_body_pin">输入另一个与真实 PIN 码不同的 PIN 码。解锁时输入它会静默清空保险库。请选择一个在压力下也能想起、但平时不会习惯性输入的 PIN 码。设置后指纹和设备解锁将被关闭，因此请先确认你当前的 PIN 码。</string>
+    <string name="settings_set_duress_body_password">输入另一个与真实密码不同的密码。解锁时输入它会静默清空保险库。请选择一个在压力下也能想起、但平时不会习惯性输入的密码。设置后指纹和设备解锁将被关闭，因此请先确认你当前的密码。</string>
+    <string name="settings_current_pin">当前 PIN 码</string>
+    <string name="settings_current_password">当前密码</string>
+    <string name="settings_remove_title_pin">移除你的 PIN 码？</string>
+    <string name="settings_remove_title_password">移除你的密码？</string>
+    <string name="settings_remove_body_duress_pin">保险库将不再要求输入它，你的胁迫 PIN 码也会一并移除。</string>
+    <string name="settings_remove_body_duress_password">保险库将不再要求输入它，你的胁迫密码也会一并移除。</string>
+    <string name="settings_remove_body">保险库将不再要求输入它，之后只能通过上方的锁定方式打开。</string>
+    <string name="settings_confirm_remove_pin">移除你的 PIN 码</string>
+    <string name="settings_confirm_remove_password">移除你的密码</string>
+    <string name="settings_cant_remove_title">暂时无法移除</string>
+    <string name="settings_save">保存</string>
+    <string name="settings_kind_password">密码</string>
+    <string name="settings_kind_pin">PIN 码</string>
+    <string name="settings_pin_min">至少 %1$d 位数字。</string>
+    <string name="settings_password_min">至少 %1$d 个字符。</string>
+    <string name="settings_confirm_field">确认</string>
+    <string name="settings_mismatch">两次输入不一致。</string>
+
+    <string name="settings_encrypt_to_self">默认加密给自己</string>
+    <string name="settings_encrypt_to_self_detail">选择收件人时预先选中你的当前身份，确保你始终能解密自己的文件。</string>
+    <string name="settings_armor_default">默认输出为文本格式（armor）</string>
+    <string name="settings_armor_default_detail">打开加密界面时默认开启 ASCII 文本格式（armor）。文本格式的输出可以粘贴到消息中；原始二进制约小三分之一。加密时切换开关也会同步更新此设置。</string>
+    <string name="settings_passphrase_default">默认仅用密码短语</string>
+    <string name="settings_passphrase_default_detail">打开收件人选择器时默认进入密码短语（scrypt）模式，而不是选择密钥，适合主要用密码短语加密的情况。</string>
+    <string name="settings_forget_passphrase">清除记住的密码短语</string>
+    <string name="settings_forget">清除</string>
+    <string name="settings_forget_passphrase_detail">密码短语正暂存在内存中，这样连续处理多个文件时只需输入一次。它从不写入磁盘，并会在保险库锁定时清除。</string>
+    <string name="settings_work_factor">密码短语工作因子</string>
+    <string name="settings_work_factor_detail_default">2^%1$d：无论文件大小，scrypt 在派生密钥时约占用 %2$d MB 内存。这是 age 的默认值。该值保存在文件中，因此任何 age 工具仍能打开文件。</string>
+    <string name="settings_work_factor_detail_custom">2^%1$d：无论文件大小，scrypt 在派生密钥时约占用 %2$d MB 内存。age 的默认值为 2^%3$d。该值保存在文件中，因此任何 age 工具仍能打开文件。</string>
+
+    <string name="settings_section_autolock">自动锁定</string>
+    <string name="settings_autolock_label">离开应用后锁定</string>
+    <string name="settings_confirm_lock_less">降低锁定频率</string>
+    <string name="settings_autolock_detail">切换离开后，AgePony 等待多久再锁定保险库。时间越短越安全；时间越长，快速切换应用时越能保留当前进度。关闭屏幕也算作切换离开。</string>
+    <string name="settings_autolock_immediately">立即</string>
+    <plurals name="settings_autolock_seconds">
+        <item quantity="other">%1$d 秒</item>
+    </plurals>
+    <plurals name="settings_autolock_minutes">
+        <item quantity="other">%1$d 分钟</item>
+    </plurals>
+
+    <string name="settings_section_network">网络</string>
+    <string name="settings_network_intro">让唯一的网络请求（从 GitHub 获取密钥）通过代理。AgePony 的其他功能本就离线运行。</string>
+    <string name="settings_proxy_off">关闭</string>
+    <string name="settings_proxy_off_detail">直接连接（默认）。</string>
+    <string name="settings_proxy_orbot">Orbot（Tor）</string>
+    <string name="settings_proxy_orbot_detail">SOCKS5 连接到 %1$s:%2$d。</string>
+    <string name="settings_proxy_custom">自定义</string>
+    <string name="settings_proxy_custom_detail">你自己的 SOCKS5 或 HTTP 代理。</string>
+    <string name="settings_orbot_missing">似乎没有安装 Orbot。请从 Google Play 或 F-Droid 安装，或选择“自定义”以指向其他 Tor SOCKS 端口。</string>
+    <string name="settings_proxy_socks">SOCKS5（Tor）</string>
+    <string name="settings_proxy_host">代理主机</string>
+    <string name="settings_proxy_port">端口</string>
+    <string name="settings_proxy_username">代理用户名（可选）</string>
+    <string name="settings_proxy_password">代理密码（可选）</string>
+    <string name="settings_proxy_credentials_detail">对于 Tor/Orbot，设置用户名和密码可让 AgePony 的流量使用独立的线路（流隔离）。对于普通代理，它们就是常规的登录凭据。不需要则留空。</string>
+    <string name="settings_proxy_no_fallback">如果无法连接代理，获取密钥会直接失败，而不会改用直接连接。</string>
+
+    <string name="settings_section_active_identity">当前身份</string>
+    <string name="settings_no_identities">还没有身份。请在“身份”标签页中添加。</string>
+    <string name="settings_active_identity_detail">当前身份是“加密给自己”的默认收件人，也是解密时首先尝试的身份。</string>
+
+    <string name="settings_section_keys">转移和备份密钥</string>
+    <string name="settings_send_keys">将密钥发送到其他设备</string>
+    <string name="settings_receive_keys">从其他设备接收密钥</string>
+    <string name="settings_paper_restore">从纸质备份恢复</string>
+    <string name="settings_keys_detail">要创建纸质备份，请在“身份”标签页中打开一个身份。硬件密钥保留在本设备上，无法转移或备份。</string>
+    <string name="settings_lock_now">立即锁定保险库</string>
+
+    <string name="settings_section_about">关于</string>
+    <string name="settings_version">版本</string>
+    <string name="settings_website">网站</string>
+    <string name="settings_source_code">源代码</string>
+    <string name="settings_age_spec">age 规范</string>
+    <string name="settings_licenses">开源许可</string>
+    <string name="settings_made_by">开发者</string>
+    <string name="settings_desktop">AgePony 桌面版</string>
+    <string name="settings_desktop_detail">适用于 macOS、Linux 和 Windows 的 age 加密</string>
+
+    <string name="settings_section_more">NorseHorse 的更多应用</string>
+    <string name="settings_more_all">所有 Pony 应用</string>
+    <string name="settings_more_all_detail">全系列应用见 pony.norsehor.se</string>
+    <string name="settings_more_pgpony_detail">用于消息和文件的 OpenPGP 加密</string>
+    <string name="settings_more_quorumpony_detail">将秘密拆分成多张卡片，合在一起即可还原</string>
+    <string name="settings_more_carrierpony_detail">端到端加密的私密消息和文件传输</string>
+    <string name="settings_more_burnpony_detail">阅后即焚的加密笔记，在你的手机上完成加密</string>
+    <string name="settings_more_vaultpony_detail">兼容 VeraCrypt 的加密保险库，完全在你的设备上运行</string>
+    <string name="settings_more_passpony_detail">pass 和 passage 密码库的客户端</string>
+    <string name="settings_more_relaypony_detail">手机之间的加密文件传输</string>
+    <string name="settings_more_scrubpony_detail">移除图片中可识别身份的元数据，不改动任何像素</string>
+
+    <string name="settings_section_help">帮助与反馈</string>
+    <string name="settings_help">帮助与常见问题</string>
+    <string name="settings_security_info">AgePony 如何保护你的文件</string>
+    <string name="settings_replay_intro">重新查看介绍</string>
+    <string name="settings_replay_intro_detail">了解 AgePony 的功能，以及你的密钥如何在本设备上保持私密。</string>
+    <string name="settings_rate">为 AgePony 评分</string>
+    <string name="settings_rate_detail">如果 AgePony 对你有帮助，评分能让更多人发现它。</string>
+    <string name="settings_send_feedback">发送反馈</string>
+    <string name="settings_send_feedback_detail">发现了问题或有新想法？这会打开一封发给 NorseHorse 的电子邮件，并自动填好你的应用和设备信息。</string>
+    <string name="settings_recently_deleted">最近删除</string>
+    <string name="settings_recently_deleted_detail">恢复你在 30 天内删除的身份或收件人。</string>
+
+    <string name="settings_reset">重置</string>
+    <string name="settings_reset_button">重置 AgePony</string>
+    <string name="settings_reset_detail">清除所有已存储的身份、收件人和笔记。你已保存到 AgePony 之外的文件不受影响。此操作无法撤销。</string>
+    <string name="settings_reset_title">重置 AgePony？</string>
+    <string name="settings_reset_body">这将删除保险库中的所有身份、收件人和加密笔记。已保存到 AgePony 之外的文件不受影响。此操作无法撤销。</string>
+
+    <string name="settings_trash_intro">已删除的身份和收件人会在这里保留 %1$d 天，之后被永久移除。恢复身份时，其私钥会完整找回。</string>
+    <string name="settings_trash_empty_state_title">最近没有删除任何内容</string>
+    <string name="settings_trash_empty">你删除的身份和收件人会显示在这里，你可以在此恢复它们。</string>
+    <string name="settings_trash_identities">身份</string>
+    <string name="settings_trash_recipients">收件人</string>
+    <string name="settings_trash_empty_bin">清空回收站</string>
+    <string name="settings_trash_empty_title">清空回收站？</string>
+    <string name="settings_trash_empty_body">这将永久移除此处的所有内容，任何已删除身份的私钥都将永远消失。此操作无法撤销。</string>
+    <string name="settings_trash_empty_confirm">清空</string>
+    <string name="settings_trash_purge_title">永久删除“%1$s”？</string>
+    <string name="settings_trash_purge_identity_body">这将永久移除该身份及其私钥。加密给它的文件将永远无法再打开。此操作无法撤销。</string>
+    <string name="settings_trash_purge_recipient_body">这将永久移除该收件人。此操作无法撤销。</string>
+    <string name="settings_trash_restore">恢复</string>
+    <string name="settings_trash_deleted_just_now">刚刚删除</string>
+    <plurals name="settings_trash_deleted_minutes">
+        <item quantity="other">%1$d 分钟前删除</item>
+    </plurals>
+    <plurals name="settings_trash_deleted_hours">
+        <item quantity="other">%1$d 小时前删除</item>
+    </plurals>
+    <plurals name="settings_trash_deleted_days">
+        <item quantity="other">%1$d 天前删除</item>
+    </plurals>
+
+    <string name="settings_security_intro">用通俗的话说明这个应用为你做了什么，以及它刻意不做什么。</string>
+    <string name="settings_security_device_title">一切都在本设备上完成</string>
+    <string name="settings_security_device_body">AgePony 不需要账号，也不与我们的任何服务器通信。加密、解密和你的密钥都只留在这部手机上。唯一的例外是从 GitHub 获取收件人的公钥，这只会在你主动请求时进行，而且你可以让它通过代理。</string>
+    <string name="settings_security_format_title">age 格式及其算法</string>
+    <string name="settings_security_format_body">文件采用 age 格式：公钥收件人使用 X25519，数据内容使用 ChaCha20-Poly1305，加密给密码短语时使用 scrypt。抗量子身份在密钥交换中加入了 ML-KEM。这些都是经过充分审查的现代算法，格式也与 age 命令行工具所用的完全相同。</string>
+    <string name="settings_security_vault_title">静态存储时的保险库</string>
+    <string name="settings_security_vault_body">身份、收件人和笔记保存在一个加密的保险库文件中。其密钥由 Android Keystore 保管，你可以要求通过设备凭据或指纹才能解锁。锁定时，保险库在磁盘上只是一堆密文。</string>
+    <string name="settings_security_passphrase_title">密码短语只存在于内存中</string>
+    <string name="settings_security_passphrase_body">你为加密文件输入的密码短语会暂存在内存中，这样连续处理多个文件时不必重复输入。它从不写入磁盘，也不保存在保险库中，并会在应用转入后台或保险库锁定时清除。</string>
+    <string name="settings_security_duress_title">胁迫密码（如果你设置了）</string>
+    <string name="settings_security_duress_body">你可以设置第二个密码，解锁时输入它会静默清空保险库。它是为你被迫打开应用、宁愿里面什么都没有的时刻准备的。</string>
+    <string name="settings_security_not_doing_title">AgePony 不会做的事</string>
+    <string name="settings_security_no_cloud">它不会把你的密钥备份到任何云端。如果你在没有导出的情况下丢失了这台设备，密钥将永久丢失。</string>
+    <string name="settings_security_no_recovery">它无法恢复你已永久删除的私钥，我们也不能。</string>
+    <string name="settings_security_no_telemetry">它不发送任何分析或遥测数据。关于你的文件或使用情况的任何信息都不会离开设备。</string>
+    <string name="settings_security_no_outside">文件离开 AgePony 后，它无法再保护它们；如果手机在系统层面已被攻破，它也无能为力。</string>
+    <string name="settings_security_footer">AgePony 是开源的。如果你想核实以上任何内容，源代码链接在“设置”的“关于”中。</string>
+
+    <string name="settings_help_intro">大家最常问的问题，简短解答。</string>
+    <string name="settings_help_what_q">age 是什么？AgePony 又是什么？</string>
+    <string name="settings_help_what_a">age 是一种现代、开放的文件加密格式：小巧、经过审计，没有旧工具的历史包袱。AgePony 是手机上一款易用的 age 客户端。它生成的文件都是普通的 age 文件，任何 age 工具都能打开。</string>
+    <string name="settings_help_recipient_q">什么是收件人？</string>
+    <string name="settings_help_recipient_a">收件人是你要加密给的人，由其公钥（age1... 字符串或 SSH 公钥）标识。添加一次收件人后，你就可以加密只有对方能打开的文件。你永远不需要对方的私钥，只需要对方分享的公钥。</string>
+    <string name="settings_help_choice_q">密码短语还是密钥：该用哪个？</string>
+    <string name="settings_help_choice_a">如果你是加密给自己，或加密给与你交换过密钥的人，密钥（即身份）最合适：无需记忆，也无需输入。如果是一次性的文件，要交给不使用 AgePony 的人，密码短语最合适。对方只需要知道这串词，不需要密钥。</string>
+    <string name="settings_help_armor_q">“输出为文本格式（armor）”是什么意思？</string>
+    <string name="settings_help_armor_a">文本格式（armor）会把加密文件写成普通的字母和数字，而不是原始字节，这样你就能把它粘贴到聊天或电子邮件中。体积会稍大一些。以附件形式发送的文件请保持关闭。</string>
+    <string name="settings_help_archive_q">我一次加密了多个文件，它们去哪了？</string>
+    <string name="settings_help_archive_a">一次加密多个文件时，它们会被打包成一个文件包，方便作为单个文件传送。解密时，AgePony 会提供“将文件解压到文件夹”，把每个原始文件还原出来。单个文件则直接加密和解密，不会打包成文件包。</string>
+    <string name="settings_help_compat_q">别人不用 AgePony 也能打开我的文件吗？</string>
+    <string name="settings_help_compat_a">可以。AgePony 生成的是标准 age 文件，因此 age 命令行工具和其他 age 客户端都能用对应的密钥或密码短语打开。你不会被锁定在某个应用里。</string>
+    <string name="settings_help_lose_q">如果我删除或丢失了身份会怎样？</string>
+    <string name="settings_help_lose_a">身份中保存着私钥。没有它，加密给该身份的文件任何人都无法打开，包括你自己。现在删除身份会先将其移到“最近删除”保留一段时间，方便你恢复，但一旦被永久删除就无法找回。如果它很重要，请导出一份副本并存放在安全的地方。</string>
+    <string name="settings_help_pq_q">什么是抗量子身份？</string>
+    <string name="settings_help_pq_a">这是一种混合身份，将经典的 X25519 与 ML-KEM 结合，后者是为抵御未来的量子计算机而设计的方案。加密给它的文件，即使攻击者现在截获、打算日后破解，也依然受到保护。它与支持该混合收件人的 age 工具完全兼容。</string>
+    <string name="settings_help_sign_q">可以只签名而不加密文件吗？</string>
+    <string name="settings_help_sign_a">可以。“文件”标签页中的“为文件签名”会生成分离式签名，让别人能证明文件出自你手；“验证签名”则可检查你的“受信任的签名者”列表中的人所做的签名。签名和加密是相互独立的：你可以只做其一，也可以两者都做。</string>
+    <string name="settings_help_footer">仍有疑问？“设置”中有“发送反馈”按钮，可打开一封发给 NorseHorse 的电子邮件。</string>
+
+    <string name="settings_licenses_intro">AgePony 是开源的，并建立在以下项目之上。每个项目仍遵循各自的许可证，完整的许可证文本可从各项目获取。</string>
+    <string name="settings_licenses_footer">AgePony 实现了开放的 age 文件格式。其自身的加密代码（agepony-core）是 AgePony 的一部分，与应用采用相同的许可证发布。源代码链接在“设置”的“关于”中。</string>
+    <string name="settings_dep_jetpack">Android Jetpack（Core、Lifecycle、Activity、Fragment、Biometric）</string>
+    <string name="settings_dep_compose">Jetpack Compose（UI、Foundation、Material 3、Material Icons）</string>
+    <string name="settings_dep_kotlin">Kotlin 标准库</string>
+    <string name="settings_dep_zxing">ZXing core（二维码编码与解码）</string>
+    <string name="settings_dep_desugar">Android 核心库脱糖（desugar_jdk_libs）</string>
+    <string name="settings_dep_play_review">Google Play 应用内评价（仅 Play 版本，F-Droid 版本不含）</string>
+    <string name="settings_lock_biometric_only">仅生物识别</string>
+    <string name="settings_lock_fingerprint_only">仅指纹</string>
+    <string name="settings_lock_biometric_only_detail_pin">只有生物识别或你的 PIN 码能打开保险库，手机的屏幕锁定不能。如果添加或移除了指纹或面孔，请输入一次 PIN 码，然后重新开启生物识别。</string>
+    <string name="settings_lock_biometric_only_detail_password">只有生物识别或你的密码能打开保险库，手机的屏幕锁定不能。如果添加或移除了指纹或面孔，请输入一次密码，然后重新开启生物识别。</string>
+    <string name="settings_lock_biometric_only_detail_none">只有生物识别或应用密码能打开保险库，手机的屏幕锁定永远不能。需要设置密码或 PIN 码作为重新进入的途径。</string>
+    <string name="settings_biometric_only_dialog_body">只有生物识别或你的应用密码或 PIN 码能打开保险库，手机的屏幕锁定不能。如果添加或移除了指纹或面孔，生物识别将无法打开保险库，直到你输入一次密码或 PIN 码。</string>
+    <string name="settings_biometric_only_dialog_needs_secret">请先设置密码或 PIN 码，它是重新进入的途径。</string>
+    <string name="settings_biometric_only_turn_on">开启</string>
+    <string name="settings_biometric_only_set_secret">设置密码或 PIN 码</string>
+    <string name="settings_confirm_set_secret">确认是你本人，以设置密码或 PIN 码</string>
+    <string name="settings_confirm_change_lock">确认是你本人，以更改 AgePony 的锁定方式</string>
+    <string name="settings_biometric_only_off_note">在你再次通过生物识别确认之前，生物识别解锁处于关闭状态。在此期间，你的应用密码或 PIN 码可以打开保险库。</string>
+    <string name="settings_biometric_only_turn_on_again">重新开启</string>
+    <string name="settings_secret_type">类型</string>
+    <string name="settings_work_factor_option">2^%1$d，约 %2$d MB</string>
+    <string name="settings_work_factor_option_default">2^%1$d，约 %2$d MB（age 默认值）</string>
+    <string name="settings_language">语言</string>
+    <string name="settings_language_app">应用语言</string>
+    <string name="settings_language_system">跟随系统</string>
+    <string name="settings_language_footer">除非你在这里另选一种语言，否则 AgePony 会使用手机的语言。在 Android 13 及更高版本中，你也可以在 Android 的应用语言设置中更改。</string>
+</resources>

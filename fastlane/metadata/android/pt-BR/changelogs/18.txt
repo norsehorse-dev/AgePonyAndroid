@@ -1,0 +1,16 @@
+AgePony 5.1.0
+
+Novidades:
+- YubiKey pede o PIN antes de aproximar
+- Bloqueio Somente biometria
+- Aba Arquivos com Criptografar e Descriptografar no topo
+- Seletores mostram o tipo e um resumo da chave
+- Botão Colar ao descriptografar texto
+- Erros mais claros
+
+Segurança:
+- Confirma que é você antes da primeira senha do app
+- Temporários apagados ao bloquear
+- Texto descriptografado tem assinatura verificada
+- NFC mais seguro com chaves de segurança
+- Testado com os vetores de teste age do C2SP

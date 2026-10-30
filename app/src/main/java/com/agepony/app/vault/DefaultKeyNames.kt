@@ -23,7 +23,8 @@ interface DefaultKeyNames {
     fun restoredKey(number: Int): String
 
     companion object {
-        fun from(context: Context): DefaultKeyNames = ResourceKeyNames(context.applicationContext)
+        fun from(context: Context): DefaultKeyNames =
+            ResourceKeyNames(com.agepony.app.i18n.AppLanguage.localized(context.applicationContext))
     }
 }
 

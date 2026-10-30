@@ -23,6 +23,7 @@
         android:allowBackup="true"
         android:largeHeap="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:localeConfig="@xml/locales_config"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -32,6 +33,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="locale|layoutDirection|screenLayout"
             android:label="@string/app_name"
             android:theme="@style/Theme.AgePony">
             <intent-filter>
@@ -47,7 +49,7 @@
             android:exported="true"
             android:label="@string/share_label"
             android:excludeFromRecents="true"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|locale|layoutDirection"
             android:theme="@style/Theme.AgePony">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -66,6 +68,23 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!-- In-app language picker (Settings, Language). AppCompat stores the choice here on
+             Android 8 to 12; Android 13 and later keep it in the system's per-app language setting.
+             Both activities handle locale changes in place, so switching language redraws the
+             screen without recreating the activity (no black frame, no lost screen state).
+             MainActivity also handles screenLayout: the first switch away from the system
+             language sets the layout-direction bits inside Configuration.screenLayout, so that
+             one change arrives as locale|layoutDirection|screenLayout (0x2104 in the event log)
+             and relaunched the activity with a black frame. Later switches don't touch it. -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
     </application>
 
 </manifest>

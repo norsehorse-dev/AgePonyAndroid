@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AgePony</string>
+    <string name="share_label">AgePony</string>
+
+    <string name="action_back">Назад</string>
+    <string name="action_copy">Копировать</string>
+    <string name="action_copied">Скопировано</string>
+    <string name="action_reveal">Показать</string>
+    <string name="action_hide">Скрыть</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_delete">Удалить</string>
+    <string name="post_quantum_label">Постквантовый</string>
+    <string name="action_more_options">Другие действия</string>
+    <string name="action_add_identity">Добавить идентичность</string>
+    <string name="action_add_recipient">Добавить получателя</string>
+    <string name="scan_title">Сканировать QR-код</string>
+    <string name="recipient_title">Получатель</string>
+    <string name="identity_title">Идентичность</string>
+    <string name="note_title">Заметка</string>
+    <string name="identity_no_backup_title">Резервная копия невозможна</string>
+    <string name="send_keys_title">Отправить ключи</string>
+    <string name="settings_identity_label">Идентичность</string>
+
+    <string name="files_title">Файлы</string>
+    <string name="files_section_encryption">Шифрование</string>
+    <string name="files_encrypt">Зашифровать файл</string>
+    <string name="files_decrypt">Расшифровать файл</string>
+    <string name="files_inspect">Просмотреть файл</string>
+    <string name="files_migrate">Перевести файлы на постквантовое шифрование</string>
+    <string name="files_section_signatures">Подписи</string>
+    <string name="files_sign">Подписать файл</string>
+    <string name="files_signatures_footer">Подпись показывает, кто создал файл и что он с тех пор не изменился. AgePony использует тот же формат подписи, что и ssh-keygen.</string>
+    <string name="files_section_tools">Другие инструменты</string>
+    <string name="files_tools_footer">Просмотр показывает, кто может открыть файл, не расшифровывая его. Перевод на постквантовое шифрование заново шифрует файлы, чтобы их могла открыть постквантовая идентичность.</string>
+    <string name="files_verify">Проверить подпись</string>
+    <string name="files_signers">Доверенные подписанты</string>
+
+    <string name="decrypt_verdict_trusted">Подпись проверена</string>
+    <string name="decrypt_verdict_unknown">Подпись верна, подписант неизвестен</string>
+    <string name="decrypt_verdict_untrusted">Подпись не признана доверенной</string>
+    <string name="decrypt_verdict_failed">Не удалось проверить подпись</string>
+
+    <plurals name="migrate_files_chosen">
+        <item quantity="one">Выбран %1$d файл</item>
+        <item quantity="few">Выбрано %1$d файла</item>
+        <item quantity="many">Выбрано %1$d файлов</item>
+        <item quantity="other">Выбрано %1$d файла</item>
+    </plurals>
+    <plurals name="migrate_upgrade_files">
+        <item quantity="one">Перевести %1$d файл</item>
+        <item quantity="few">Перевести %1$d файла</item>
+        <item quantity="many">Перевести %1$d файлов</item>
+        <item quantity="other">Перевести %1$d файла</item>
+    </plurals>
+
+    <plurals name="signers_exported">
+        <item quantity="one">Экспортирован %1$d подписант.</item>
+        <item quantity="few">Экспортировано %1$d подписанта.</item>
+        <item quantity="many">Экспортировано %1$d подписантов.</item>
+        <item quantity="other">Экспортировано %1$d подписанта.</item>
+    </plurals>
+    <plurals name="signers_unreadable_lines">
+        <item quantity="one">%1$d строку не удалось прочитать, она пропущена.</item>
+        <item quantity="few">%1$d строки не удалось прочитать, они пропущены.</item>
+        <item quantity="many">%1$d строк не удалось прочитать, они пропущены.</item>
+        <item quantity="other">%1$d строки не удалось прочитать, они пропущены.</item>
+    </plurals>
+
+    <plurals name="recipients_found">
+        <item quantity="one">Найден %1$d получатель</item>
+        <item quantity="few">Найдено %1$d получателя</item>
+        <item quantity="many">Найдено %1$d получателей</item>
+        <item quantity="other">Найдено %1$d получателя</item>
+    </plurals>
+    <string name="recipient_delete_title">Удалить «%1$s»?</string>
+    <string name="recipient_delete_body">Он переместится в «Недавно удалённые», откуда его можно восстановить.</string>
+
+    <string name="note_delete_title">Удалить эту заметку?</string>
+    <string name="note_delete_body">Заметка и её зашифрованный текст будут удалены навсегда. Это действие нельзя отменить.</string>
+
+    <plurals name="transfer_identities">
+        <item quantity="one">%1$d идентичность</item>
+        <item quantity="few">%1$d идентичности</item>
+        <item quantity="many">%1$d идентичностей</item>
+        <item quantity="other">%1$d идентичности</item>
+    </plurals>
+    <plurals name="transfer_recipients">
+        <item quantity="one">%1$d получатель</item>
+        <item quantity="few">%1$d получателя</item>
+        <item quantity="many">%1$d получателей</item>
+        <item quantity="other">%1$d получателя</item>
+    </plurals>
+    <plurals name="transfer_signers">
+        <item quantity="one">%1$d подписант</item>
+        <item quantity="few">%1$d подписанта</item>
+        <item quantity="many">%1$d подписантов</item>
+        <item quantity="other">%1$d подписанта</item>
+    </plurals>
+
+    <plurals name="paper_restored">
+        <item quantity="one">Восстановлена %1$d идентичность</item>
+        <item quantity="few">Восстановлено %1$d идентичности</item>
+        <item quantity="many">Восстановлено %1$d идентичностей</item>
+        <item quantity="other">Восстановлено %1$d идентичности</item>
+    </plurals>
+</resources>

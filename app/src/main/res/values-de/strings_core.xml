@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="core_vault_no_screen_lock">Richte eine Displaysperre oder Biometrie ein, um deinen AgePony-Tresor zu schützen.</string>
+    <string name="core_prompt_create_title">AgePony-Tresor erstellen</string>
+    <string name="core_prompt_create_subtitle">Bestätige, dass du es bist, um deine Schlüssel zu schützen</string>
+    <string name="core_prompt_add_lock_subtitle">Diese Sperre zu deinem AgePony-Tresor hinzufügen</string>
+    <string name="core_auth_failed">Authentifizierung fehlgeschlagen.</string>
+    <string name="core_vault_create_failed">Der Tresor konnte nicht erstellt werden.</string>
+    <string name="core_vault_unlock_failed">Der Tresor konnte nicht entsperrt werden.</string>
+    <string name="core_vault_orphaned">AgePony wurde neu installiert oder aus einem Backup wiederhergestellt, und der Geräteschlüssel, mit dem dein alter Tresor versiegelt war, ist nicht mehr vorhanden. Deshalb lässt er sich nicht mehr öffnen. Richte einen neuen Tresor ein, um fortzufahren.</string>
+    <string name="core_unlock_vault_first">Entsperre zuerst den Tresor.</string>
+    <string name="core_set_device_lock_first">Lege zuerst in den Android-Einstellungen eine PIN, ein Muster oder ein Passwort für das Gerät fest.</string>
+    <string name="core_lock_change_failed">Die Sperreinstellung konnte nicht geändert werden.</string>
+
+    <plurals name="core_vault_erased_pin">
+        <item quantity="one">Die PIN wurde %1$d Mal falsch eingegeben, deshalb wurde der Tresor gemäß deinen Einstellungen gelöscht.</item>
+        <item quantity="other">Die PIN wurde %1$d Mal falsch eingegeben, deshalb wurde der Tresor gemäß deinen Einstellungen gelöscht.</item>
+    </plurals>
+    <plurals name="core_vault_erased_password">
+        <item quantity="one">Das Passwort wurde %1$d Mal falsch eingegeben, deshalb wurde der Tresor gemäß deinen Einstellungen gelöscht.</item>
+        <item quantity="other">Das Passwort wurde %1$d Mal falsch eingegeben, deshalb wurde der Tresor gemäß deinen Einstellungen gelöscht.</item>
+    </plurals>
+    <plurals name="core_wrong_pin_erase_warning">
+        <item quantity="one">Falsche PIN. Nach %1$d weiteren Fehlversuch wird der Tresor gelöscht.</item>
+        <item quantity="other">Falsche PIN. Nach %1$d weiteren Fehlversuchen wird der Tresor gelöscht.</item>
+    </plurals>
+    <plurals name="core_wrong_password_erase_warning">
+        <item quantity="one">Falsches Passwort. Nach %1$d weiteren Fehlversuch wird der Tresor gelöscht.</item>
+        <item quantity="other">Falsches Passwort. Nach %1$d weiteren Fehlversuchen wird der Tresor gelöscht.</item>
+    </plurals>
+
+    <string name="core_remove_duress_first_pin">Entferne zuerst die Notfall-PIN, um zwischen Passwort und PIN zu wechseln.</string>
+    <string name="core_remove_duress_first_password">Entferne zuerst das Notfall-Passwort, um zwischen Passwort und PIN zu wechseln.</string>
+    <string name="core_differs_from_duress_pin">Die neue PIN muss sich von deiner Notfall-PIN unterscheiden.</string>
+    <string name="core_differs_from_duress_password">Das neue Passwort muss sich von deinem Notfall-Passwort unterscheiden.</string>
+    <string name="core_secret_set_device_failed_pin">Die PIN konnte auf diesem Gerät nicht festgelegt werden.</string>
+    <string name="core_secret_set_device_failed_password">Das Passwort konnte auf diesem Gerät nicht festgelegt werden.</string>
+    <string name="core_secret_save_failed_pin">Die PIN konnte nicht gespeichert werden.</string>
+    <string name="core_secret_save_failed_password">Das Passwort konnte nicht gespeichert werden.</string>
+    <string name="core_secret_set_failed_pin">Die PIN konnte nicht festgelegt werden.</string>
+    <string name="core_secret_set_failed_password">Das Passwort konnte nicht festgelegt werden.</string>
+    <string name="core_secret_remove_failed_pin">Die PIN konnte nicht entfernt werden.</string>
+    <string name="core_secret_remove_failed_password">Das Passwort konnte nicht entfernt werden.</string>
+    <string name="core_duress_needs_secret_pin">Lege zuerst eine PIN fest, bevor du eine Notfall-PIN festlegst.</string>
+    <string name="core_duress_needs_secret_password">Lege zuerst ein Passwort fest, bevor du ein Notfall-Passwort festlegst.</string>
+    <string name="core_enter_current_pin">Gib zuerst deine aktuelle PIN ein.</string>
+    <string name="core_enter_current_password">Gib zuerst dein aktuelles Passwort ein.</string>
+    <string name="core_duress_differs_pin">Die Notfall-PIN muss sich von deiner echten PIN unterscheiden.</string>
+    <string name="core_duress_differs_password">Das Notfall-Passwort muss sich von deinem echten Passwort unterscheiden.</string>
+    <string name="core_duress_set_failed_pin">Die Notfall-PIN konnte nicht festgelegt werden.</string>
+    <string name="core_duress_set_failed_password">Das Notfall-Passwort konnte nicht festgelegt werden.</string>
+    <string name="core_duress_remove_failed_pin">Die Notfall-PIN konnte nicht entfernt werden.</string>
+    <string name="core_duress_remove_failed_password">Das Notfall-Passwort konnte nicht entfernt werden.</string>
+    <string name="core_password_only_pin">Deine PIN ist der einzige Weg in den Tresor. Wähle oben „Biometrie“ oder „Geräte-PIN, -Muster oder -Passwort“, bevor du sie entfernst.</string>
+    <string name="core_password_only_password">Dein Passwort ist der einzige Weg in den Tresor. Wähle oben „Biometrie“ oder „Geräte-PIN, -Muster oder -Passwort“, bevor du es entfernst.</string>
+    <string name="core_password_only_duress_pin">Deine PIN ist der einzige Weg in den Tresor. Entferne die Notfall-PIN und wähle dann oben „Biometrie“ oder „Geräte-PIN, -Muster oder -Passwort“, bevor du sie entfernst.</string>
+    <string name="core_password_only_duress_password">Dein Passwort ist der einzige Weg in den Tresor. Entferne das Notfall-Passwort und wähle dann oben „Biometrie“ oder „Geräte-PIN, -Muster oder -Passwort“, bevor du es entfernst.</string>
+
+    <string name="core_pin_digits_only">Eine PIN darf nur Ziffern enthalten.</string>
+    <plurals name="core_pin_min_digits">
+        <item quantity="one">Verwende mindestens %1$d Ziffer.</item>
+        <item quantity="other">Verwende mindestens %1$d Ziffern.</item>
+    </plurals>
+    <plurals name="core_password_min_chars">
+        <item quantity="one">Verwende mindestens %1$d Zeichen.</item>
+        <item quantity="other">Verwende mindestens %1$d Zeichen.</item>
+    </plurals>
+
+    <plurals name="core_wait_seconds">
+        <item quantity="one">%1$d Sekunde</item>
+        <item quantity="other">%1$d Sekunden</item>
+    </plurals>
+    <plurals name="core_wait_minutes">
+        <item quantity="one">%1$d Minute</item>
+        <item quantity="other">%1$d Minuten</item>
+    </plurals>
+    <plurals name="core_wait_hours">
+        <item quantity="one">%1$d Stunde</item>
+        <item quantity="other">%1$d Stunden</item>
+    </plurals>
+
+    <string name="core_prompt_sign_title">Mit Hardwareschlüssel signieren</string>
+    <string name="core_prompt_hw_decrypt_title">Mit deinem Hardwareschlüssel entschlüsseln</string>
+    <string name="core_prompt_hw_decrypt_subtitle">Bestätige, dass du es bist, um diesen Schlüssel zu verwenden</string>
+    <string name="core_yubikey_tap_read">Halte deinen YubiKey an die Rückseite des Telefons, um seinen age-Schlüssel zu lesen.</string>
+    <string name="core_yubikey_tap_decrypt">Halte deinen YubiKey an die Rückseite des Telefons, um zu entschlüsseln.</string>
+
+    <string name="core_private_ssh_ed25519">SSH Ed25519: Der private Schlüssel ist im Tresor gespeichert und kann nicht als Text exportiert werden.</string>
+    <string name="core_private_hardware">Hardwareschlüssel: Der private Schlüssel bleibt im Keystore des Geräts und kann nicht exportiert werden.</string>
+    <string name="core_private_security_key">Sicherheitsschlüssel: Signiert wird auf dem FIDO-Gerät über NFC. Es gibt keinen privaten Schlüssel zum Exportieren.</string>
+    <string name="core_private_hardware_tag">Hardwareschlüssel: Entschlüsselt wird in der sicheren Hardware dieses Geräts. Der Schlüssel kann nicht exportiert werden.</string>
+
+    <string name="core_transfer_lives_on_security_key">Liegt auf einem Sicherheitsschlüssel: Sein öffentlicher Schlüssel lässt sich ohne diesen Schlüssel nicht prüfen.</string>
+    <string name="core_transfer_lives_on_yubikey">Liegt auf einem YubiKey: Zum Entschlüsseln wird dieser YubiKey gebraucht.</string>
+
+    <string name="core_signer_opt_cert_authority">Zertifizierungsstelle (signiert Zertifikate, keine Dateien)</string>
+    <string name="core_signer_opt_only_for">Nur für %1$s</string>
+    <string name="core_signer_opt_not_for">Nicht für %1$s</string>
+    <string name="core_signer_opt_valid_from">Gültig ab %1$s</string>
+    <string name="core_signer_opt_valid_until">Gültig bis %1$s</string>
+    <string name="core_signer_opt_no_touch">Berührung des Sicherheitsschlüssels nicht erforderlich</string>
+    <string name="core_signer_opt_verify_required">PIN oder Fingerabdruck am Sicherheitsschlüssel erforderlich</string>
+    <string name="core_signer_opt_unknown">Unbekannte Option: %1$s</string>
+    <string name="core_signer_opt_unreadable">Nicht lesbare Optionen: %1$s</string>
+
+    <string name="core_signer_blocked_cert_authority">Ein Schlüssel einer Zertifizierungsstelle. AgePony unterstützt keine SSH-Zertifikate und kann diesen Eintrag daher nicht durchsetzen.</string>
+    <string name="core_signer_blocked_unreadable">Seine Optionen können nicht gelesen werden (%1$s), daher kann AgePony sie nicht durchsetzen.</string>
+    <string name="core_signer_blocked_unknown">Er enthält Optionen, die AgePony nicht versteht (%1$s), daher kann AgePony sie nicht durchsetzen.</string>
+    <string name="core_signer_blocked_bad_key">Sein Schlüssel kann nicht gelesen werden.</string>
+
+    <string name="core_signer_warn_expired">Am %1$s abgelaufen.</string>
+    <string name="core_signer_warn_not_yet_valid">Erst ab %1$s gültig.</string>
+    <string name="core_signer_warn_not_agepony">Darf keine AgePony-Dateien signieren (nur für %1$s).</string>
+    <string name="core_share_chooser_text">Teilen</string>
+    <string name="core_share_chooser_file">Verschlüsselte Datei teilen</string>
+
+    <string name="core_yubikey_pin_body">Gib die PIV-PIN für diesen YubiKey ein und halte den Schlüssel dann an die Rückseite des Telefons. AgePony behält die PIN nur, bis dieses Entschlüsseln abgeschlossen ist.</string>
+    <string name="core_yubikey_no_pin">Dieser Schlüssel hat keine PIN</string>
+    <string name="core_yubikey_pin_note_needs">Dieser YubiKey-Schlüssel braucht seine PIN.</string>
+    <string name="core_yubikey_pin_note_length">Eine YubiKey-PIN hat 6 bis 8 Zeichen.</string>
+    <plurals name="core_yubikey_pin_note_wrong">
+        <item quantity="one">Falsche PIN. Noch %1$d Versuch, bevor die PIN gesperrt wird.</item>
+        <item quantity="other">Falsche PIN. Noch %1$d Versuche, bevor die PIN gesperrt wird.</item>
+    </plurals>
+    <string name="core_yubikey_hold_again">Der YubiKey hat während der PIN-Prüfung den Kontakt verloren. Halte ihn an die Rückseite des Telefons und versuche es noch einmal.</string>
+    <string name="core_nfc_hold_key_again">Der Schlüssel hat während der PIN-Prüfung den Kontakt verloren. Halte ihn an die Rückseite des Telefons und versuche es noch einmal.</string>
+    <string name="core_owner_check_needed">Bestätige mit Fingerabdruck, Gesicht oder Displaysperre, dass du es bist, und lege dann das Passwort oder die PIN noch einmal fest.</string>
+    <string name="core_biometric_changed_pin">Auf diesem Telefon wurde ein Fingerabdruck oder Gesicht hinzugefügt oder entfernt. Deshalb kann Biometrie den Tresor erst wieder öffnen, wenn du einmal deine PIN eingegeben hast. Danach kannst du biometrisches Entsperren wieder einschalten. Wenn du das nicht selbst geändert hast, sieh in den Sicherheitseinstellungen deines Telefons nach einem Fingerabdruck oder Gesicht, das du nicht hinzugefügt hast, bevor du deine PIN eingibst.</string>
+    <string name="core_biometric_changed_password">Auf diesem Telefon wurde ein Fingerabdruck oder Gesicht hinzugefügt oder entfernt. Deshalb kann Biometrie den Tresor erst wieder öffnen, wenn du einmal dein Passwort eingegeben hast. Danach kannst du biometrisches Entsperren wieder einschalten. Wenn du das nicht selbst geändert hast, sieh in den Sicherheitseinstellungen deines Telefons nach einem Fingerabdruck oder Gesicht, das du nicht hinzugefügt hast, bevor du dein Passwort eingibst.</string>
+    <string name="core_biometric_unavailable_pin">Biometrie ist gerade nicht verfügbar. Gib deine PIN ein, um den Tresor zu öffnen. Die Displaysperre des Telefons öffnet ihn nicht.</string>
+    <string name="core_biometric_unavailable_password">Biometrie ist gerade nicht verfügbar. Gib dein Passwort ein, um den Tresor zu öffnen. Die Displaysperre des Telefons öffnet ihn nicht.</string>
+    <string name="core_biometric_lockout_pin">Biometrie ist nach zu vielen Versuchen gesperrt. Gib deine PIN ein, um den Tresor zu öffnen. Wenn du das Telefon mit der Displaysperre entsperrst, wird Biometrie wieder freigegeben, aber die Displaysperre öffnet AgePony nicht.</string>
+    <string name="core_biometric_lockout_password">Biometrie ist nach zu vielen Versuchen gesperrt. Gib dein Passwort ein, um den Tresor zu öffnen. Wenn du das Telefon mit der Displaysperre entsperrst, wird Biometrie wieder freigegeben, aber die Displaysperre öffnet AgePony nicht.</string>
+    <string name="core_biometric_only_needs_secret">Lege zuerst ein Passwort oder eine PIN fest. Damit kommst du wieder hinein, falls sich deine Biometrie ändert.</string>
+    <string name="core_biometric_only_no_biometric">Für diese Sperre muss auf diesem Telefon in den Android-Sicherheitseinstellungen ein Fingerabdruck oder Gesicht eingerichtet sein.</string>
+    <string name="core_biometric_only_refused">Android hat den Tresorschlüssel nicht allein hinter Biometrie gespeichert. Die Sperre bleibt unverändert.</string>
+    <string name="core_biometric_only_refused_code">Android hat den Tresorschlüssel nicht allein hinter Biometrie gespeichert (Keystore-Fehler %1$d). Die Sperre bleibt unverändert.</string>
+    <string name="core_prompt_biometric_only_subtitle">Nur Biometrie zum Entsperren von AgePony verwenden</string>
+    <string name="core_password_only_biometric_pin">„Nur Biometrie“ braucht deine PIN als Weg zurück, falls sich deine Biometrie ändert. Wähle oben eine andere Sperre, bevor du sie entfernst.</string>
+    <string name="core_password_only_biometric_password">„Nur Biometrie“ braucht dein Passwort als Weg zurück, falls sich deine Biometrie ändert. Wähle oben eine andere Sperre, bevor du es entfernst.</string>
+</resources>

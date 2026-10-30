@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="core_vault_no_screen_lock">Настройте блокировку экрана или биометрию, чтобы защитить хранилище AgePony.</string>
+    <string name="core_prompt_create_title">Создание хранилища AgePony</string>
+    <string name="core_prompt_create_subtitle">Подтвердите, что это вы, чтобы защитить ключи</string>
+    <string name="core_prompt_add_lock_subtitle">Добавьте этот способ блокировки в хранилище AgePony</string>
+    <string name="core_auth_failed">Не удалось пройти проверку подлинности.</string>
+    <string name="core_vault_create_failed">Не удалось создать хранилище.</string>
+    <string name="core_vault_unlock_failed">Не удалось разблокировать хранилище.</string>
+    <string name="core_vault_orphaned">AgePony был переустановлен или восстановлен из резервной копии, и ключ устройства, которым было запечатано старое хранилище, утрачен, поэтому его нельзя открыть снова. Чтобы продолжить, создайте новое хранилище.</string>
+    <string name="core_unlock_vault_first">Сначала разблокируйте хранилище.</string>
+    <string name="core_set_device_lock_first">Сначала задайте PIN-код, графический ключ или пароль устройства в настройках Android.</string>
+    <string name="core_lock_change_failed">Не удалось изменить способ блокировки.</string>
+
+    <plurals name="core_vault_erased_pin">
+        <item quantity="one">PIN-код был введён неверно %1$d раз, поэтому хранилище стёрто, как задано в настройках.</item>
+        <item quantity="few">PIN-код был введён неверно %1$d раза, поэтому хранилище стёрто, как задано в настройках.</item>
+        <item quantity="many">PIN-код был введён неверно %1$d раз, поэтому хранилище стёрто, как задано в настройках.</item>
+        <item quantity="other">PIN-код был введён неверно %1$d раза, поэтому хранилище стёрто, как задано в настройках.</item>
+    </plurals>
+    <plurals name="core_vault_erased_password">
+        <item quantity="one">Пароль был введён неверно %1$d раз, поэтому хранилище стёрто, как задано в настройках.</item>
+        <item quantity="few">Пароль был введён неверно %1$d раза, поэтому хранилище стёрто, как задано в настройках.</item>
+        <item quantity="many">Пароль был введён неверно %1$d раз, поэтому хранилище стёрто, как задано в настройках.</item>
+        <item quantity="other">Пароль был введён неверно %1$d раза, поэтому хранилище стёрто, как задано в настройках.</item>
+    </plurals>
+    <plurals name="core_wrong_pin_erase_warning">
+        <item quantity="one">Неверный PIN-код. Ещё %1$d неверная попытка сотрёт хранилище.</item>
+        <item quantity="few">Неверный PIN-код. Ещё %1$d неверные попытки сотрут хранилище.</item>
+        <item quantity="many">Неверный PIN-код. Ещё %1$d неверных попыток сотрут хранилище.</item>
+        <item quantity="other">Неверный PIN-код. Ещё %1$d неверные попытки сотрут хранилище.</item>
+    </plurals>
+    <plurals name="core_wrong_password_erase_warning">
+        <item quantity="one">Неверный пароль. Ещё %1$d неверная попытка сотрёт хранилище.</item>
+        <item quantity="few">Неверный пароль. Ещё %1$d неверные попытки сотрут хранилище.</item>
+        <item quantity="many">Неверный пароль. Ещё %1$d неверных попыток сотрут хранилище.</item>
+        <item quantity="other">Неверный пароль. Ещё %1$d неверные попытки сотрут хранилище.</item>
+    </plurals>
+
+    <string name="core_remove_duress_first_pin">Чтобы переключаться между паролем и PIN-кодом, сначала удалите тревожный PIN-код.</string>
+    <string name="core_remove_duress_first_password">Чтобы переключаться между паролем и PIN-кодом, сначала удалите тревожный пароль.</string>
+    <string name="core_differs_from_duress_pin">Новый PIN-код должен отличаться от тревожного PIN-кода.</string>
+    <string name="core_differs_from_duress_password">Новый пароль должен отличаться от тревожного пароля.</string>
+    <string name="core_secret_set_device_failed_pin">Не удалось задать PIN-код на этом устройстве.</string>
+    <string name="core_secret_set_device_failed_password">Не удалось задать пароль на этом устройстве.</string>
+    <string name="core_secret_save_failed_pin">Не удалось сохранить PIN-код.</string>
+    <string name="core_secret_save_failed_password">Не удалось сохранить пароль.</string>
+    <string name="core_secret_set_failed_pin">Не удалось задать PIN-код.</string>
+    <string name="core_secret_set_failed_password">Не удалось задать пароль.</string>
+    <string name="core_secret_remove_failed_pin">Не удалось удалить PIN-код.</string>
+    <string name="core_secret_remove_failed_password">Не удалось удалить пароль.</string>
+    <string name="core_duress_needs_secret_pin">Прежде чем задавать тревожный PIN-код, задайте обычный PIN-код.</string>
+    <string name="core_duress_needs_secret_password">Прежде чем задавать тревожный пароль, задайте обычный пароль.</string>
+    <string name="core_enter_current_pin">Сначала введите текущий PIN-код.</string>
+    <string name="core_enter_current_password">Сначала введите текущий пароль.</string>
+    <string name="core_duress_differs_pin">Тревожный PIN-код должен отличаться от настоящего.</string>
+    <string name="core_duress_differs_password">Тревожный пароль должен отличаться от настоящего.</string>
+    <string name="core_duress_set_failed_pin">Не удалось задать тревожный PIN-код.</string>
+    <string name="core_duress_set_failed_password">Не удалось задать тревожный пароль.</string>
+    <string name="core_duress_remove_failed_pin">Не удалось удалить тревожный PIN-код.</string>
+    <string name="core_duress_remove_failed_password">Не удалось удалить тревожный пароль.</string>
+    <string name="core_password_only_pin">PIN-код — единственный способ открыть хранилище. Прежде чем удалять его, выберите выше «Биометрия» или «PIN-код, графический ключ или пароль устройства».</string>
+    <string name="core_password_only_password">Пароль — единственный способ открыть хранилище. Прежде чем удалять его, выберите выше «Биометрия» или «PIN-код, графический ключ или пароль устройства».</string>
+    <string name="core_password_only_duress_pin">PIN-код — единственный способ открыть хранилище. Прежде чем удалять его, удалите тревожный PIN-код, а затем выберите выше «Биометрия» или «PIN-код, графический ключ или пароль устройства».</string>
+    <string name="core_password_only_duress_password">Пароль — единственный способ открыть хранилище. Прежде чем удалять его, удалите тревожный пароль, а затем выберите выше «Биометрия» или «PIN-код, графический ключ или пароль устройства».</string>
+
+    <string name="core_pin_digits_only">PIN-код может содержать только цифры.</string>
+    <plurals name="core_pin_min_digits">
+        <item quantity="one">Используйте не менее %1$d цифры.</item>
+        <item quantity="few">Используйте не менее %1$d цифр.</item>
+        <item quantity="many">Используйте не менее %1$d цифр.</item>
+        <item quantity="other">Используйте не менее %1$d цифры.</item>
+    </plurals>
+    <plurals name="core_password_min_chars">
+        <item quantity="one">Используйте не менее %1$d символа.</item>
+        <item quantity="few">Используйте не менее %1$d символов.</item>
+        <item quantity="many">Используйте не менее %1$d символов.</item>
+        <item quantity="other">Используйте не менее %1$d символа.</item>
+    </plurals>
+
+    <plurals name="core_wait_seconds">
+        <item quantity="one">%1$d секунду</item>
+        <item quantity="few">%1$d секунды</item>
+        <item quantity="many">%1$d секунд</item>
+        <item quantity="other">%1$d секунды</item>
+    </plurals>
+    <plurals name="core_wait_minutes">
+        <item quantity="one">%1$d минуту</item>
+        <item quantity="few">%1$d минуты</item>
+        <item quantity="many">%1$d минут</item>
+        <item quantity="other">%1$d минуты</item>
+    </plurals>
+    <plurals name="core_wait_hours">
+        <item quantity="one">%1$d час</item>
+        <item quantity="few">%1$d часа</item>
+        <item quantity="many">%1$d часов</item>
+        <item quantity="other">%1$d часа</item>
+    </plurals>
+
+    <string name="core_prompt_sign_title">Подписать аппаратным ключом</string>
+    <string name="core_prompt_hw_decrypt_title">Расшифровать аппаратным ключом</string>
+    <string name="core_prompt_hw_decrypt_subtitle">Подтвердите, что это вы, чтобы использовать этот ключ</string>
+    <string name="core_yubikey_tap_read">Приложите YubiKey к задней панели телефона, чтобы прочитать его ключ age.</string>
+    <string name="core_yubikey_tap_decrypt">Приложите YubiKey к задней панели телефона, чтобы расшифровать.</string>
+
+    <string name="core_private_ssh_ed25519">SSH Ed25519: закрытый ключ хранится в хранилище и не может быть экспортирован в виде текста.</string>
+    <string name="core_private_hardware">Аппаратный ключ: закрытый ключ остаётся в хранилище ключей устройства и не может быть экспортирован.</string>
+    <string name="core_private_security_key">Ключ безопасности: подпись выполняется на устройстве FIDO через NFC. Закрытого ключа для экспорта нет.</string>
+    <string name="core_private_hardware_tag">Аппаратный ключ: расшифровка выполняется в защищённом оборудовании этого устройства. Ключ нельзя экспортировать.</string>
+
+    <string name="core_transfer_lives_on_security_key">Находится на ключе безопасности: его открытый ключ нельзя проверить без этого ключа.</string>
+    <string name="core_transfer_lives_on_yubikey">Находится на YubiKey: для расшифровки с ним нужен этот YubiKey.</string>
+
+    <string name="core_signer_opt_cert_authority">Центр сертификации (подписывает сертификаты, а не файлы)</string>
+    <string name="core_signer_opt_only_for">Только для %1$s</string>
+    <string name="core_signer_opt_not_for">Не для %1$s</string>
+    <string name="core_signer_opt_valid_from">Действует с %1$s</string>
+    <string name="core_signer_opt_valid_until">Действует до %1$s</string>
+    <string name="core_signer_opt_no_touch">Касание ключа безопасности не требуется</string>
+    <string name="core_signer_opt_verify_required">Требуется PIN-код или отпечаток пальца на ключе безопасности</string>
+    <string name="core_signer_opt_unknown">Неизвестный параметр: %1$s</string>
+    <string name="core_signer_opt_unreadable">Нечитаемые параметры: %1$s</string>
+
+    <string name="core_signer_blocked_cert_authority">Ключ центра сертификации. AgePony не поддерживает сертификаты SSH, поэтому не может применить эту запись.</string>
+    <string name="core_signer_blocked_unreadable">Параметры записи не удаётся прочитать (%1$s), поэтому AgePony не может их применить.</string>
+    <string name="core_signer_blocked_unknown">В записи есть параметры, которые AgePony не понимает (%1$s), поэтому AgePony не может их применить.</string>
+    <string name="core_signer_blocked_bad_key">Ключ в записи не удаётся прочитать.</string>
+
+    <string name="core_signer_warn_expired">Срок действия истёк %1$s.</string>
+    <string name="core_signer_warn_not_yet_valid">Действует только с %1$s.</string>
+    <string name="core_signer_warn_not_agepony">Не может подписывать файлы AgePony (только для %1$s).</string>
+    <string name="core_share_chooser_text">Поделиться</string>
+    <string name="core_share_chooser_file">Поделиться зашифрованным файлом</string>
+
+    <string name="core_yubikey_pin_body">Введите PIN-код PIV для этого YubiKey, затем приложите ключ к задней панели телефона. AgePony хранит PIN-код только до конца этой расшифровки.</string>
+    <string name="core_yubikey_no_pin">У этого ключа нет PIN-кода</string>
+    <string name="core_yubikey_pin_note_needs">Этому ключу YubiKey нужен PIN-код.</string>
+    <string name="core_yubikey_pin_note_length">PIN-код YubiKey состоит из 6–8 символов.</string>
+    <plurals name="core_yubikey_pin_note_wrong">
+        <item quantity="one">Неверный PIN-код. До блокировки осталась %1$d попытка.</item>
+        <item quantity="few">Неверный PIN-код. До блокировки осталось %1$d попытки.</item>
+        <item quantity="many">Неверный PIN-код. До блокировки осталось %1$d попыток.</item>
+        <item quantity="other">Неверный PIN-код. До блокировки осталось %1$d попытки.</item>
+    </plurals>
+    <string name="core_yubikey_hold_again">YubiKey потерял связь во время проверки PIN-кода. Приложите его к задней панели телефона и повторите попытку.</string>
+    <string name="core_nfc_hold_key_again">Ключ потерял связь во время проверки PIN-кода. Приложите его к задней панели телефона и повторите попытку.</string>
+    <string name="core_owner_check_needed">Подтвердите, что это вы, отпечатком пальца, лицом или блокировкой экрана, а затем задайте пароль или PIN-код ещё раз.</string>
+    <string name="core_biometric_changed_pin">На этом телефоне был добавлен или удалён отпечаток пальца или лицо, поэтому биометрия не откроет хранилище, пока вы один раз не введёте PIN-код. После этого разблокировку биометрией можно включить снова. Если вы не меняли это сами, прежде чем вводить PIN-код, проверьте в настройках безопасности телефона, нет ли там отпечатка пальца или лица, которые вы не добавляли.</string>
+    <string name="core_biometric_changed_password">На этом телефоне был добавлен или удалён отпечаток пальца или лицо, поэтому биометрия не откроет хранилище, пока вы один раз не введёте пароль. После этого разблокировку биометрией можно включить снова. Если вы не меняли это сами, прежде чем вводить пароль, проверьте в настройках безопасности телефона, нет ли там отпечатка пальца или лица, которые вы не добавляли.</string>
+    <string name="core_biometric_unavailable_pin">Биометрия сейчас недоступна. Введите PIN-код, чтобы открыть хранилище. Блокировка экрана телефона его не открывает.</string>
+    <string name="core_biometric_unavailable_password">Биометрия сейчас недоступна. Введите пароль, чтобы открыть хранилище. Блокировка экрана телефона его не открывает.</string>
+    <string name="core_biometric_lockout_pin">Биометрия заблокирована после слишком большого числа попыток. Введите PIN-код, чтобы открыть хранилище. Разблокировка телефона через блокировку экрана снова включит биометрию, но блокировка экрана не открывает AgePony.</string>
+    <string name="core_biometric_lockout_password">Биометрия заблокирована после слишком большого числа попыток. Введите пароль, чтобы открыть хранилище. Разблокировка телефона через блокировку экрана снова включит биометрию, но блокировка экрана не открывает AgePony.</string>
+    <string name="core_biometric_only_needs_secret">Сначала задайте пароль или PIN-код. С их помощью можно будет войти, если ваша биометрия изменится.</string>
+    <string name="core_biometric_only_no_biometric">Для этого способа блокировки на телефоне должен быть настроен отпечаток пальца или лицо (в настройках безопасности Android).</string>
+    <string name="core_biometric_only_refused">Android не позволил защитить ключ хранилища только биометрией. Способ блокировки не изменён.</string>
+    <string name="core_biometric_only_refused_code">Android не позволил защитить ключ хранилища только биометрией (ошибка Keystore %1$d). Способ блокировки не изменён.</string>
+    <string name="core_prompt_biometric_only_subtitle">Разблокировка AgePony только биометрией</string>
+    <string name="core_password_only_biometric_pin">В режиме «Только биометрия» PIN-код нужен, чтобы войти, если ваша биометрия изменится. Прежде чем удалять его, выберите выше другой способ блокировки.</string>
+    <string name="core_password_only_biometric_password">В режиме «Только биометрия» пароль нужен, чтобы войти, если ваша биометрия изменится. Прежде чем удалять его, выберите выше другой способ блокировки.</string>
+</resources>

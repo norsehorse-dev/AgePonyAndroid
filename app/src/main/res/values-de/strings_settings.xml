@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_ok">OK</string>
+    <string name="settings_action_change">Ändern</string>
+    <string name="settings_action_remove">Entfernen</string>
+
+    <string name="settings_section_security">Sicherheit</string>
+    <string name="settings_lock_intro">Wie der Tresor von AgePony gesperrt wird. Ein unten festgelegtes Passwort oder eine PIN ist ein zweiter Weg hinein neben „Biometrie“ oder „Geräte-PIN“, kein zusätzlicher Schritt. Bei „Keine Sperre“ ist das Passwort der einzige Weg hinein.</string>
+    <string name="settings_pin_only_note_pin">Schalte die Notfall-PIN aus, um Fingerabdruck oder Geräteentsperrung zu verwenden.</string>
+    <string name="settings_pin_only_note_password">Schalte das Notfall-Passwort aus, um Fingerabdruck oder Geräteentsperrung zu verwenden.</string>
+    <string name="settings_lock_biometric">Biometrie</string>
+    <string name="settings_lock_biometric_detail">Dein Fingerabdruck oder Gesicht entsperrt den Tresor, mit der Geräteentsperrung als Ausweichmöglichkeit.</string>
+    <string name="settings_lock_biometric_unavailable">Auf diesem Gerät muss ein Fingerabdruck oder Gesicht eingerichtet sein.</string>
+    <string name="settings_lock_device">Geräte-PIN, -Muster oder -Passwort</string>
+    <string name="settings_lock_device_no_screen_lock">Richte in den Android-Einstellungen eine Displaysperre ein, um das zu verwenden.</string>
+    <string name="settings_lock_device_legacy">Bei jedem Entsperren erforderlich. Unter dieser Android-Version schützt das den Zugang, fügt aber keine hardwaregestützte Verschlüsselung hinzu; ein Tresor-Passwort weiter unten schon.</string>
+    <string name="settings_lock_device_detail">Deine Geräte-PIN, dein Muster oder Passwort wird bei jedem Entsperren verlangt und gegen den Schlüssel in der Hardware geprüft.</string>
+    <string name="settings_lock_off">Keine Sperre</string>
+    <string name="settings_lock_off_detail_pin">Keine Prüfung per Fingerabdruck oder Gerät. Deine PIN unten ist dann der einzige Weg hinein.</string>
+    <string name="settings_lock_off_detail_password">Keine Prüfung per Fingerabdruck oder Gerät. Dein Passwort unten ist dann der einzige Weg hinein.</string>
+    <string name="settings_lock_off_detail_open">Der Tresor öffnet sich ohne Bestätigung: Wer die App öffnet, ist drin. Lege unten ein Passwort fest, damit es der einzige Weg hinein ist.</string>
+    <string name="settings_confirm_lock_off">Fingerabdruck und Geräteentsperrung ausschalten</string>
+
+    <string name="settings_set_secret_button">Passwort oder PIN festlegen…</string>
+    <string name="settings_set_secret_hint">Ein Passwort, mit dem du auch ohne eingerichtete Biometrie entsperren kannst, und die Grundlage für ein Notfall-Passwort.</string>
+    <string name="settings_secret_set_pin">Entsperr-PIN ist festgelegt.</string>
+    <string name="settings_secret_set_password">Entsperr-Passwort ist festgelegt.</string>
+    <string name="settings_pin_too_short">Deine PIN ist kürzer als die %1$d Ziffern, die AgePony jetzt verlangt. Sie funktioniert weiterhin, aber eine längere ist viel schwerer zu erraten. Ändere sie unten.</string>
+    <string name="settings_password_too_short">Dein Passwort ist kürzer als die %1$d Zeichen, die AgePony jetzt verlangt. Es funktioniert weiterhin, aber ein längeres ist viel schwerer zu erraten. Ändere es unten.</string>
+    <string name="settings_confirm_change_pin">PIN ändern</string>
+    <string name="settings_confirm_change_password">Passwort ändern</string>
+    <string name="settings_set_duress_button_pin">Notfall-PIN festlegen…</string>
+    <string name="settings_set_duress_button_password">Notfall-Passwort festlegen…</string>
+    <string name="settings_duress_hint_pin">Eine zweite, andere PIN, die den Tresor unbemerkt löscht, statt ihn zu öffnen. Unter Zwang eingegeben, hinterlässt sie eine leere App, die nichts preisgeben kann. Es gibt keine Rückfrage und kein Rückgängig. Solange sie festgelegt ist, sind Fingerabdruck und Geräteentsperrung ausgeschaltet, der Sperrbildschirm fragt also immer nach deiner PIN.</string>
+    <string name="settings_duress_hint_password">Ein zweites, anderes Passwort, das den Tresor unbemerkt löscht, statt ihn zu öffnen. Unter Zwang eingegeben, hinterlässt es eine leere App, die nichts preisgeben kann. Es gibt keine Rückfrage und kein Rückgängig. Solange es festgelegt ist, sind Fingerabdruck und Geräteentsperrung ausgeschaltet, der Sperrbildschirm fragt also immer nach deinem Passwort.</string>
+    <string name="settings_duress_set_pin">Notfall-PIN ist festgelegt. Ihre Eingabe löscht den Tresor. Fingerabdruck und Geräteentsperrung bleiben aus, solange sie festgelegt ist.</string>
+    <string name="settings_duress_set_password">Notfall-Passwort ist festgelegt. Seine Eingabe löscht den Tresor. Fingerabdruck und Geräteentsperrung bleiben aus, solange es festgelegt ist.</string>
+    <string name="settings_confirm_remove_duress_pin">Notfall-PIN entfernen</string>
+    <string name="settings_confirm_remove_duress_password">Notfall-Passwort entfernen</string>
+    <plurals name="settings_erase_title">
+        <item quantity="one">Tresor nach %1$d Fehlversuch löschen</item>
+        <item quantity="other">Tresor nach %1$d Fehlversuchen löschen</item>
+    </plurals>
+    <plurals name="settings_erase_detail_pin">
+        <item quantity="one">Nach %1$d falscher PIN löscht AgePony den Tresor am Sperrbildschirm, genau wie die Notfall-PIN. Ab %2$d Fehlversuchen muss außerdem vor jedem neuen Versuch länger gewartet werden.</item>
+        <item quantity="other">Nach %1$d falschen PINs in Folge löscht AgePony den Tresor am Sperrbildschirm, genau wie die Notfall-PIN. Ab %2$d Fehlversuchen muss außerdem vor jedem neuen Versuch länger gewartet werden.</item>
+    </plurals>
+    <plurals name="settings_erase_detail_password">
+        <item quantity="one">Nach %1$d falschem Passwort löscht AgePony den Tresor am Sperrbildschirm, genau wie das Notfall-Passwort. Ab %2$d Fehlversuchen muss außerdem vor jedem neuen Versuch länger gewartet werden.</item>
+        <item quantity="other">Nach %1$d falschen Passwörtern in Folge löscht AgePony den Tresor am Sperrbildschirm, genau wie das Notfall-Passwort. Ab %2$d Fehlversuchen muss außerdem vor jedem neuen Versuch länger gewartet werden.</item>
+    </plurals>
+    <string name="settings_confirm_stop_erasing">Löschen nach Fehlversuchen beenden</string>
+    <string name="settings_screenshots">Screenshots erlauben</string>
+    <string name="settings_screenshots_detail">Aus: Die Bildschirme von AgePony erscheinen nicht in Screenshots, Bildschirmaufnahmen und der Vorschau der zuletzt verwendeten Apps. Schalte das nur ein, solange du einen Bildschirm festhalten musst.</string>
+
+    <string name="settings_set_secret_title">Passwort oder PIN festlegen</string>
+    <string name="settings_set_duress_title_pin">Notfall-PIN festlegen</string>
+    <string name="settings_set_duress_title_password">Notfall-Passwort festlegen</string>
+    <string name="settings_set_duress_confirm">Festlegen</string>
+    <string name="settings_set_duress_body_pin">Gib eine zweite PIN ein, die sich von deiner echten unterscheidet. Ihre Eingabe beim Entsperren löscht den Tresor unbemerkt. Wähle etwas, an das du dich unter Druck erinnerst, das du aber nicht aus Gewohnheit eingibst. Solange sie festgelegt ist, sind Fingerabdruck und Geräteentsperrung ausgeschaltet, bestätige also zuerst deine aktuelle PIN.</string>
+    <string name="settings_set_duress_body_password">Gib ein zweites Passwort ein, das sich von deinem echten unterscheidet. Seine Eingabe beim Entsperren löscht den Tresor unbemerkt. Wähle etwas, an das du dich unter Druck erinnerst, das du aber nicht aus Gewohnheit eingibst. Solange es festgelegt ist, sind Fingerabdruck und Geräteentsperrung ausgeschaltet, bestätige also zuerst dein aktuelles Passwort.</string>
+    <string name="settings_current_pin">Aktuelle PIN</string>
+    <string name="settings_current_password">Aktuelles Passwort</string>
+    <string name="settings_remove_title_pin">PIN entfernen?</string>
+    <string name="settings_remove_title_password">Passwort entfernen?</string>
+    <string name="settings_remove_body_duress_pin">Der Tresor fragt nicht mehr danach, und deine Notfall-PIN wird ebenfalls entfernt.</string>
+    <string name="settings_remove_body_duress_password">Der Tresor fragt nicht mehr danach, und dein Notfall-Passwort wird ebenfalls entfernt.</string>
+    <string name="settings_remove_body">Der Tresor fragt nicht mehr danach. Er öffnet sich dann nur noch mit der Sperrart oben.</string>
+    <string name="settings_confirm_remove_pin">PIN entfernen</string>
+    <string name="settings_confirm_remove_password">Passwort entfernen</string>
+    <string name="settings_cant_remove_title">Kann noch nicht entfernt werden</string>
+    <string name="settings_save">Speichern</string>
+    <string name="settings_kind_password">Passwort</string>
+    <string name="settings_kind_pin">PIN</string>
+    <string name="settings_pin_min">Mindestens %1$d Ziffern.</string>
+    <string name="settings_password_min">Mindestens %1$d Zeichen.</string>
+    <string name="settings_confirm_field">Bestätigen</string>
+    <string name="settings_mismatch">Die Eingaben stimmen nicht überein.</string>
+
+    <string name="settings_encrypt_to_self">Standardmäßig für dich selbst verschlüsseln</string>
+    <string name="settings_encrypt_to_self_detail">Wählt beim Auswählen der Empfänger deine aktive Identität vorab aus, damit du deine eigenen Dateien immer entschlüsseln kannst.</string>
+    <string name="settings_armor_default">Standardmäßig als Text ausgeben (Armor)</string>
+    <string name="settings_armor_default_detail">Startet den Verschlüsselungsbildschirm mit eingeschaltetem ASCII-Armor. Ausgabe im Textformat lässt sich in eine Nachricht einfügen; reines Binärformat ist etwa ein Drittel kleiner. Wenn du den Schalter beim Verschlüsseln umlegst, ändert sich auch diese Einstellung.</string>
+    <string name="settings_passphrase_default">Standardmäßig nur Passphrase</string>
+    <string name="settings_passphrase_default_detail">Öffnet die Empfängerauswahl im Passphrase-Modus (scrypt) statt in der Schlüsselauswahl, falls du meistens mit einer Passphrase verschlüsselst.</string>
+    <string name="settings_forget_passphrase">Gemerkte Passphrase vergessen</string>
+    <string name="settings_forget">Vergessen</string>
+    <string name="settings_forget_passphrase_detail">Eine Passphrase wird im Arbeitsspeicher gehalten, damit sie bei mehreren Dateien hintereinander nur einmal abgefragt wird. Sie wird nie auf den Datenträger geschrieben und verworfen, sobald der Tresor gesperrt wird.</string>
+    <string name="settings_work_factor">Arbeitsfaktor der Passphrase</string>
+    <string name="settings_work_factor_detail_default">2^%1$d: scrypt belegt beim Ableiten des Schlüssels etwa %2$d MB, unabhängig von der Dateigröße. Das ist der Standard von age. Der Wert wird in der Datei gespeichert, daher kann jedes age-Programm sie trotzdem öffnen.</string>
+    <string name="settings_work_factor_detail_custom">2^%1$d: scrypt belegt beim Ableiten des Schlüssels etwa %2$d MB, unabhängig von der Dateigröße. Der Standard von age ist 2^%3$d. Der Wert wird in der Datei gespeichert, daher kann jedes age-Programm sie trotzdem öffnen.</string>
+
+    <string name="settings_section_autolock">Automatische Sperre</string>
+    <string name="settings_autolock_label">Sperren nach Verlassen der App</string>
+    <string name="settings_confirm_lock_less">Seltener sperren</string>
+    <string name="settings_autolock_detail">Wie lange AgePony nach dem Wechsel zu einer anderen App wartet, bevor der Tresor gesperrt wird. Kürzer ist sicherer; länger behält deine Position bei einem kurzen App-Wechsel. Das Ausschalten des Bildschirms zählt als Wechsel.</string>
+    <string name="settings_autolock_immediately">Sofort</string>
+    <plurals name="settings_autolock_seconds">
+        <item quantity="one">%1$d Sekunde</item>
+        <item quantity="other">%1$d Sekunden</item>
+    </plurals>
+    <plurals name="settings_autolock_minutes">
+        <item quantity="one">%1$d Minute</item>
+        <item quantity="other">%1$d Minuten</item>
+    </plurals>
+
+    <string name="settings_section_network">Netzwerk</string>
+    <string name="settings_network_intro">Leite die einzige Netzwerkverbindung, das Abrufen von Schlüsseln bei GitHub, über einen Proxy. Alles andere in AgePony läuft ohnehin offline.</string>
+    <string name="settings_proxy_off">Aus</string>
+    <string name="settings_proxy_off_detail">Direkte Verbindung (Standard).</string>
+    <string name="settings_proxy_orbot">Orbot (Tor)</string>
+    <string name="settings_proxy_orbot_detail">SOCKS5 über %1$s:%2$d.</string>
+    <string name="settings_proxy_custom">Benutzerdefiniert</string>
+    <string name="settings_proxy_custom_detail">Dein eigener SOCKS5- oder HTTP-Proxy.</string>
+    <string name="settings_orbot_missing">Orbot scheint nicht installiert zu sein. Installiere es über Google Play oder F-Droid, oder wähle „Benutzerdefiniert“, um einen anderen Tor-SOCKS-Port anzugeben.</string>
+    <string name="settings_proxy_socks">SOCKS5 (Tor)</string>
+    <string name="settings_proxy_host">Proxy-Host</string>
+    <string name="settings_proxy_port">Port</string>
+    <string name="settings_proxy_username">Proxy-Benutzername (optional)</string>
+    <string name="settings_proxy_password">Proxy-Passwort (optional)</string>
+    <string name="settings_proxy_credentials_detail">Bei Tor/Orbot sorgen Benutzername und Passwort dafür, dass der Datenverkehr von AgePony einen eigenen Circuit bekommt (Stream-Isolation). Bei einem echten Proxy sind es normale Zugangsdaten. Leer lassen, wenn keine nötig sind.</string>
+    <string name="settings_proxy_no_fallback">Ist der Proxy nicht erreichbar, schlägt das Abrufen der Schlüssel fehl, statt auf eine direkte Verbindung auszuweichen.</string>
+
+    <string name="settings_section_active_identity">Aktive Identität</string>
+    <string name="settings_no_identities">Noch keine Identitäten. Füge im Tab „Identitäten“ eine hinzu.</string>
+    <string name="settings_active_identity_detail">Die aktive Identität ist der Standardempfänger für „Für dich selbst verschlüsseln“ und wird beim Entschlüsseln zuerst versucht.</string>
+
+    <string name="settings_section_keys">Schlüssel übertragen und sichern</string>
+    <string name="settings_send_keys">Schlüssel an ein anderes Gerät senden</string>
+    <string name="settings_receive_keys">Schlüssel von einem anderen Gerät empfangen</string>
+    <string name="settings_paper_restore">Aus Papier-Backup wiederherstellen</string>
+    <string name="settings_keys_detail">Für ein Papier-Backup öffne eine Identität im Tab „Identitäten“. Hardwareschlüssel bleiben auf diesem Gerät und lassen sich weder übertragen noch sichern.</string>
+    <string name="settings_lock_now">Tresor jetzt sperren</string>
+
+    <string name="settings_section_about">Über</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_website">Website</string>
+    <string name="settings_source_code">Quellcode</string>
+    <string name="settings_age_spec">age-Spezifikation</string>
+    <string name="settings_licenses">Open-Source-Lizenzen</string>
+    <string name="settings_made_by">Entwickelt von</string>
+    <string name="settings_desktop">AgePony für Desktop</string>
+    <string name="settings_desktop_detail">age-Verschlüsselung für macOS, Linux und Windows</string>
+
+    <string name="settings_section_more">Mehr von NorseHorse</string>
+    <string name="settings_more_all">Alle Pony-Apps</string>
+    <string name="settings_more_all_detail">Die ganze Familie auf pony.norsehor.se</string>
+    <string name="settings_more_pgpony_detail">OpenPGP-Verschlüsselung für Nachrichten und Dateien</string>
+    <string name="settings_more_quorumpony_detail">Ein Geheimnis auf Karten aufteilen, die es gemeinsam wiederherstellen</string>
+    <string name="settings_more_carrierpony_detail">Private Nachrichten und Dateiübertragung, Ende-zu-Ende versiegelt</string>
+    <string name="settings_more_burnpony_detail">Selbstzerstörende verschlüsselte Notizen, verschlüsselt auf deinem Telefon</string>
+    <string name="settings_more_vaultpony_detail">VeraCrypt-kompatible verschlüsselte Container, komplett auf deinem Gerät</string>
+    <string name="settings_more_passpony_detail">Ein Client für pass- und passage-Passwortspeicher</string>
+    <string name="settings_more_relaypony_detail">Verschlüsselte Dateiübertragung von Telefon zu Telefon</string>
+    <string name="settings_more_scrubpony_detail">Identifizierende Metadaten aus Bildern entfernen, ohne ein Pixel zu verändern</string>
+
+    <string name="settings_section_help">Hilfe &amp; Feedback</string>
+    <string name="settings_help">Hilfe &amp; FAQ</string>
+    <string name="settings_security_info">Wie AgePony deine Dateien schützt</string>
+    <string name="settings_replay_intro">Einführung erneut ansehen</string>
+    <string name="settings_replay_intro_detail">Sieh dir an, was AgePony macht und wie deine Schlüssel auf diesem Gerät privat bleiben.</string>
+    <string name="settings_rate">AgePony bewerten</string>
+    <string name="settings_rate_detail">Wenn AgePony dir nützt, hilft eine Bewertung anderen, die App zu finden.</string>
+    <string name="settings_send_feedback">Feedback senden</string>
+    <string name="settings_send_feedback_detail">Einen Fehler gefunden oder eine Idee? Damit öffnet sich eine E-Mail an NorseHorse, in der App- und Gerätedaten schon eingetragen sind.</string>
+    <string name="settings_recently_deleted">Zuletzt gelöscht</string>
+    <string name="settings_recently_deleted_detail">Stelle eine gelöschte Identität oder einen gelöschten Empfänger wieder her, bis zu 30 Tage lang.</string>
+
+    <string name="settings_reset">Zurücksetzen</string>
+    <string name="settings_reset_button">AgePony zurücksetzen</string>
+    <string name="settings_reset_detail">Löscht alle gespeicherten Identitäten, Empfänger und Notizen. Dateien, die du bereits außerhalb von AgePony gespeichert hast, bleiben unberührt. Das lässt sich nicht rückgängig machen.</string>
+    <string name="settings_reset_title">AgePony zurücksetzen?</string>
+    <string name="settings_reset_body">Damit werden alle Identitäten, Empfänger und verschlüsselten Notizen im Tresor gelöscht. Dateien, die bereits außerhalb von AgePony gespeichert sind, sind nicht betroffen. Das lässt sich nicht rückgängig machen.</string>
+
+    <string name="settings_trash_intro">Gelöschte Identitäten und Empfänger bleiben hier %1$d Tage lang, bevor sie endgültig entfernt werden. Beim Wiederherstellen einer Identität kommt ihr privater Schlüssel unversehrt zurück.</string>
+    <string name="settings_trash_empty_state_title">Keine gelöschten Elemente</string>
+    <string name="settings_trash_empty">Identitäten und Empfänger, die du löschst, erscheinen hier und lassen sich wiederherstellen.</string>
+    <string name="settings_trash_identities">Identitäten</string>
+    <string name="settings_trash_recipients">Empfänger</string>
+    <string name="settings_trash_empty_bin">Papierkorb leeren</string>
+    <string name="settings_trash_empty_title">Papierkorb leeren?</string>
+    <string name="settings_trash_empty_body">Damit wird alles hier endgültig entfernt. Der private Schlüssel jeder gelöschten Identität ist dann für immer weg. Das lässt sich nicht rückgängig machen.</string>
+    <string name="settings_trash_empty_confirm">Leeren</string>
+    <string name="settings_trash_purge_title">„%1$s“ endgültig löschen?</string>
+    <string name="settings_trash_purge_identity_body">Damit werden die Identität und ihr privater Schlüssel endgültig entfernt. Dateien, die dafür verschlüsselt sind, lassen sich nie wieder öffnen. Das lässt sich nicht rückgängig machen.</string>
+    <string name="settings_trash_purge_recipient_body">Damit wird der Empfänger endgültig entfernt. Das lässt sich nicht rückgängig machen.</string>
+    <string name="settings_trash_restore">Wiederherstellen</string>
+    <string name="settings_trash_deleted_just_now">Gerade gelöscht</string>
+    <plurals name="settings_trash_deleted_minutes">
+        <item quantity="one">Vor %1$d Minute gelöscht</item>
+        <item quantity="other">Vor %1$d Minuten gelöscht</item>
+    </plurals>
+    <plurals name="settings_trash_deleted_hours">
+        <item quantity="one">Vor %1$d Stunde gelöscht</item>
+        <item quantity="other">Vor %1$d Stunden gelöscht</item>
+    </plurals>
+    <plurals name="settings_trash_deleted_days">
+        <item quantity="one">Vor %1$d Tag gelöscht</item>
+        <item quantity="other">Vor %1$d Tagen gelöscht</item>
+    </plurals>
+
+    <string name="settings_security_intro">Was die App für dich tut, in einfachen Worten, und was sie bewusst nicht tut.</string>
+    <string name="settings_security_device_title">Alles passiert auf diesem Gerät</string>
+    <string name="settings_security_device_body">AgePony hat kein Konto und spricht mit keinem Server von uns. Verschlüsselung, Entschlüsselung und deine Schlüssel bleiben auf diesem Telefon. Die einzige Ausnahme ist das Abrufen des öffentlichen Schlüssels eines Empfängers von GitHub, das nur auf deine Anfrage hin passiert und das du über einen Proxy leiten kannst.</string>
+    <string name="settings_security_format_title">Das age-Format und seine Algorithmen</string>
+    <string name="settings_security_format_body">Dateien verwenden das age-Format: X25519 für Empfänger mit öffentlichem Schlüssel, ChaCha20-Poly1305 für die Nutzdaten und scrypt, wenn du mit einer Passphrase verschlüsselst. Quantensichere Identitäten ergänzen den Schlüsselaustausch um ML-KEM. Das sind moderne, gut geprüfte Verfahren, und das Format ist dasselbe, das auch das age-Kommandozeilenprogramm verwendet.</string>
+    <string name="settings_security_vault_title">Dein Tresor im Ruhezustand</string>
+    <string name="settings_security_vault_body">Identitäten, Empfänger und Notizen liegen in einer verschlüsselten Tresordatei. Deren Schlüssel verwahrt der Android Keystore, und du kannst das Entsperren an deine Geräteentsperrung oder einen Fingerabdruck binden. Gesperrt ist der Tresor nur Chiffrat auf dem Datenträger.</string>
+    <string name="settings_security_passphrase_title">Passphrasen nur im Arbeitsspeicher</string>
+    <string name="settings_security_passphrase_body">Eine Passphrase, die du zum Verschlüsseln einer Datei eingibst, wird im Arbeitsspeicher gehalten, damit du sie bei mehreren Dateien hintereinander nicht neu eintippen musst. Sie wird nie auf den Datenträger geschrieben, nie im Tresor gespeichert und verworfen, sobald die App in den Hintergrund geht oder der Tresor gesperrt wird.</string>
+    <string name="settings_security_duress_title">Ein Notfall-Passwort, wenn du eines festlegst</string>
+    <string name="settings_security_duress_body">Du kannst ein zweites Passwort festlegen, das den Tresor unbemerkt löscht, wenn es beim Entsperren eingegeben wird. Es ist für den Moment gedacht, in dem du gezwungen wirst, die App zu öffnen, und es dir lieber ist, dass sie leer erscheint.</string>
+    <string name="settings_security_not_doing_title">Was AgePony nicht tut</string>
+    <string name="settings_security_no_cloud">Es sichert deine Schlüssel in keiner Cloud. Verlierst du dieses Gerät ohne Export, sind die Schlüssel weg.</string>
+    <string name="settings_security_no_recovery">Es kann keinen privaten Schlüssel wiederherstellen, den du endgültig gelöscht hast, und wir können das auch nicht.</string>
+    <string name="settings_security_no_telemetry">Es sendet keine Analyse- oder Telemetriedaten. Nichts über deine Dateien oder deine Nutzung verlässt das Gerät.</string>
+    <string name="settings_security_no_outside">Es kann Dateien nicht mehr schützen, nachdem sie AgePony verlassen haben, und schützt nicht vor einem Telefon, das bereits auf Systemebene kompromittiert ist.</string>
+    <string name="settings_security_footer">AgePony ist Open Source. Wenn du etwas davon überprüfen willst, findest du den Link zum Quellcode in den Einstellungen unter „Über“.</string>
+
+    <string name="settings_help_intro">Kurze Antworten auf die häufigsten Fragen.</string>
+    <string name="settings_help_what_q">Was ist age, und was ist AgePony?</string>
+    <string name="settings_help_what_a">age ist ein modernes, offenes Format zur Dateiverschlüsselung: klein, geprüft und frei vom Altballast älterer Werkzeuge. AgePony ist ein benutzerfreundlicher age-Client für dein Telefon. Die Dateien, die es schreibt, sind gewöhnliche age-Dateien, die jedes age-Programm öffnen kann.</string>
+    <string name="settings_help_recipient_q">Was ist ein Empfänger?</string>
+    <string name="settings_help_recipient_a">Ein Empfänger ist jemand, für den du verschlüsselst, erkennbar an seinem öffentlichen Schlüssel (einem age1...-String oder einem öffentlichen SSH-Schlüssel). Füge einen Empfänger einmal hinzu, dann kannst du Dateien verschlüsseln, die nur diese Person öffnen kann. Ihren privaten Schlüssel brauchst du nie, nur den öffentlichen, den sie teilt.</string>
+    <string name="settings_help_choice_q">Passphrase oder Schlüssel: Was soll ich verwenden?</string>
+    <string name="settings_help_choice_a">Ein Schlüssel (eine Identität) ist am besten, wenn du für dich selbst verschlüsselst oder für Leute, mit denen du Schlüssel austauschst: nichts zu merken, nichts einzutippen. Eine Passphrase ist am besten für eine einzelne Datei, die du jemandem geben willst, der AgePony nicht nutzt. Diese Person braucht dann nur die Passphrase, keinen Schlüssel.</string>
+    <string name="settings_help_armor_q">Was bedeutet „Als Text ausgeben (Armor)“?</string>
+    <string name="settings_help_armor_a">Armor schreibt die verschlüsselte Datei als normale Buchstaben und Ziffern statt als rohe Bytes, sodass du sie in einen Chat oder eine E-Mail einfügen kannst. Sie wird dadurch etwas größer. Für Dateien, die du als Anhang sendest, lass die Option ausgeschaltet.</string>
+    <string name="settings_help_archive_q">Ich habe mehrere Dateien auf einmal verschlüsselt. Wo sind sie?</string>
+    <string name="settings_help_archive_a">Wenn du mehr als eine Datei verschlüsselst, werden sie in ein einzelnes Archiv gepackt, damit sie als eine Datei unterwegs sind. Beim Entschlüsseln bietet AgePony „Dateien in einen Ordner entpacken“ an, womit jede ursprüngliche Datei wieder geschrieben wird. Eine einzelne Datei wird ohne Archiv ver- und entschlüsselt.</string>
+    <string name="settings_help_compat_q">Kann jemand meine Datei ohne AgePony öffnen?</string>
+    <string name="settings_help_compat_a">Ja. AgePony schreibt standardkonforme age-Dateien, daher öffnen das age-Kommandozeilenprogramm und andere age-Clients sie mit dem passenden Schlüssel oder der passenden Passphrase. Du bist nicht gebunden.</string>
+    <string name="settings_help_lose_q">Was passiert, wenn ich eine Identität lösche oder verliere?</string>
+    <string name="settings_help_lose_a">Eine Identität enthält einen privaten Schlüssel. Ohne ihn kann niemand die dafür verschlüsselten Dateien öffnen, auch du nicht. Eine gelöschte Identität landet jetzt zunächst eine Weile unter „Zuletzt gelöscht“, wo du sie wiederherstellen kannst; ist sie aber endgültig weg, lässt sie sich nicht wiederherstellen. Wenn sie wichtig ist, exportiere eine Kopie und bewahre sie an einem sicheren Ort auf.</string>
+    <string name="settings_help_pq_q">Was ist eine quantensichere Identität?</string>
+    <string name="settings_help_pq_a">Das ist eine hybride Identität, die klassisches X25519 mit ML-KEM kombiniert, einem Verfahren, das künftigen Quantencomputern standhalten soll. Dafür verschlüsselte Dateien bleiben auch gegen Angreifer geschützt, die sie heute mitschneiden, um sie später zu knacken. Sie ist voll kompatibel mit age-Programmen, die den hybriden Empfänger unterstützen.</string>
+    <string name="settings_help_sign_q">Kann ich eine Datei signieren, ohne sie zu verschlüsseln?</string>
+    <string name="settings_help_sign_a">Ja. „Datei signieren“ im Tab „Dateien“ erstellt eine abgetrennte Signatur, mit der andere nachweisen können, dass eine Datei von dir stammt, und „Signatur prüfen“ prüft Signaturen von Personen auf deiner Liste „Vertrauenswürdige Signierer“. Signieren und Verschlüsseln sind getrennt: Du kannst das eine, das andere oder beides tun.</string>
+    <string name="settings_help_footer">Kommst du nicht weiter? In den Einstellungen gibt es die Schaltfläche „Feedback senden“, die eine E-Mail an NorseHorse öffnet.</string>
+
+    <string name="settings_licenses_intro">AgePony ist Open Source und baut auf diesen Projekten auf. Jedes steht weiterhin unter seiner eigenen Lizenz, und die vollständigen Lizenztexte sind bei jedem Projekt erhältlich.</string>
+    <string name="settings_licenses_footer">AgePony implementiert das offene age-Dateiformat. Sein eigener Verschlüsselungscode (agepony-core) ist Teil von AgePony und steht unter derselben Lizenz wie die App. Den Link zum Quellcode findest du in den Einstellungen unter „Über“.</string>
+    <string name="settings_dep_jetpack">Android Jetpack (Core, Lifecycle, Activity, Fragment, Biometric)</string>
+    <string name="settings_dep_compose">Jetpack Compose (UI, Foundation, Material 3, Material Icons)</string>
+    <string name="settings_dep_kotlin">Kotlin-Standardbibliothek</string>
+    <string name="settings_dep_zxing">ZXing Core (QR-Kodierung und -Dekodierung)</string>
+    <string name="settings_dep_desugar">Desugaring der Android-Core-Library (desugar_jdk_libs)</string>
+    <string name="settings_dep_play_review">Google Play In-App Review (nur im Play-Build, nicht im F-Droid-Build)</string>
+    <string name="settings_lock_biometric_only">Nur Biometrie</string>
+    <string name="settings_lock_fingerprint_only">Nur Fingerabdruck</string>
+    <string name="settings_lock_biometric_only_detail_pin">Nur Biometrie oder deine PIN öffnet den Tresor, nicht die Displaysperre des Telefons. Wird ein Fingerabdruck oder Gesicht hinzugefügt oder entfernt, gib einmal deine PIN ein und schalte Biometrie wieder ein.</string>
+    <string name="settings_lock_biometric_only_detail_password">Nur Biometrie oder dein Passwort öffnet den Tresor, nicht die Displaysperre des Telefons. Wird ein Fingerabdruck oder Gesicht hinzugefügt oder entfernt, gib einmal dein Passwort ein und schalte Biometrie wieder ein.</string>
+    <string name="settings_lock_biometric_only_detail_none">Nur Biometrie oder ein App-Passwort öffnet den Tresor, nie die Displaysperre des Telefons. Erfordert ein Passwort oder eine PIN als Weg zurück hinein.</string>
+    <string name="settings_biometric_only_dialog_body">Nur Biometrie oder dein App-Passwort bzw. deine PIN öffnet den Tresor, nicht die Displaysperre des Telefons. Wird ein Fingerabdruck oder Gesicht hinzugefügt oder entfernt, öffnet Biometrie den Tresor erst wieder, nachdem du einmal dein Passwort oder deine PIN eingegeben hast.</string>
+    <string name="settings_biometric_only_dialog_needs_secret">Lege zuerst ein Passwort oder eine PIN fest. Das ist dein Weg zurück hinein.</string>
+    <string name="settings_biometric_only_turn_on">Einschalten</string>
+    <string name="settings_biometric_only_set_secret">Passwort oder PIN festlegen</string>
+    <string name="settings_confirm_set_secret">Bestätige, dass du es bist, um ein Passwort oder eine PIN festzulegen</string>
+    <string name="settings_confirm_change_lock">Bestätige, dass du es bist, um die Sperrart von AgePony zu ändern</string>
+    <string name="settings_biometric_only_off_note">Das Entsperren per Biometrie ist aus, bis du erneut mit Biometrie bestätigst. Bis dahin öffnet dein App-Passwort oder deine PIN den Tresor.</string>
+    <string name="settings_biometric_only_turn_on_again">Wieder einschalten</string>
+    <string name="settings_secret_type">Typ</string>
+    <string name="settings_work_factor_option">2^%1$d, etwa %2$d MB</string>
+    <string name="settings_work_factor_option_default">2^%1$d, etwa %2$d MB (age-Standard)</string>
+    <string name="settings_language">Sprache</string>
+    <string name="settings_language_app">App-Sprache</string>
+    <string name="settings_language_system">Systemsprache</string>
+    <string name="settings_language_footer">AgePony nutzt die Sprache deines Telefons, außer du wählst hier eine andere. Ab Android 13 kannst du sie auch in den App-Spracheinstellungen von Android ändern.</string>
+</resources>

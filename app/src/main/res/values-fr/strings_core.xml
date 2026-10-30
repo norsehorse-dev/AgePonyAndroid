@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="core_vault_no_screen_lock">Configurez un verrouillage de l\'écran ou la biométrie pour protéger votre coffre AgePony.</string>
+    <string name="core_prompt_create_title">Créer le coffre AgePony</string>
+    <string name="core_prompt_create_subtitle">Confirmez que c\'est bien vous pour protéger vos clés</string>
+    <string name="core_prompt_add_lock_subtitle">Ajouter ce verrouillage à votre coffre AgePony</string>
+    <string name="core_auth_failed">Échec de l\'authentification.</string>
+    <string name="core_vault_create_failed">Impossible de créer le coffre.</string>
+    <string name="core_vault_unlock_failed">Impossible de déverrouiller le coffre.</string>
+    <string name="core_vault_orphaned">AgePony a été réinstallé ou restauré depuis une sauvegarde, et la clé de l\'appareil qui scellait votre ancien coffre a disparu : il ne peut donc plus être rouvert. Créez un nouveau coffre pour continuer.</string>
+    <string name="core_unlock_vault_first">Déverrouillez d\'abord le coffre.</string>
+    <string name="core_set_device_lock_first">Définissez d\'abord un code PIN, un schéma ou un mot de passe pour l\'appareil dans les paramètres Android.</string>
+    <string name="core_lock_change_failed">Impossible de modifier le réglage de verrouillage.</string>
+    <plurals name="core_vault_erased_pin">
+        <item quantity="one">Le code PIN a été saisi incorrectement %1$d fois : le coffre a donc été effacé, comme défini dans Paramètres.</item>
+        <item quantity="many">Le code PIN a été saisi incorrectement %1$d fois : le coffre a donc été effacé, comme défini dans Paramètres.</item>
+        <item quantity="other">Le code PIN a été saisi incorrectement %1$d fois : le coffre a donc été effacé, comme défini dans Paramètres.</item>
+    </plurals>
+    <plurals name="core_vault_erased_password">
+        <item quantity="one">Le mot de passe a été saisi incorrectement %1$d fois : le coffre a donc été effacé, comme défini dans Paramètres.</item>
+        <item quantity="many">Le mot de passe a été saisi incorrectement %1$d fois : le coffre a donc été effacé, comme défini dans Paramètres.</item>
+        <item quantity="other">Le mot de passe a été saisi incorrectement %1$d fois : le coffre a donc été effacé, comme défini dans Paramètres.</item>
+    </plurals>
+    <plurals name="core_wrong_pin_erase_warning">
+        <item quantity="one">Code PIN incorrect. Encore %1$d tentative incorrecte et le coffre sera effacé.</item>
+        <item quantity="many">Code PIN incorrect. Encore %1$d de tentatives incorrectes et le coffre sera effacé.</item>
+        <item quantity="other">Code PIN incorrect. Encore %1$d tentatives incorrectes et le coffre sera effacé.</item>
+    </plurals>
+    <plurals name="core_wrong_password_erase_warning">
+        <item quantity="one">Mot de passe incorrect. Encore %1$d tentative incorrecte et le coffre sera effacé.</item>
+        <item quantity="many">Mot de passe incorrect. Encore %1$d de tentatives incorrectes et le coffre sera effacé.</item>
+        <item quantity="other">Mot de passe incorrect. Encore %1$d tentatives incorrectes et le coffre sera effacé.</item>
+    </plurals>
+    <string name="core_remove_duress_first_pin">Supprimez d\'abord le code PIN de contrainte pour passer d\'un mot de passe à un code PIN, ou l\'inverse.</string>
+    <string name="core_remove_duress_first_password">Supprimez d\'abord le mot de passe de contrainte pour passer d\'un mot de passe à un code PIN, ou l\'inverse.</string>
+    <string name="core_differs_from_duress_pin">Le nouveau code PIN doit être différent de votre code PIN de contrainte.</string>
+    <string name="core_differs_from_duress_password">Le nouveau mot de passe doit être différent de votre mot de passe de contrainte.</string>
+    <string name="core_secret_set_device_failed_pin">Impossible de définir le code PIN sur cet appareil.</string>
+    <string name="core_secret_set_device_failed_password">Impossible de définir le mot de passe sur cet appareil.</string>
+    <string name="core_secret_save_failed_pin">Impossible d\'enregistrer le code PIN.</string>
+    <string name="core_secret_save_failed_password">Impossible d\'enregistrer le mot de passe.</string>
+    <string name="core_secret_set_failed_pin">Impossible de définir le code PIN.</string>
+    <string name="core_secret_set_failed_password">Impossible de définir le mot de passe.</string>
+    <string name="core_secret_remove_failed_pin">Impossible de supprimer le code PIN.</string>
+    <string name="core_secret_remove_failed_password">Impossible de supprimer le mot de passe.</string>
+    <string name="core_duress_needs_secret_pin">Définissez un code PIN avant un code PIN de contrainte.</string>
+    <string name="core_duress_needs_secret_password">Définissez un mot de passe avant un mot de passe de contrainte.</string>
+    <string name="core_enter_current_pin">Saisissez d\'abord votre code PIN actuel.</string>
+    <string name="core_enter_current_password">Saisissez d\'abord votre mot de passe actuel.</string>
+    <string name="core_duress_differs_pin">Le code PIN de contrainte doit être différent de votre vrai code PIN.</string>
+    <string name="core_duress_differs_password">Le mot de passe de contrainte doit être différent de votre vrai mot de passe.</string>
+    <string name="core_duress_set_failed_pin">Impossible de définir le code PIN de contrainte.</string>
+    <string name="core_duress_set_failed_password">Impossible de définir le mot de passe de contrainte.</string>
+    <string name="core_duress_remove_failed_pin">Impossible de supprimer le code PIN de contrainte.</string>
+    <string name="core_duress_remove_failed_password">Impossible de supprimer le mot de passe de contrainte.</string>
+    <string name="core_password_only_pin">Votre code PIN est le seul moyen d\'ouvrir le coffre. Choisissez Biométrie ou Code PIN, schéma ou mot de passe de l\'appareil ci-dessus avant de le supprimer.</string>
+    <string name="core_password_only_password">Votre mot de passe est le seul moyen d\'ouvrir le coffre. Choisissez Biométrie ou Code PIN, schéma ou mot de passe de l\'appareil ci-dessus avant de le supprimer.</string>
+    <string name="core_password_only_duress_pin">Votre code PIN est le seul moyen d\'ouvrir le coffre. Supprimez le code PIN de contrainte, puis choisissez Biométrie ou Code PIN, schéma ou mot de passe de l\'appareil ci-dessus avant de le supprimer.</string>
+    <string name="core_password_only_duress_password">Votre mot de passe est le seul moyen d\'ouvrir le coffre. Supprimez le mot de passe de contrainte, puis choisissez Biométrie ou Code PIN, schéma ou mot de passe de l\'appareil ci-dessus avant de le supprimer.</string>
+    <string name="core_pin_digits_only">Un code PIN ne peut contenir que des chiffres.</string>
+    <plurals name="core_pin_min_digits">
+        <item quantity="one">Utilisez au moins %1$d chiffre.</item>
+        <item quantity="many">Utilisez au moins %1$d de chiffres.</item>
+        <item quantity="other">Utilisez au moins %1$d chiffres.</item>
+    </plurals>
+    <plurals name="core_password_min_chars">
+        <item quantity="one">Utilisez au moins %1$d caractère.</item>
+        <item quantity="many">Utilisez au moins %1$d de caractères.</item>
+        <item quantity="other">Utilisez au moins %1$d caractères.</item>
+    </plurals>
+    <plurals name="core_wait_seconds">
+        <item quantity="one">%1$d seconde</item>
+        <item quantity="many">%1$d de secondes</item>
+        <item quantity="other">%1$d secondes</item>
+    </plurals>
+    <plurals name="core_wait_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="many">%1$d de minutes</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="core_wait_hours">
+        <item quantity="one">%1$d heure</item>
+        <item quantity="many">%1$d d\'heures</item>
+        <item quantity="other">%1$d heures</item>
+    </plurals>
+    <string name="core_prompt_sign_title">Signer avec la clé matérielle</string>
+    <string name="core_prompt_hw_decrypt_title">Déchiffrer avec votre clé matérielle</string>
+    <string name="core_prompt_hw_decrypt_subtitle">Confirmez que c\'est bien vous pour utiliser cette clé</string>
+    <string name="core_yubikey_tap_read">Approchez votre YubiKey du dos du téléphone pour lire sa clé age.</string>
+    <string name="core_yubikey_tap_decrypt">Approchez votre YubiKey du dos du téléphone pour déchiffrer.</string>
+    <string name="core_private_ssh_ed25519">SSH Ed25519 : la clé privée est stockée dans le coffre et ne peut pas être exportée sous forme de texte.</string>
+    <string name="core_private_hardware">Clé matérielle : la clé privée reste dans le magasin de clés de l\'appareil et ne peut pas être exportée.</string>
+    <string name="core_private_security_key">Clé de sécurité : la signature se fait sur l\'appareil FIDO, via NFC. Il n\'y a aucune clé privée à exporter.</string>
+    <string name="core_private_hardware_tag">Clé matérielle : le déchiffrement se fait dans le matériel sécurisé de cet appareil. La clé ne peut pas être exportée.</string>
+    <string name="core_transfer_lives_on_security_key">Stockée sur une clé de sécurité : sa clé publique ne peut pas être vérifiée sans cette clé.</string>
+    <string name="core_transfer_lives_on_yubikey">Stockée sur une YubiKey : le déchiffrement nécessite cette YubiKey.</string>
+    <string name="core_signer_opt_cert_authority">Autorité de certification (signe des certificats, pas des fichiers)</string>
+    <string name="core_signer_opt_only_for">Uniquement pour %1$s</string>
+    <string name="core_signer_opt_not_for">Pas pour %1$s</string>
+    <string name="core_signer_opt_valid_from">Valide à partir du %1$s</string>
+    <string name="core_signer_opt_valid_until">Valide jusqu\'au %1$s</string>
+    <string name="core_signer_opt_no_touch">Contact avec la clé de sécurité non requis</string>
+    <string name="core_signer_opt_verify_required">Code PIN ou empreinte digitale de la clé de sécurité requis</string>
+    <string name="core_signer_opt_unknown">Option inconnue : %1$s</string>
+    <string name="core_signer_opt_unreadable">Options illisibles : %1$s</string>
+    <string name="core_signer_blocked_cert_authority">Clé d\'autorité de certification. AgePony ne prend pas en charge les certificats SSH et ne peut donc pas appliquer cette entrée.</string>
+    <string name="core_signer_blocked_unreadable">Ses options sont illisibles (%1$s) : AgePony ne peut donc pas les appliquer.</string>
+    <string name="core_signer_blocked_unknown">Elle contient des options qu\'AgePony ne comprend pas (%1$s) : AgePony ne peut donc pas les appliquer.</string>
+    <string name="core_signer_blocked_bad_key">Sa clé est illisible.</string>
+    <string name="core_signer_warn_expired">A expiré le %1$s.</string>
+    <string name="core_signer_warn_not_yet_valid">Valide seulement à partir du %1$s.</string>
+    <string name="core_signer_warn_not_agepony">Non autorisé à signer des fichiers AgePony (uniquement pour %1$s).</string>
+    <string name="core_share_chooser_text">Partager</string>
+    <string name="core_share_chooser_file">Partager le fichier chiffré</string>
+    <string name="core_yubikey_pin_body">Saisissez le code PIN PIV de cette YubiKey, puis approchez la clé du dos du téléphone. AgePony ne conserve le code PIN que le temps de ce déchiffrement.</string>
+    <string name="core_yubikey_no_pin">Cette clé n\'a pas de code PIN</string>
+    <string name="core_yubikey_pin_note_needs">Cette clé YubiKey nécessite son code PIN.</string>
+    <string name="core_yubikey_pin_note_length">Le code PIN d\'une YubiKey compte 6 à 8 caractères.</string>
+    <plurals name="core_yubikey_pin_note_wrong">
+        <item quantity="one">Code PIN incorrect. Il reste %1$d essai avant le blocage.</item>
+        <item quantity="many">Code PIN incorrect. Il reste %1$d d\'essais avant le blocage.</item>
+        <item quantity="other">Code PIN incorrect. Il reste %1$d essais avant le blocage.</item>
+    </plurals>
+    <string name="core_yubikey_hold_again">La YubiKey a perdu le contact pendant la vérification du code PIN. Approchez-la du dos du téléphone et réessayez.</string>
+    <string name="core_nfc_hold_key_again">La clé a perdu le contact pendant la vérification du code PIN. Approchez-la du dos du téléphone et réessayez.</string>
+    <string name="core_owner_check_needed">Confirmez que c\'est bien vous avec votre empreinte digitale, votre visage ou le verrouillage de l\'écran, puis définissez à nouveau le mot de passe ou le code PIN.</string>
+    <string name="core_biometric_changed_pin">Une empreinte digitale ou un visage a été ajouté ou supprimé sur ce téléphone : la biométrie ne peut donc plus ouvrir le coffre tant que vous n\'avez pas saisi votre code PIN une fois. Vous pourrez ensuite réactiver le déverrouillage biométrique. Si vous n\'avez pas fait cette modification vous-même, cherchez dans les paramètres de sécurité du téléphone une empreinte ou un visage que vous n\'avez pas ajouté, avant de saisir votre code PIN.</string>
+    <string name="core_biometric_changed_password">Une empreinte digitale ou un visage a été ajouté ou supprimé sur ce téléphone : la biométrie ne peut donc plus ouvrir le coffre tant que vous n\'avez pas saisi votre mot de passe une fois. Vous pourrez ensuite réactiver le déverrouillage biométrique. Si vous n\'avez pas fait cette modification vous-même, cherchez dans les paramètres de sécurité du téléphone une empreinte ou un visage que vous n\'avez pas ajouté, avant de saisir votre mot de passe.</string>
+    <string name="core_biometric_unavailable_pin">La biométrie n\'est pas disponible pour le moment. Saisissez votre code PIN pour ouvrir le coffre. Le verrouillage de l\'écran du téléphone ne l\'ouvre pas.</string>
+    <string name="core_biometric_unavailable_password">La biométrie n\'est pas disponible pour le moment. Saisissez votre mot de passe pour ouvrir le coffre. Le verrouillage de l\'écran du téléphone ne l\'ouvre pas.</string>
+    <string name="core_biometric_lockout_pin">La biométrie est bloquée après trop de tentatives. Saisissez votre code PIN pour ouvrir le coffre. Déverrouiller le téléphone avec son verrouillage de l\'écran réactive la biométrie, mais le verrouillage de l\'écran n\'ouvre pas AgePony.</string>
+    <string name="core_biometric_lockout_password">La biométrie est bloquée après trop de tentatives. Saisissez votre mot de passe pour ouvrir le coffre. Déverrouiller le téléphone avec son verrouillage de l\'écran réactive la biométrie, mais le verrouillage de l\'écran n\'ouvre pas AgePony.</string>
+    <string name="core_biometric_only_needs_secret">Définissez d\'abord un mot de passe ou un code PIN. C\'est votre moyen de revenir dans le coffre si votre biométrie change.</string>
+    <string name="core_biometric_only_no_biometric">Ce verrouillage nécessite une empreinte digitale ou un visage configuré sur ce téléphone, dans les paramètres de sécurité d\'Android.</string>
+    <string name="core_biometric_only_refused">Android n\'a pas accepté de protéger la clé du coffre par la biométrie seule. Le verrouillage n\'a pas changé.</string>
+    <string name="core_biometric_only_refused_code">Android n\'a pas accepté de protéger la clé du coffre par la biométrie seule (erreur Keystore %1$d). Le verrouillage n\'a pas changé.</string>
+    <string name="core_prompt_biometric_only_subtitle">Utiliser uniquement la biométrie pour déverrouiller AgePony</string>
+    <string name="core_password_only_biometric_pin">Le mode Biométrie uniquement a besoin de votre code PIN comme moyen de revenir dans le coffre si votre biométrie change. Choisissez un autre verrouillage ci-dessus avant de le supprimer.</string>
+    <string name="core_password_only_biometric_password">Le mode Biométrie uniquement a besoin de votre mot de passe comme moyen de revenir dans le coffre si votre biométrie change. Choisissez un autre verrouillage ci-dessus avant de le supprimer.</string>
+</resources>

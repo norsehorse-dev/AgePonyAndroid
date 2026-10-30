@@ -36,3 +36,11 @@ build/
 /issues/
 issues.md
 /_to_delete/
+
+# fastlane / Play
+.env
+.env.*
+*service-account*.json
+fastlane/report.xml
+fastlane/README.md
+vendor/bundle/

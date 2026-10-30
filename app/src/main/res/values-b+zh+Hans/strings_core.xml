@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="core_vault_no_screen_lock">请设置屏幕锁定或生物识别，以保护你的 AgePony 保险库。</string>
+    <string name="core_prompt_create_title">创建 AgePony 保险库</string>
+    <string name="core_prompt_create_subtitle">确认是你本人，以保护你的密钥</string>
+    <string name="core_prompt_add_lock_subtitle">将此锁定方式添加到你的 AgePony 保险库</string>
+    <string name="core_auth_failed">身份验证失败。</string>
+    <string name="core_vault_create_failed">无法创建保险库。</string>
+    <string name="core_vault_unlock_failed">无法解锁保险库。</string>
+    <string name="core_vault_orphaned">AgePony 被重新安装过或从备份中恢复过，用于加密旧保险库的设备密钥已经不在了，因此无法再打开旧保险库。请设置一个新的保险库以继续。</string>
+    <string name="core_unlock_vault_first">请先解锁保险库。</string>
+    <string name="core_set_device_lock_first">请先在 Android 设置中设置设备 PIN 码、图案或密码。</string>
+    <string name="core_lock_change_failed">无法更改锁定设置。</string>
+
+    <plurals name="core_vault_erased_pin">
+        <item quantity="other">PIN 码已输错 %1$d 次，保险库已按“设置”中的设定被清空。</item>
+    </plurals>
+    <plurals name="core_vault_erased_password">
+        <item quantity="other">密码已输错 %1$d 次，保险库已按“设置”中的设定被清空。</item>
+    </plurals>
+    <plurals name="core_wrong_pin_erase_warning">
+        <item quantity="other">PIN 码错误。再输错 %1$d 次，保险库将被清空。</item>
+    </plurals>
+    <plurals name="core_wrong_password_erase_warning">
+        <item quantity="other">密码错误。再输错 %1$d 次，保险库将被清空。</item>
+    </plurals>
+
+    <string name="core_remove_duress_first_pin">要在密码和 PIN 码之间切换，请先移除胁迫 PIN 码。</string>
+    <string name="core_remove_duress_first_password">要在密码和 PIN 码之间切换，请先移除胁迫密码。</string>
+    <string name="core_differs_from_duress_pin">新 PIN 码不能与胁迫 PIN 码相同。</string>
+    <string name="core_differs_from_duress_password">新密码不能与胁迫密码相同。</string>
+    <string name="core_secret_set_device_failed_pin">无法在此设备上设置 PIN 码。</string>
+    <string name="core_secret_set_device_failed_password">无法在此设备上设置密码。</string>
+    <string name="core_secret_save_failed_pin">无法保存 PIN 码。</string>
+    <string name="core_secret_save_failed_password">无法保存密码。</string>
+    <string name="core_secret_set_failed_pin">无法设置 PIN 码。</string>
+    <string name="core_secret_set_failed_password">无法设置密码。</string>
+    <string name="core_secret_remove_failed_pin">无法移除 PIN 码。</string>
+    <string name="core_secret_remove_failed_password">无法移除密码。</string>
+    <string name="core_duress_needs_secret_pin">请先设置 PIN 码，再设置胁迫 PIN 码。</string>
+    <string name="core_duress_needs_secret_password">请先设置密码，再设置胁迫密码。</string>
+    <string name="core_enter_current_pin">请先输入当前的 PIN 码。</string>
+    <string name="core_enter_current_password">请先输入当前的密码。</string>
+    <string name="core_duress_differs_pin">胁迫 PIN 码不能与真实的 PIN 码相同。</string>
+    <string name="core_duress_differs_password">胁迫密码不能与真实的密码相同。</string>
+    <string name="core_duress_set_failed_pin">无法设置胁迫 PIN 码。</string>
+    <string name="core_duress_set_failed_password">无法设置胁迫密码。</string>
+    <string name="core_duress_remove_failed_pin">无法移除胁迫 PIN 码。</string>
+    <string name="core_duress_remove_failed_password">无法移除胁迫密码。</string>
+    <string name="core_password_only_pin">PIN 码是进入保险库的唯一方式。移除它之前，请先在上方选择“生物识别”或“设备 PIN 码、图案或密码”。</string>
+    <string name="core_password_only_password">密码是进入保险库的唯一方式。移除它之前，请先在上方选择“生物识别”或“设备 PIN 码、图案或密码”。</string>
+    <string name="core_password_only_duress_pin">PIN 码是进入保险库的唯一方式。请先移除胁迫 PIN 码，然后在上方选择“生物识别”或“设备 PIN 码、图案或密码”，再移除它。</string>
+    <string name="core_password_only_duress_password">密码是进入保险库的唯一方式。请先移除胁迫密码，然后在上方选择“生物识别”或“设备 PIN 码、图案或密码”，再移除它。</string>
+
+    <string name="core_pin_digits_only">PIN 码只能包含数字。</string>
+    <plurals name="core_pin_min_digits">
+        <item quantity="other">请至少使用 %1$d 位数字。</item>
+    </plurals>
+    <plurals name="core_password_min_chars">
+        <item quantity="other">请至少使用 %1$d 个字符。</item>
+    </plurals>
+
+    <plurals name="core_wait_seconds">
+        <item quantity="other">%1$d 秒</item>
+    </plurals>
+    <plurals name="core_wait_minutes">
+        <item quantity="other">%1$d 分钟</item>
+    </plurals>
+    <plurals name="core_wait_hours">
+        <item quantity="other">%1$d 小时</item>
+    </plurals>
+
+    <string name="core_prompt_sign_title">使用硬件密钥签名</string>
+    <string name="core_prompt_hw_decrypt_title">使用你的硬件密钥解密</string>
+    <string name="core_prompt_hw_decrypt_subtitle">确认是你本人，以使用此密钥</string>
+    <string name="core_yubikey_tap_read">请将 YubiKey 贴近手机背面，以读取其中的 age 密钥。</string>
+    <string name="core_yubikey_tap_decrypt">请将 YubiKey 贴近手机背面以解密。</string>
+
+    <string name="core_private_ssh_ed25519">SSH Ed25519：私钥保存在保险库中，无法以文本形式导出。</string>
+    <string name="core_private_hardware">硬件密钥：私钥保存在设备的密钥库中，无法导出。</string>
+    <string name="core_private_security_key">安全密钥：签名通过 NFC 在 FIDO 设备上完成，没有可导出的私钥。</string>
+    <string name="core_private_hardware_tag">硬件密钥：解密在本设备的安全硬件内完成，密钥无法导出。</string>
+
+    <string name="core_transfer_lives_on_security_key">位于安全密钥上：没有该密钥就无法核对其公钥。</string>
+    <string name="core_transfer_lives_on_yubikey">位于 YubiKey 上：用它解密需要那个 YubiKey。</string>
+
+    <string name="core_signer_opt_cert_authority">证书颁发机构（为证书签名，而不是为文件签名）</string>
+    <string name="core_signer_opt_only_for">仅用于 %1$s</string>
+    <string name="core_signer_opt_not_for">不用于 %1$s</string>
+    <string name="core_signer_opt_valid_from">自 %1$s 起有效</string>
+    <string name="core_signer_opt_valid_until">有效期至 %1$s</string>
+    <string name="core_signer_opt_no_touch">无需触摸安全密钥</string>
+    <string name="core_signer_opt_verify_required">需要安全密钥的 PIN 码或指纹</string>
+    <string name="core_signer_opt_unknown">未知选项：%1$s</string>
+    <string name="core_signer_opt_unreadable">无法读取的选项：%1$s</string>
+
+    <string name="core_signer_blocked_cert_authority">这是证书颁发机构密钥。AgePony 不支持 SSH 证书，因此无法执行这一条目。</string>
+    <string name="core_signer_blocked_unreadable">无法读取它的选项（%1$s），因此 AgePony 无法执行这些选项。</string>
+    <string name="core_signer_blocked_unknown">它包含 AgePony 无法理解的选项（%1$s），因此 AgePony 无法执行这些选项。</string>
+    <string name="core_signer_blocked_bad_key">无法读取它的密钥。</string>
+
+    <string name="core_signer_warn_expired">已于 %1$s 过期。</string>
+    <string name="core_signer_warn_not_yet_valid">%1$s 之前无效。</string>
+    <string name="core_signer_warn_not_agepony">不允许为 AgePony 文件签名（仅用于 %1$s）。</string>
+    <string name="core_share_chooser_text">分享</string>
+    <string name="core_share_chooser_file">分享加密文件</string>
+
+    <string name="core_yubikey_pin_body">请输入这个 YubiKey 的 PIV PIN 码，然后将密钥贴近手机背面。AgePony 只会在本次解密完成前保留这个 PIN 码。</string>
+    <string name="core_yubikey_no_pin">此密钥没有 PIN 码</string>
+    <string name="core_yubikey_pin_note_needs">这个 YubiKey 密钥需要输入 PIN 码。</string>
+    <string name="core_yubikey_pin_note_length">YubiKey 的 PIN 码为 6 到 8 个字符。</string>
+    <plurals name="core_yubikey_pin_note_wrong">
+        <item quantity="other">PIN 码错误。还剩 %1$d 次尝试机会，之后将被锁定。</item>
+    </plurals>
+    <string name="core_yubikey_hold_again">检查 PIN 码时 YubiKey 断开了连接。请将它贴近手机背面，然后重试。</string>
+    <string name="core_nfc_hold_key_again">检查 PIN 码时密钥断开了连接。请将它贴近手机背面，然后重试。</string>
+    <string name="core_owner_check_needed">请用指纹、面孔或屏幕锁定确认是你本人，然后重新设置密码或 PIN 码。</string>
+    <string name="core_biometric_changed_pin">这部手机上添加或移除了指纹或面孔，因此在你输入一次 PIN 码之前，生物识别无法打开保险库。之后你可以重新开启生物识别解锁。如果这不是你自己更改的，请在输入 PIN 码之前，先到手机的安全设置中检查有没有不是你添加的指纹或面孔。</string>
+    <string name="core_biometric_changed_password">这部手机上添加或移除了指纹或面孔，因此在你输入一次密码之前，生物识别无法打开保险库。之后你可以重新开启生物识别解锁。如果这不是你自己更改的，请在输入密码之前，先到手机的安全设置中检查有没有不是你添加的指纹或面孔。</string>
+    <string name="core_biometric_unavailable_pin">生物识别目前不可用。请输入 PIN 码打开保险库。手机的屏幕锁定无法打开它。</string>
+    <string name="core_biometric_unavailable_password">生物识别目前不可用。请输入密码打开保险库。手机的屏幕锁定无法打开它。</string>
+    <string name="core_biometric_lockout_pin">尝试次数过多，生物识别已被锁定。请输入 PIN 码打开保险库。用屏幕锁定解锁手机可以重新启用生物识别，但屏幕锁定无法打开 AgePony。</string>
+    <string name="core_biometric_lockout_password">尝试次数过多，生物识别已被锁定。请输入密码打开保险库。用屏幕锁定解锁手机可以重新启用生物识别，但屏幕锁定无法打开 AgePony。</string>
+    <string name="core_biometric_only_needs_secret">请先设置密码或 PIN 码。如果你的生物识别信息发生变化，可以用它重新进入。</string>
+    <string name="core_biometric_only_no_biometric">此锁定方式需要先在 Android 的安全设置中为这部手机设置指纹或面孔。</string>
+    <string name="core_biometric_only_refused">Android 不允许仅用生物识别来保护保险库密钥。锁定方式未更改。</string>
+    <string name="core_biometric_only_refused_code">Android 不允许仅用生物识别来保护保险库密钥（Keystore 错误 %1$d）。锁定方式未更改。</string>
+    <string name="core_prompt_biometric_only_subtitle">仅使用生物识别解锁 AgePony</string>
+    <string name="core_password_only_biometric_pin">“仅生物识别”需要你的 PIN 码，以便在生物识别信息变化时重新进入。移除它之前，请先在上方选择其他锁定方式。</string>
+    <string name="core_password_only_biometric_password">“仅生物识别”需要你的密码，以便在生物识别信息变化时重新进入。移除它之前，请先在上方选择其他锁定方式。</string>
+</resources>
