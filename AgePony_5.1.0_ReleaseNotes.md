@@ -59,3 +59,4 @@ it changes the age format or your existing files, keys or vault.
 
 - Signing certificate, SHA-256:
   `1B:28:44:FA:FC:B9:B1:71:97:B8:8E:AD:54:E4:22:79:56:1C:D4:F9:A3:3E:C8:F1:E8:0A:AD:DA:9A:06:83:58`
+- SHA-256 of `AgePony-5.1.0-foss.apk`: 82fbfb64ac5149bf7ff515c91327a6a96e2c80cd6b50a8bf86e0233f77473c46

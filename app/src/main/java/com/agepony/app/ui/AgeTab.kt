@@ -20,7 +20,7 @@ import com.agepony.app.R
  *
  * Icons are all from material-icons-core (no extended dependency required).
  */
-enum class AgeTab(@StringRes val labelRes: Int, val icon: ImageVector) {
+enum class AgeTab(@param:StringRes val labelRes: Int, val icon: ImageVector) {
     FILES(R.string.files_title, Icons.AutoMirrored.Filled.List),
     NOTES(R.string.app_tab_notes, Icons.Filled.Create),
     TEXT(R.string.app_tab_text, Icons.Filled.Lock),

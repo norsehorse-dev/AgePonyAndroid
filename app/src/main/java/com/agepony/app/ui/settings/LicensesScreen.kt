@@ -23,7 +23,7 @@ import com.agepony.app.R
 import com.agepony.app.ui.components.AgeScreen
 
 // License names stay literal: they are the licenses' own titles, not app copy.
-private data class Dep(@StringRes val name: Int, val license: String)
+private data class Dep(@param:StringRes val name: Int, val license: String)
 
 private val DEPS = listOf(
     Dep(R.string.settings_dep_jetpack, "Apache License 2.0"),

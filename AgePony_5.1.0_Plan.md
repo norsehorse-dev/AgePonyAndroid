@@ -199,8 +199,7 @@ any reply, then close with a short note of the version that fixed it.
 ## 6. Build and test
 
 ```
-./gradlew clean :agepony-core:testDebugUnitTest :app:testFossDebugUnitTest :app:compilePlayReleaseKotlin :app:assembleFossRelease
-tools/verify_repro.sh rebuild v5.1.0-rc1
+./gradlew clean :agepony-core:test :app:testFossDebugUnitTest :app:compilePlayReleaseKotlin :app:assembleFossRelease :app:bundlePlayRelease
 ```
 
 Device pass for RC1: item 1 acceptance with an NFC YubiKey (default key, `Never` key, a 5.0.1

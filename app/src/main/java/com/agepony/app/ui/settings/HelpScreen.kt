@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.agepony.app.R
 import com.agepony.app.ui.components.AgeScreen
 
-private data class Qa(@StringRes val q: Int, @StringRes val a: Int)
+private data class Qa(@param:StringRes val q: Int, @param:StringRes val a: Int)
 
 private val FAQ = listOf(
     Qa(R.string.settings_help_what_q, R.string.settings_help_what_a),

@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.agepony.app.R
 import com.agepony.app.ui.components.AgeScreen
 
-private data class Block(@StringRes val title: Int, @StringRes val body: Int)
+private data class Block(@param:StringRes val title: Int, @param:StringRes val body: Int)
 
 private val PROTECTS = listOf(
     Block(R.string.settings_security_device_title, R.string.settings_security_device_body),
