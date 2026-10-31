@@ -1,3 +1,4 @@
-AgePony 5.1.1
+AgePony 5.2.0
 
 - AgePony ya está disponible en alemán, español, francés, portugués de Brasil, ruso y chino simplificado. Usa el idioma de tu teléfono, o puedes elegir otro en Ajustes, Idioma. El cambio es inmediato, sin reiniciar.
+- La introducción ahora puede crear una identidad de cualquier tipo, importar una o traer claves de otro dispositivo o de una copia en papel.

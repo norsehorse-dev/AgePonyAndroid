@@ -198,7 +198,7 @@
 
     <string name="app_onboarding_welcome_body">AgePony verschlüsselt Dateien, Text und Notizen mit dem modernen Verschlüsselungsstandard age. Alles passiert direkt hier auf deinem Gerät.</string>
     <string name="app_onboarding_identity_title">Deine Identität</string>
-    <string name="app_onboarding_identity_body">Eine Identität ist dein persönliches Schlüsselpaar. Der private Schlüssel ist in deinem Tresor versiegelt und verlässt dieses Gerät nie. Erstelle im Tab „Identitäten“ eine, um mit dem Verschlüsseln zu beginnen.</string>
+    <string name="app_onboarding_identity_body">Eine Identität ist dein persönliches Schlüsselpaar. Der private Schlüssel ist in deinem Tresor versiegelt und verlässt dieses Gerät nie. Erstelle jetzt eine, übernimm eine vorhandene oder mach das später im Tab „Identitäten“.</string>
     <string name="app_onboarding_recipients_title">Empfänger</string>
     <string name="app_onboarding_recipients_body">Füge Empfänger über ihren öffentlichen Schlüssel oder ihren GitHub-Benutzernamen hinzu. Verschlüssele für eine oder viele Personen gleichzeitig und auch für dich selbst, damit du deine eigenen Dateien immer öffnen kannst.</string>
     <string name="app_onboarding_files_title">Dateien, Text und Notizen</string>
@@ -251,4 +251,8 @@
     <string name="sign_verify_key_type_label">Schlüsseltyp</string>
     <string name="sign_verify_fingerprint_label">Fingerabdruck</string>
     <string name="text_decrypt_another">Weiteren Text entschlüsseln</string>
+    <plurals name="onboarding_identity_count">
+        <item quantity="one">Dein Tresor enthält %1$d Identität.</item>
+        <item quantity="other">Dein Tresor enthält %1$d Identitäten.</item>
+    </plurals>
 </resources>

@@ -193,7 +193,7 @@
     <string name="app_passphrase_encrypt_action">Chiffrer avec une phrase secrète</string>
     <string name="app_onboarding_welcome_body">AgePony chiffre fichiers, textes et notes avec age, un standard de chiffrement moderne. Tout se passe ici, sur votre appareil.</string>
     <string name="app_onboarding_identity_title">Votre identité</string>
-    <string name="app_onboarding_identity_body">Une identité est votre paire de clés personnelle. La clé privée est scellée dans votre coffre et ne quitte jamais cet appareil. Créez-en une dans l\'onglet Identités pour commencer à chiffrer.</string>
+    <string name="app_onboarding_identity_body">Une identité est votre paire de clés personnelle. La clé privée est scellée dans votre coffre et ne quitte jamais cet appareil. Créez-en une maintenant, reprenez une identité existante ou faites-le plus tard dans l\'onglet Identités.</string>
     <string name="app_onboarding_recipients_title">Destinataires</string>
     <string name="app_onboarding_recipients_body">Ajoutez des destinataires à partir de leur clé publique ou de leur nom d\'utilisateur GitHub. Chiffrez pour une ou plusieurs personnes à la fois, et pour vous-même afin de toujours pouvoir ouvrir vos propres fichiers.</string>
     <string name="app_onboarding_files_title">Fichiers, textes et notes</string>
@@ -243,4 +243,9 @@
     <string name="sign_verify_key_type_label">Type de clé</string>
     <string name="sign_verify_fingerprint_label">Empreinte</string>
     <string name="text_decrypt_another">Déchiffrer un autre texte</string>
+    <plurals name="onboarding_identity_count">
+        <item quantity="one">Votre coffre contient %1$d identité.</item>
+        <item quantity="many">Votre coffre contient %1$d d\'identités.</item>
+        <item quantity="other">Votre coffre contient %1$d identités.</item>
+    </plurals>
 </resources>

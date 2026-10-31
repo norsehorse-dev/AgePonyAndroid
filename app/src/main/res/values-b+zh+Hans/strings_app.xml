@@ -192,7 +192,7 @@
 
     <string name="app_onboarding_welcome_body">AgePony 使用现代的 age 加密标准来加密文件、文本和笔记。一切都在你的设备上完成。</string>
     <string name="app_onboarding_identity_title">你的身份</string>
-    <string name="app_onboarding_identity_body">身份就是你个人的密钥对。私钥加密保存在你的保险库中，绝不会离开这台设备。在“身份”标签页中创建一个身份，即可开始加密。</string>
+    <string name="app_onboarding_identity_body">身份就是你个人的密钥对。私钥加密保存在你的保险库中，绝不会离开这台设备。现在就创建一个，导入已有的身份，或者稍后在“身份”标签页中再设置。</string>
     <string name="app_onboarding_recipients_title">收件人</string>
     <string name="app_onboarding_recipients_body">通过公钥或 GitHub 用户名添加收件人。你可以一次加密给一个人或多个人，也可以同时加密给自己，这样你总能打开自己的文件。</string>
     <string name="app_onboarding_files_title">文件、文本和笔记</string>
@@ -245,4 +245,7 @@
     <string name="sign_verify_key_type_label">密钥类型</string>
     <string name="sign_verify_fingerprint_label">指纹</string>
     <string name="text_decrypt_another">再解密一段</string>
+    <plurals name="onboarding_identity_count">
+        <item quantity="other">你的保险库中有 %1$d 个身份。</item>
+    </plurals>
 </resources>

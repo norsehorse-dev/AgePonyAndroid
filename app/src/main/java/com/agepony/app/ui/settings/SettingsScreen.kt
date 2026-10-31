@@ -728,7 +728,7 @@ fun SettingsScreen(
 
         ListDivider()
 
-        // Language (5.1.1): live switch, see AppLanguage.
+        // Language (5.2.0): live switch, see AppLanguage.
         SectionHeader(stringResource(R.string.settings_language))
         val chosenLanguage by AppLanguage.chosen
         ActionRow(

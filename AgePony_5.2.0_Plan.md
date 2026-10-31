@@ -1,17 +1,34 @@
-# AgePony 5.2.0 plan (Rev 1)
+# AgePony 5.2.0 plan (Rev 2)
 
-Started Oct 29 2026. Android first, iOS where an item applies there too. One RC at a time: the
-next RC's work doesn't start until the current one is built and tested on device.
+Started Oct 29 2026. Rev 2 (Oct 31): 5.1.1 is folded in and never ships on its own. Everything
+built for it (six languages, the language picker, fastlane, the onboarding identity step) ships as
+5.2.0, versionCode 19. One RC at a time: the next RC's work doesn't start until the current one is
+built and tested on device.
 
 ## Status
 
 | Item | State |
 | --- | --- |
+| 0a. Six languages, live language picker, fastlane and screenshot tooling | Done, RC1 (`4ea469f`, built and device-tested as 5.1.1 RC1). |
+| 0b. Onboarding identity step (generate any kind, import, receive, paper restore) | Written, RC2. Needs its build and device pass. |
 | 1. YubiKey PIV over USB-C | Planned. Moved from 5.1.0 item 2. Blocked on hardware. |
 | 2. FIDO security keys over USB-C | Planned. Android only. |
 | 3. Security keys when signing while encrypting | Planned. iOS `PLANNED_FEATURES.md` item 5. |
 | 4. Sign text | Planned. iOS `PLANNED_FEATURES.md` item 5. |
 | 5. More than one "Also encrypt to" key | Planned. iOS `PLANNED_FEATURES.md` item 4; Android has no "Also encrypt to" setting yet. |
+| 6. Hide file name | Planned. iOS `PLANNED_FEATURES.md` item 6 (iOS 5.2.0 in progress). Same bytes on both. |
+
+## RC breakdown
+
+- **RC1 (done):** languages, picker, fastlane, demo seeding, screenshot script.
+- **RC2:** the onboarding identity step. Build, device pass, commit.
+- **RC3:** items 6, 5, 4 and 3 (encrypt-side features shared with iOS 5.2.0). Strings for the RC
+  translated into all six languages with several agents, then the checker.
+- **RC4:** item 2 (FIDO over USB-C), and item 1 if a working USB-C YubiKey turns up.
+- **Release prep:** What's new `19.txt` in seven languages grows with each RC; screenshots with
+  `bundle exec fastlane screenshots` on an Android 13+ emulator; listing and screenshots with
+  `fastlane metadata`; the translated 5.1.0 What's new (`18.txt`) can go up any time with
+  `fastlane whats_new version_code:18`; GitHub release notes; signed APK and Play bundle.
 
 ---
 
@@ -102,6 +119,15 @@ the matching text verify, and "Sign as" on Text encrypt. Android and iOS togethe
 See iOS `PLANNED_FEATURES.md` item 4. Android has no "Also encrypt to" setting yet, so it lands
 here in the multi-key shape from the start: a list of recipient IDs applied by Files encrypt, Text
 encrypt and the share sheet.
+
+## 6. Hide file name
+
+See iOS `PLANNED_FEATURES.md` item 6 for the decisions and the format (`agepony.com/name v1`
+stanza for public-key recipients, a small tar wrapper for unsigned passphrase files, random hex
+outer name or a typed one, numbered for one-file-each batches). Android mirrors it byte for byte:
+`agepony-core` gets `naming/NameStanza.kt` (the iOS file already names it as its mirror) and the
+named bundle, both pinned by the same test vector as iOS. A file iOS encrypts with a hidden name
+must open under its real name on Android and the other way round; that is the RC3 acceptance test.
 
 ## Credit
 

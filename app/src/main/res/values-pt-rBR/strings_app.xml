@@ -204,7 +204,7 @@
 
     <string name="app_onboarding_welcome_body">O AgePony criptografa arquivos, textos e notas com o age, um padrão moderno de criptografia. Tudo acontece aqui mesmo, no seu dispositivo.</string>
     <string name="app_onboarding_identity_title">Sua identidade</string>
-    <string name="app_onboarding_identity_body">Uma identidade é o seu par de chaves pessoal. A chave privada fica selada no seu cofre e nunca sai deste dispositivo. Crie uma na aba Identidades para começar a criptografar.</string>
+    <string name="app_onboarding_identity_body">Uma identidade é o seu par de chaves pessoal. A chave privada fica selada no seu cofre e nunca sai deste dispositivo. Crie uma agora, use uma que você já tem ou pule esta etapa e faça isso depois na aba Identidades.</string>
     <string name="app_onboarding_recipients_title">Destinatários</string>
     <string name="app_onboarding_recipients_body">Adicione destinatários pela chave pública ou pelo nome de usuário do GitHub. Criptografe para uma ou várias pessoas de uma vez, e também para você mesmo, para sempre conseguir abrir seus próprios arquivos.</string>
     <string name="app_onboarding_files_title">Arquivos, textos e notas</string>
@@ -257,4 +257,9 @@
     <string name="sign_verify_key_type_label">Tipo de chave</string>
     <string name="sign_verify_fingerprint_label">Impressão digital</string>
     <string name="text_decrypt_another">Descriptografar outro</string>
+    <plurals name="onboarding_identity_count">
+        <item quantity="one">Seu cofre tem %1$d identidade.</item>
+        <item quantity="many">Seu cofre tem %1$d de identidades.</item>
+        <item quantity="other">Seu cofre tem %1$d identidades.</item>
+    </plurals>
 </resources>

@@ -273,24 +273,30 @@ private fun IdentityRow(identity: StoredIdentity, isActive: Boolean, onClick: ()
 
 // MARK: - Add identity (choice -> generate | import)
 
-private enum class AddIdentityStage { CHOICE, GENERATE, IMPORT }
+internal enum class AddIdentityStage { CHOICE, GENERATE, IMPORT }
 
+/**
+ * Adding an identity: the generate-or-import choice, the key type chooser, and each key's form.
+ * Onboarding (5.2.0) opens it straight at [AddIdentityStage.GENERATE] or [AddIdentityStage.IMPORT];
+ * back from the stage it opened at leaves the flow.
+ */
 @Composable
-private fun AddIdentityFlow(
+internal fun AddIdentityFlow(
     vault: Vault,
     modifier: Modifier,
     onDone: () -> Unit,
     onCancel: () -> Unit,
+    initialStage: AddIdentityStage = AddIdentityStage.CHOICE,
 ) {
-    var stage by rememberSaveable { mutableStateOf(AddIdentityStage.CHOICE) }
+    var stage by rememberSaveable { mutableStateOf(initialStage) }
     var keyType by rememberSaveable { mutableStateOf<GenKeyType?>(null) }
 
     // One app bar for the whole flow; its back arrow (and system back) steps up one level:
     // key form -> type chooser -> add choice -> identity list.
     fun back() {
         when {
-            stage == AddIdentityStage.CHOICE -> onCancel()
             stage == AddIdentityStage.GENERATE && keyType != null -> keyType = null
+            stage == initialStage -> onCancel()
             else -> stage = AddIdentityStage.CHOICE
         }
     }

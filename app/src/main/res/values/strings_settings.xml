@@ -284,7 +284,7 @@
     <string name="settings_secret_type">Type</string>
     <string name="settings_work_factor_option">2^%1$d, about %2$d MB</string>
     <string name="settings_work_factor_option_default">2^%1$d, about %2$d MB (age default)</string>
-    <!-- 5.1.1: in-app language picker -->
+    <!-- 5.2.0: in-app language picker -->
     <string name="settings_language">Language</string>
     <string name="settings_language_app">App language</string>
     <string name="settings_language_system">System default</string>

@@ -210,7 +210,7 @@
 
     <string name="app_onboarding_welcome_body">AgePony шифрует файлы, текст и заметки по современному стандарту шифрования age. Всё происходит прямо на вашем устройстве.</string>
     <string name="app_onboarding_identity_title">Ваша идентичность</string>
-    <string name="app_onboarding_identity_body">Идентичность — это ваша личная пара ключей. Закрытый ключ запечатан в хранилище и никогда не покидает это устройство. Создайте идентичность на вкладке «Идентичности», чтобы начать шифровать.</string>
+    <string name="app_onboarding_identity_body">Идентичность — это ваша личная пара ключей. Закрытый ключ запечатан в хранилище и никогда не покидает это устройство. Создайте её сейчас, перенесите существующую или сделайте это позже на вкладке «Идентичности».</string>
     <string name="app_onboarding_recipients_title">Получатели</string>
     <string name="app_onboarding_recipients_body">Добавляйте получателей по открытому ключу или имени пользователя GitHub. Шифруйте для одного человека или сразу для нескольких, а также для себя, чтобы всегда открывать свои файлы.</string>
     <string name="app_onboarding_files_title">Файлы, текст и заметки</string>
@@ -263,4 +263,10 @@
     <string name="sign_verify_key_type_label">Тип ключа</string>
     <string name="sign_verify_fingerprint_label">Отпечаток</string>
     <string name="text_decrypt_another">Расшифровать ещё</string>
+    <plurals name="onboarding_identity_count">
+        <item quantity="one">В хранилище %1$d идентичность.</item>
+        <item quantity="few">В хранилище %1$d идентичности.</item>
+        <item quantity="many">В хранилище %1$d идентичностей.</item>
+        <item quantity="other">В хранилище %1$d идентичности.</item>
+    </plurals>
 </resources>

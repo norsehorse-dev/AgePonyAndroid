@@ -36,6 +36,19 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import com.agepony.app.ui.settings.LanguageOptions
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.pluralStringResource
+import com.agepony.app.ui.components.QuietAction
+import com.agepony.app.ui.components.SecondaryAction
+import com.agepony.app.ui.identities.AddIdentityFlow
+import com.agepony.app.ui.identities.AddIdentityStage
+import com.agepony.app.ui.portability.PaperRestoreScreen
+import com.agepony.app.ui.portability.ReceiveKeysScreen
+import com.agepony.app.vault.Vault
 
 //
 // First-run dynamic walkthrough (Phase 2e). Shown once after the vault is first
@@ -56,9 +69,14 @@ import com.agepony.app.ui.settings.LanguageOptions
 private data class OnboardingPage(
     @param:StringRes val title: Int,
     @param:StringRes val body: Int,
-    /** 5.1.1: the first page picks the app language, so the rest of the tour reads in it. */
+    /** 5.2.0: the first page picks the app language, so the rest of the tour reads in it. */
     val languagePicker: Boolean = false,
+    /** 5.2.0: the identity page offers to generate, import, receive or restore a key. */
+    val identityActions: Boolean = false,
 )
+
+/** Where an identity-page action leads: a full-screen flow over the tour, which resumes after. */
+private enum class OnboardingAction { GENERATE, IMPORT, RECEIVE, PAPER }
 
 private fun onboardingPages(): List<OnboardingPage> = listOf(
     OnboardingPage(
@@ -73,6 +91,7 @@ private fun onboardingPages(): List<OnboardingPage> = listOf(
     OnboardingPage(
         title = R.string.app_onboarding_identity_title,
         body = R.string.app_onboarding_identity_body,
+        identityActions = true,
     ),
     OnboardingPage(
         title = R.string.app_onboarding_recipients_title,
@@ -89,11 +108,43 @@ private fun onboardingPages(): List<OnboardingPage> = listOf(
 )
 
 @Composable
-fun OnboardingScreen(onFinish: () -> Unit) {
+fun OnboardingScreen(vault: Vault, onFinish: () -> Unit) {
     val pages = remember { onboardingPages() }
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
     val onLastPage = pagerState.currentPage == pages.lastIndex
+
+    // An identity-page action covers the tour until it finishes or is backed out of. When the
+    // vault holds an identity afterwards, the tour moves on to the next page, as PGPony's does.
+    var action by rememberSaveable { mutableStateOf<OnboardingAction?>(null) }
+    var advanceAfterAction by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(action, advanceAfterAction) {
+        if (action == null && advanceAfterAction) {
+            advanceAfterAction = false
+            if (vault.identities.isNotEmpty() && pagerState.currentPage < pages.lastIndex) {
+                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+            }
+        }
+    }
+    fun closeAction() {
+        action = null
+        advanceAfterAction = true
+    }
+    when (action) {
+        OnboardingAction.GENERATE, OnboardingAction.IMPORT -> {
+            AddIdentityFlow(
+                vault = vault,
+                modifier = Modifier.fillMaxSize(),
+                onDone = { closeAction() },
+                onCancel = { action = null },
+                initialStage = if (action == OnboardingAction.GENERATE) AddIdentityStage.GENERATE else AddIdentityStage.IMPORT,
+            )
+            return
+        }
+        OnboardingAction.RECEIVE -> { ReceiveKeysScreen(vault = vault, onBack = { closeAction() }); return }
+        OnboardingAction.PAPER -> { PaperRestoreScreen(vault = vault, onBack = { closeAction() }); return }
+        null -> {}
+    }
     // System back leaves the walkthrough (same as Skip) instead of closing the app.
     BackHandler(onBack = onFinish)
 
@@ -128,7 +179,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                     .fillMaxWidth()
                     .weight(1f),
             ) { page ->
-                PageContent(pages[page])
+                PageContent(pages[page], vault = vault, onAction = { action = it })
             }
 
             PageIndicator(
@@ -158,7 +209,11 @@ fun OnboardingScreen(onFinish: () -> Unit) {
 }
 
 @Composable
-private fun PageContent(page: OnboardingPage) {
+private fun PageContent(page: OnboardingPage, vault: Vault, onAction: (OnboardingAction) -> Unit) {
+    if (page.identityActions) {
+        IdentityPage(page, vault, onAction)
+        return
+    }
     if (page.languagePicker) {
         // Taller than the other pages, so it scrolls instead of centring.
         Column(
@@ -231,6 +286,71 @@ private fun PageIndicator(count: Int, selected: Int, modifier: Modifier = Modifi
                             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                         }
                     ),
+            )
+        }
+    }
+}
+
+/**
+ * The identity page: what an identity is, then the ways to get one (5.2.0, after PGPony's key
+ * slide). Generate covers every kind the Identities tab can make (age, quantum-safe, hardware
+ * decryption, SSH, hardware signing, security key); import takes an age, OpenSSH or YubiKey
+ * identity; receive and paper restore bring keys from another phone or a backup. On a replay with
+ * identities already in the vault, the page says how many instead of pushing more.
+ */
+@Composable
+private fun IdentityPage(page: OnboardingPage, vault: Vault, onAction: (OnboardingAction) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 8.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(page.title),
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = stringResource(page.body),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(24.dp))
+        val count = vault.identities.size
+        if (count > 0) {
+            Text(
+                text = pluralStringResource(R.plurals.onboarding_identity_count, count, count),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+            )
+        } else {
+            SecondaryAction(
+                text = stringResource(R.string.identities_generate_new),
+                onClick = { onAction(OnboardingAction.GENERATE) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(4.dp))
+            QuietAction(
+                text = stringResource(R.string.identities_import_existing),
+                onClick = { onAction(OnboardingAction.IMPORT) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            QuietAction(
+                text = stringResource(R.string.settings_receive_keys),
+                onClick = { onAction(OnboardingAction.RECEIVE) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            QuietAction(
+                text = stringResource(R.string.settings_paper_restore),
+                onClick = { onAction(OnboardingAction.PAPER) },
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

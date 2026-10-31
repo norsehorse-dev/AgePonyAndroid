@@ -204,7 +204,7 @@
 
     <string name="app_onboarding_welcome_body">AgePony cifra archivos, textos y notas con age, el estándar de cifrado moderno. Todo ocurre aquí mismo, en tu dispositivo.</string>
     <string name="app_onboarding_identity_title">Tu identidad</string>
-    <string name="app_onboarding_identity_body">Una identidad es tu par de claves personal. La clave privada está sellada en tu bóveda y nunca sale de este dispositivo. Crea una en la pestaña Identidades para empezar a cifrar.</string>
+    <string name="app_onboarding_identity_body">Una identidad es tu par de claves personal. La clave privada está sellada en tu bóveda y nunca sale de este dispositivo. Crea una ahora, usa una que ya tengas u omite este paso y hazlo más tarde en la pestaña Identidades.</string>
     <string name="app_onboarding_recipients_title">Destinatarios</string>
     <string name="app_onboarding_recipients_body">Añade destinatarios con su clave pública o su nombre de usuario de GitHub. Cifra para una persona o para muchas a la vez, y también para ti, así siempre podrás abrir tus propios archivos.</string>
     <string name="app_onboarding_files_title">Archivos, textos y notas</string>
@@ -257,4 +257,9 @@
     <string name="sign_verify_key_type_label">Tipo de clave</string>
     <string name="sign_verify_fingerprint_label">Huella</string>
     <string name="text_decrypt_another">Descifrar otro</string>
+    <plurals name="onboarding_identity_count">
+        <item quantity="one">Tu bóveda tiene %1$d identidad.</item>
+        <item quantity="many">Tu bóveda tiene %1$d de identidades.</item>
+        <item quantity="other">Tu bóveda tiene %1$d identidades.</item>
+    </plurals>
 </resources>

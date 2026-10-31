@@ -61,6 +61,7 @@ fun AgePonyApp(vm: VaultViewModel) {
     var showOnboarding by rememberSaveable { mutableStateOf(!vault.hasCompletedOnboarding) }
     if (showOnboarding) {
         OnboardingScreen(
+            vault = vault,
             onFinish = {
                 vault.hasCompletedOnboarding = true
                 showOnboarding = false

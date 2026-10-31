@@ -225,7 +225,7 @@
     <!-- Onboarding (the first page reuses app_welcome_title) -->
     <string name="app_onboarding_welcome_body">AgePony encrypts files, text, and notes with the modern age encryption standard. Everything happens right here on your device.</string>
     <string name="app_onboarding_identity_title">Your identity</string>
-    <string name="app_onboarding_identity_body">An identity is your personal keypair. The private key is sealed in your vault and never leaves this device. Create one on the Identities tab to start encrypting.</string>
+    <string name="app_onboarding_identity_body">An identity is your personal keypair. The private key is sealed in your vault and never leaves this device. Make one now, bring one you already have, or skip this and do it later on the Identities tab.</string>
     <string name="app_onboarding_recipients_title">Recipients</string>
     <string name="app_onboarding_recipients_body">Add recipients by their public key or GitHub username. Encrypt to one person or many at once, and to yourself so you can always open your own files.</string>
     <string name="app_onboarding_files_title">Files, text and notes</string>
@@ -283,4 +283,9 @@
     <string name="sign_verify_key_type_label">Key type</string>
     <string name="sign_verify_fingerprint_label">Fingerprint</string>
     <string name="text_decrypt_another">Decrypt another</string>
+    <!-- 5.2.0: onboarding identity page, shown on a replay when the vault already has identities -->
+    <plurals name="onboarding_identity_count">
+        <item quantity="one">You have %1$d identity in your vault.</item>
+        <item quantity="other">You have %1$d identities in your vault.</item>
+    </plurals>
 </resources>
