@@ -38,11 +38,9 @@ was exposed in this repository's history, so it can't be trusted for anything ne
 Android 9 and later update a 5.0.0 install normally and then refuse updates signed only with
 the old key.
 
-To check the signer with [AppVerifier](https://github.com/soupslurpr/AppVerifier), paste this
-as the verification info:
+To check the signer with [`AppVerifier`](https://github.com/soupslurpr/AppVerifier), paste this text as the verification info:
 
 ```
-AgePony
 com.agepony.app
 1B:28:44:FA:FC:B9:B1:71:97:B8:8E:AD:54:E4:22:79:56:1C:D4:F9:A3:3E:C8:F1:E8:0A:AD:DA:9A:06:83:58
 ```
